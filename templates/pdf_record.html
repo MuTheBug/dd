@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<style>
+@page {
+    size: A4;
+    margin: 1.5cm;
+    @top-center {
+        content: "حقنا - نظام توثيق الضحايا";
+        font-size: 8pt;
+        color: #999;
+    }
+    @bottom-center {
+        content: "صفحة " counter(page) " من " counter(pages);
+        font-size: 8pt;
+        color: #999;
+    }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.6;
+    color: #1a1a2e;
+    direction: rtl;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid #0d7377;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+}
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.logo { width: 60px; height: 60px; border-radius: 50%; }
+.header-title h1 { font-size: 16pt; color: #0d7377; margin-bottom: 2px; }
+.header-title p { font-size: 8pt; color: #666; }
+.header-left { text-align: left; }
+.header-left .record-id { font-size: 12pt; font-weight: bold; color: #0d7377; }
+.header-left .record-date { font-size: 8pt; color: #999; }
+
+.status-banner {
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12pt;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 16px;
+}
+.status-survivor { background: #27ae60; }
+.status-enforced { background: #e67e22; }
+.status-deceased { background: #c0392b; }
+
+.person-header {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: flex-start;
+}
+.person-photo { width: 100px; height: 120px; border-radius: 6px; object-fit: cover; border: 2px solid #ddd; }
+.person-photo-placeholder {
+    width: 100px; height: 120px; border-radius: 6px;
+    border: 2px dashed #ddd; display: flex; align-items: center;
+    justify-content: center; color: #ccc; font-size: 30pt;
+}
+.person-info { flex: 1; }
+.person-name { font-size: 16pt; font-weight: bold; color: #095355; margin-bottom: 4px; }
+.person-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 9pt; color: #666; }
+
+.section {
+    margin-bottom: 14px;
+    page-break-inside: avoid;
+}
+.section-title {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #0d7377;
+    border-bottom: 2px solid #0d7377;
+    padding-bottom: 4px;
+    margin-bottom: 8px;
+}
+
+.field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 16px;
+}
+.field { margin-bottom: 4px; }
+.field-label { font-size: 8pt; color: #888; font-weight: 600; }
+.field-value { font-size: 10pt; color: #1a1a2e; }
+.field-full { grid-column: 1 / -1; }
+
+.warning-box {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-size: 9pt;
+    color: #856404;
+}
+
+.footer-note {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+    font-size: 7pt;
+    color: #999;
+    text-align: center;
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div class="header-right">
+        {% if logo_b64 %}
+        <img src="data:image/jpeg;base64,{{ logo_b64 }}" class="logo" alt="حقنا">
+        {% endif %}
+        <div class="header-title">
+            <h1>حقنا</h1>
+            <p>جمعية اجتماعية ثقافية - نظام التوثيق وفق بروتوكول بيركلي</p>
+        </div>
+    </div>
+    <div class="header-left">
+        <div class="record-id">سجل رقم #{{ record.id }}</div>
+        <div class="record-date">{{ record.created_at or '' }}</div>
+    </div>
+</div>
+
+<!-- Status Banner -->
+<div class="status-banner {% if record.status == 'survivor' %}status-survivor{% elif record.status == 'enforced' %}status-enforced{% else %}status-deceased{% endif %}">
+    {% if record.status == 'survivor' %}ناجٍ
+    {% elif record.status == 'enforced' %}مغيّب قسراً
+    {% elif record.status == 'deceased' %}متوفى
+    {% else %}غير محدد{% endif %}
+    {% if record.case_type %}
+    {% for code, label in CASE_TYPES %}{% if record.case_type == code %} — {{ label }}{% endif %}{% endfor %}
+    {% endif %}
+</div>
+
+<!-- Person Header -->
+<div class="person-header">
+    {% if photo_b64 %}
+    <img src="data:image/jpeg;base64,{{ photo_b64 }}" class="person-photo" alt="صورة">
+    {% else %}
+    <div class="person-photo-placeholder">?</div>
+    {% endif %}
+    <div class="person-info">
+        <div class="person-name">{{ record.first_name }} {{ record.father_name }} {{ record.last_name }}</div>
+        <div class="person-meta">
+            <span>اسم الأم: {{ record.mother_name }}</span>
+            <span>{{ 'ذكر' if record.gender == 'male' else 'أنثى' }}</span>
+            {% if record.birth_year %}<span>مواليد: {{ record.birth_year }}</span>{% endif %}
+            <span>{{ record.province }}</span>
+            {% if record.national_id %}<span>الرقم الوطني: {{ record.national_id }}</span>{% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Arrest Details -->
+<div class="section">
+    <div class="section-title">تفاصيل الاعتقال والاحتجاز</div>
+    <div class="field-grid">
+        <div class="field">
+            <div class="field-label">تاريخ الاعتقال</div>
+            <div class="field-value">{% if record.arrest_year %}{{ record.arrest_day or '?' }}/{{ record.arrest_month or '?' }}/{{ record.arrest_year }}{% else %}-{% endif %}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">الجهة المعتقِلة</div>
+            <div class="field-value">{{ record.arrest_authority or '-' }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">مكان الاحتجاز</div>
+            <div class="field-value">{{ record.arrest_place or '-' }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">سبب الاعتقال</div>
+            <div class="field-value">{{ record.arrest_reason or '-' }}</div>
+        </div>
+        {% if record.arrest_causer %}
+        <div class="field">
+            <div class="field-label">المتسبب</div>
+            <div class="field-value">{{ record.arrest_causer }}</div>
+        </div>
+        {% endif %}
+        {% if record.status == 'survivor' and record.release_year %}
+        <div class="field">
+            <div class="field-label">تاريخ الإفراج</div>
+            <div class="field-value">{{ record.release_day or '?' }}/{{ record.release_month or '?' }}/{{ record.release_year }}</div>
+        </div>
+        {% endif %}
+        {% if record.status == 'deceased' and record.death_year %}
+        <div class="field">
+            <div class="field-label">تاريخ الوفاة</div>
+            <div class="field-value">{{ record.death_day or '?' }}/{{ record.death_month or '?' }}/{{ record.death_year }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">مكان الوفاة</div>
+            <div class="field-value">{{ record.death_place or '-' }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Evidence -->
+<div class="section">
+    <div class="section-title">الأدلة والتحقق - بروتوكول بيركلي</div>
+    <div class="field-grid">
+        <div class="field">
+            <div class="field-label">مستوى الأدلة</div>
+            <div class="field-value">{% for c,l in EVIDENCE_LEVELS %}{% if record.evidence_level==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not record.evidence_level }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">حالة التحقق</div>
+            <div class="field-value">{% for c,l in VERIFICATION_STATUSES %}{% if record.verification_status==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not record.verification_status }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">حالة السجل المدني</div>
+            <div class="field-value">{% for c,l in CIVIL_REGISTRY_STATUSES %}{% if record.civil_registry_status==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not record.civil_registry_status }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">عدد مصادر الأدلة</div>
+            <div class="field-value">{{ record.evidence_sources_count or 0 }}</div>
+        </div>
+        {% if record.digital_evidence_type %}
+        <div class="field">
+            <div class="field-label">نوع الدليل الرقمي</div>
+            <div class="field-value">{% for c,l in DIGITAL_EVIDENCE_TYPES %}{% if record.digital_evidence_type==c %}{{ l }}{% endif %}{% endfor %}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% if record.has_conflicting_info %}
+    <div class="warning-box">
+        &#x26A0; معلومات متضاربة: {{ record.conflicting_info_details or 'يوجد تضارب في المعلومات' }}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Reporter -->
+<div class="section">
+    <div class="section-title">بيانات المُبلِّغ</div>
+    <div class="field-grid">
+        <div class="field">
+            <div class="field-label">اسم المُبلِّغ</div>
+            <div class="field-value">{{ record.reporter_name or '-' }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">صلة المُبلِّغ</div>
+            <div class="field-value">{{ record.reporter_relation or '-' }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">موافقة واعية</div>
+            <div class="field-value">{{ 'نعم' if record.informant_consent else 'لا' }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">جامع البيانات</div>
+            <div class="field-value">{{ record.collector_name or '-' }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Family -->
+<div class="section">
+    <div class="section-title">البيانات العائلية والاجتماعية</div>
+    <div class="field-grid">
+        <div class="field">
+            <div class="field-label">الحالة الاجتماعية</div>
+            <div class="field-value">{% for c,l in MARITAL_STATUSES %}{% if record.marital==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not record.marital }}</div>
+        </div>
+        {% if record.spouse_name %}
+        <div class="field">
+            <div class="field-label">الزوج/ة</div>
+            <div class="field-value">{{ record.spouse_name }}</div>
+        </div>
+        {% endif %}
+        <div class="field">
+            <div class="field-label">أطفال</div>
+            <div class="field-value">{{ 'نعم (' ~ record.kids_count ~ ')' if record.has_kids == 'yes' else 'لا' }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">العنوان</div>
+            <div class="field-value">{{ record.address or '-' }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">السكن</div>
+            <div class="field-value">{{ record.housing_type or '-' }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">التعليم</div>
+            <div class="field-value">{{ record.education or '-' }}{% if record.edu_specialization %} - {{ record.edu_specialization }}{% endif %}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">المهنة</div>
+            <div class="field-value">{{ record.profession or '-' }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">المعيل</div>
+            <div class="field-value">{{ record.breadwinner or '-' }}</div>
+        </div>
+    </div>
+</div>
+
+{% if record.notes %}
+<div class="section">
+    <div class="section-title">ملاحظات</div>
+    <p style="white-space: pre-wrap; font-size: 9pt;">{{ record.notes }}</p>
+</div>
+{% endif %}
+
+<div class="footer-note">
+    هذا المستند صادر عن نظام توثيق حقنا وفق بروتوكول بيركلي للتحقيقات الرقمية مفتوحة المصدر.
+    جميع المعلومات الواردة فيه سرية ولا يجوز مشاركتها دون إذن مسبق.
+</div>
+
+</body>
+</html>

@@ -1,0 +1,799 @@
+{% extends "base.html" %}
+{% block title %}إدخال حالة جديدة - حقنا{% endblock %}
+
+{% block content %}
+<div class="entry-header">
+    <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="حقنا">
+    <h1>نموذج إدخال حالة جديدة</h1>
+    <p>وفق بروتوكول بيركلي للتحقيقات الرقمية مفتوحة المصدر</p>
+</div>
+
+<!-- Step Indicator -->
+<div class="form-step-indicator" id="stepIndicator">
+    <div class="step-dot active" data-step="1">1</div>
+    <div class="step-connector"></div>
+    <div class="step-dot" data-step="2">2</div>
+    <div class="step-connector"></div>
+    <div class="step-dot" data-step="3">3</div>
+    <div class="step-connector"></div>
+    <div class="step-dot" data-step="4">4</div>
+    <div class="step-connector"></div>
+    <div class="step-dot" data-step="5">5</div>
+    <div class="step-connector"></div>
+    <div class="step-dot" data-step="6">6</div>
+    <div class="step-connector"></div>
+    <div class="step-dot" data-step="7">7</div>
+</div>
+
+<form method="POST" action="{{ url_for('entry_submit') }}" enctype="multipart/form-data" id="entryForm">
+
+<!-- STEP 1: Reporter & Classification -->
+<div class="form-step active" data-step="1">
+    <div class="form-section">
+        <div class="form-section-title">&#x1F4DD; بيانات المُبلِّغ وتصنيف الحالة</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>تصنيف الحالة <span class="required">*</span></label>
+                <select name="status" id="statusSelect" required onchange="handleStatusChange()">
+                    <option value="">-- اختر --</option>
+                    <option value="survivor">ناجٍ (شخص أُفرج عنه / هرب)</option>
+                    <option value="enforced">مغيّب قسراً (لا يُعرف مصيره)</option>
+                    <option value="deceased">متوفى (مؤكد الوفاة)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>نوع الحالة التفصيلي</label>
+                <select name="case_type" id="caseTypeSelect">
+                    <option value="">-- اختر بعد تحديد التصنيف --</option>
+                </select>
+                <span class="hint">سيتم تحديث الخيارات بناءً على التصنيف</span>
+            </div>
+            <div class="form-group">
+                <label>اسم المُبلِّغ <span class="required">*</span></label>
+                <input type="text" name="reporter_name" required placeholder="الاسم الكامل للمُبلِّغ">
+            </div>
+            <div class="form-group">
+                <label>صلة المُبلِّغ بالضحية <span class="required">*</span></label>
+                <select name="reporter_relation" required>
+                    <option value="">-- اختر --</option>
+                    {% for rel in REPORTER_RELATIONS %}
+                    <option value="{{ rel }}">{{ rel }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>هاتف المُبلِّغ</label>
+                <input type="tel" name="reporter_phone" placeholder="رقم الهاتف">
+            </div>
+            <div class="form-group">
+                <label>رقم هوية المُبلِّغ</label>
+                <input type="text" name="reporter_id" placeholder="الرقم الوطني للمُبلِّغ">
+            </div>
+            <div class="form-group">
+                <label>اسم جامع البيانات</label>
+                <input type="text" name="collector_name" placeholder="اسم الموظف/المتطوع">
+            </div>
+            <div class="form-group">
+                <label>تاريخ جمع البيانات</label>
+                <input type="date" name="collection_date" value="{{ now }}">
+            </div>
+            <div class="form-group full-width">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="informant_consent" value="1">
+                    أقرّ بموافقتي الواعية على جمع هذه المعلومات واستخدامها لأغراض التوثيق وفق بروتوكول بيركلي
+                </label>
+            </div>
+        </div>
+    </div>
+    <div class="step-nav">
+        <span></span>
+        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+    </div>
+</div>
+
+<!-- STEP 2: Personal Information -->
+<div class="form-step" data-step="2">
+    <div class="form-section">
+        <div class="form-section-title">&#x1F464; البيانات الشخصية للضحية</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>الاسم الأول <span class="required">*</span></label>
+                <input type="text" name="first_name" required placeholder="الاسم الأول">
+            </div>
+            <div class="form-group">
+                <label>اسم الأب <span class="required">*</span></label>
+                <input type="text" name="father_name" required placeholder="اسم الأب">
+            </div>
+            <div class="form-group">
+                <label>الكنية (اسم العائلة) <span class="required">*</span></label>
+                <input type="text" name="last_name" required placeholder="اسم العائلة">
+            </div>
+            <div class="form-group">
+                <label>اسم الأم <span class="required">*</span></label>
+                <input type="text" name="mother_name" required placeholder="اسم الأم الكامل">
+            </div>
+            <div class="form-group">
+                <label>الجنس <span class="required">*</span></label>
+                <select name="gender" required>
+                    <option value="">-- اختر --</option>
+                    <option value="male">ذكر</option>
+                    <option value="female">أنثى</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>تاريخ الميلاد</label>
+                <div class="form-date-group">
+                    <input type="number" name="birth_day" placeholder="اليوم" min="0" max="31">
+                    <input type="number" name="birth_month" placeholder="الشهر" min="0" max="12">
+                    <input type="number" name="birth_year" placeholder="السنة" min="1930" max="2010">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>المحافظة <span class="required">*</span></label>
+                <select name="province" required>
+                    <option value="">-- اختر --</option>
+                    {% for p in PROVINCES %}
+                    <option value="{{ p }}">{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>الرقم الوطني <span class="required">*</span></label>
+                <input type="text" name="national_id" required placeholder="الرقم الوطني">
+            </div>
+            <div class="form-group">
+                <label>رقم الهاتف</label>
+                <input type="tel" name="phone" placeholder="رقم الهاتف">
+            </div>
+            <div class="form-group">
+                <label>زمرة الدم</label>
+                <select name="blood_type">
+                    <option value="">-- اختر --</option>
+                    {% for bt in BLOOD_TYPES %}
+                    <option value="{{ bt }}">{{ bt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>صورة شخصية</label>
+                <input type="file" name="photo" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label>وثيقة هوية (صورة)</label>
+                <input type="file" name="document" accept="image/*,.pdf">
+            </div>
+        </div>
+    </div>
+    <div class="step-nav">
+        <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
+        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+    </div>
+</div>
+
+<!-- STEP 3: Arrest & Detention Details -->
+<div class="form-step" data-step="3">
+    <div class="form-section">
+        <div class="form-section-title">&#x26D3;&#xFE0F; تفاصيل الاعتقال والاحتجاز</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>تاريخ الاعتقال</label>
+                <div class="form-date-group">
+                    <input type="number" name="arrest_day" placeholder="اليوم" min="0" max="31">
+                    <input type="number" name="arrest_month" placeholder="الشهر" min="0" max="12">
+                    <input type="number" name="arrest_year" placeholder="السنة" min="2000" max="2026">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>الجهة المعتقِلة <span class="required">*</span></label>
+                <select name="arrest_authority" required>
+                    <option value="">-- اختر --</option>
+                    {% for a in ARREST_AUTHORITIES %}
+                    <option value="{{ a }}">{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>مكان الاحتجاز / المعتقل</label>
+                <select name="arrest_place" id="arrestPlace">
+                    <option value="">-- اختر --</option>
+                    {% for f in DETENTION_FACILITIES %}
+                    <option value="{{ f }}">{{ f }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>سبب الاعتقال <span class="required">*</span></label>
+                <input type="text" name="arrest_reason" required placeholder="مثال: مظاهرة، تقرير كيدي، حاجز...">
+            </div>
+            <div class="form-group">
+                <label>المتسبب بالاعتقال (إن وُجد)</label>
+                <input type="text" name="arrest_causer" placeholder="اسم الشخص أو الجهة">
+            </div>
+            <div class="form-group">
+                <label>آخر مكان معروف</label>
+                <input type="text" name="last_known_location" placeholder="آخر مكان عُرف أن الشخص كان فيه">
+            </div>
+            <div class="form-group">
+                <label>آخر تاريخ عُرف أنه حي</label>
+                <input type="date" name="last_known_alive_date">
+            </div>
+        </div>
+    </div>
+
+    <!-- Survivor: Release info -->
+    <div class="form-section conditional-section" id="releaseSection">
+        <div class="form-section-title">&#x1F513; بيانات الإفراج (للناجين)</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>تاريخ الإفراج</label>
+                <div class="form-date-group">
+                    <input type="number" name="release_day" placeholder="اليوم" min="0" max="31">
+                    <input type="number" name="release_month" placeholder="الشهر" min="0" max="12">
+                    <input type="number" name="release_year" placeholder="السنة" min="2000" max="2026">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>صورة عن السيرة الذاتية / ملخص التجربة</label>
+                <input type="file" name="survivor_cv" accept="image/*,.pdf,.doc,.docx">
+            </div>
+            <div class="form-group">
+                <label>صورة شخصية بعد الإفراج</label>
+                <input type="file" name="survivor_cv_photo" accept="image/*">
+            </div>
+            <div class="form-group full-width">
+                <label>وصف تجربة الاعتقال</label>
+                <textarea name="survivor_cv_text" rows="4" placeholder="وصف مختصر لتجربة الاعتقال والاحتجاز..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deceased: Death info -->
+    <div class="form-section conditional-section" id="deathSection">
+        <div class="form-section-title">&#x1F3F4; بيانات الوفاة</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>تاريخ الوفاة</label>
+                <div class="form-date-group">
+                    <input type="number" name="death_day" placeholder="اليوم" min="0" max="31">
+                    <input type="number" name="death_month" placeholder="الشهر" min="0" max="12">
+                    <input type="number" name="death_year" placeholder="السنة" min="2000" max="2026">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>مكان الوفاة</label>
+                <input type="text" name="death_place" placeholder="مكان الوفاة إن عُرف">
+            </div>
+        </div>
+    </div>
+
+    <div class="step-nav">
+        <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
+        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+    </div>
+</div>
+
+<!-- STEP 4: Evidence & Verification (Berkeley Protocol) -->
+<div class="form-step" data-step="4">
+    <div class="form-section">
+        <div class="form-section-title">&#x1F50D; الأدلة والتحقق - بروتوكول بيركلي</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>نوع الدليل الرقمي</label>
+                <select name="digital_evidence_type" id="digitalEvidenceType" onchange="handleDigitalEvidence()">
+                    <option value="">-- لا يوجد --</option>
+                    {% for code, label in DIGITAL_EVIDENCE_TYPES %}
+                    <option value="{{ code }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>مستوى الأدلة</label>
+                <select name="evidence_level">
+                    {% for code, label in EVIDENCE_LEVELS %}
+                    <option value="{{ code }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>عدد مصادر الأدلة</label>
+                <input type="number" name="evidence_sources_count" min="0" value="0">
+            </div>
+        </div>
+    </div>
+
+    <!-- Digital Evidence Details -->
+    <div class="form-section conditional-section" id="digitalEvidenceSection">
+        <div class="form-section-title">&#x1F4F1; تفاصيل الدليل الرقمي</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>رابط الدليل (إن وُجد)</label>
+                <input type="url" name="digital_evidence_url" placeholder="https://...">
+            </div>
+            <div class="form-group">
+                <label>حالة الرابط</label>
+                <select name="digital_evidence_url_status">
+                    <option value="">-- اختر --</option>
+                    <option value="active">فعّال</option>
+                    <option value="deleted">محذوف</option>
+                    <option value="archived">مؤرشف</option>
+                    <option value="unknown">غير معروف</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>لقطة شاشة للدليل</label>
+                <input type="file" name="digital_evidence_screenshot" accept="image/*,.pdf">
+                <span class="hint">مهم جداً في حال كان الرابط محذوفاً</span>
+            </div>
+            <div class="form-group">
+                <label>تاريخ الدليل الرقمي</label>
+                <input type="date" name="digital_evidence_date">
+            </div>
+            <div class="form-group">
+                <label>الاسم الوارد في الدليل</label>
+                <input type="text" name="digital_evidence_person_name" placeholder="الاسم كما ظهر في التسريبات">
+            </div>
+            <div class="form-group">
+                <label>تاريخ الوفاة الوارد في الدليل</label>
+                <input type="date" name="digital_evidence_death_date">
+            </div>
+            <div class="form-group full-width">
+                <label>وصف الدليل</label>
+                <textarea name="digital_evidence_description" rows="3" placeholder="وصف تفصيلي للدليل الرقمي..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Civil Registry -->
+    <div class="form-section">
+        <div class="form-section-title">&#x1F4C4; حالة السجل المدني (النفوس)</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>حالة السجل المدني</label>
+                <select name="civil_registry_status" id="civilRegistryStatus" onchange="handleCivilRegistry()">
+                    {% for code, label in CIVIL_REGISTRY_STATUSES %}
+                    <option value="{{ code }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>تاريخ مراجعة النفوس</label>
+                <input type="date" name="civil_registry_date">
+            </div>
+            <div class="form-group">
+                <label>وثيقة من النفوس (إخراج قيد)</label>
+                <input type="file" name="civil_registry_document" accept="image/*,.pdf">
+            </div>
+        </div>
+    </div>
+
+    <!-- Conflicting Info -->
+    <div class="form-section">
+        <div class="form-section-title">&#x26A0;&#xFE0F; معلومات متضاربة</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="has_conflicting_info" value="1" id="conflictCheck" onchange="document.getElementById('conflictDetails').style.display=this.checked?'block':'none'">
+                    يوجد تضارب في المعلومات
+                </label>
+                <span class="hint">مثال: التسريبات تقول متوفى لكن النفوس تقول حي</span>
+            </div>
+            <div class="form-group full-width" id="conflictDetails" style="display:none">
+                <label>تفاصيل التضارب</label>
+                <textarea name="conflicting_info_details" rows="3" placeholder="اشرح التضارب بالتفصيل..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Witnesses -->
+    <div class="form-section">
+        <div class="form-section-title">&#x1F465; الشهود</div>
+        <div id="witnessesContainer"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addWitness()" style="margin-top: 0.5rem;">
+            + إضافة شاهد
+        </button>
+        <input type="hidden" name="witnesses_data" id="witnessesData" value="[]">
+    </div>
+
+    <div class="step-nav">
+        <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
+        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+    </div>
+</div>
+
+<!-- STEP 5: Family & Social -->
+<div class="form-step" data-step="5">
+    <div class="form-section">
+        <div class="form-section-title">&#x1F46A; البيانات العائلية والاجتماعية</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>الحالة الاجتماعية</label>
+                <select name="marital" id="maritalSelect" onchange="handleMarital()">
+                    <option value="">-- اختر --</option>
+                    {% for code, label in MARITAL_STATUSES %}
+                    <option value="{{ code }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>اسم ولي الأمر / المعرّف</label>
+                <input type="text" name="guardian_name">
+            </div>
+            <div class="form-group">
+                <label>صلة ولي الأمر</label>
+                <input type="text" name="guardian_relation">
+            </div>
+            <div class="form-group">
+                <label>هاتف ولي الأمر</label>
+                <input type="tel" name="guardian_phone">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section conditional-section" id="spouseSection">
+        <div class="form-section-title">&#x1F48D; بيانات الزوج/ة</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>اسم الزوج/ة</label>
+                <input type="text" name="spouse_name">
+            </div>
+            <div class="form-group">
+                <label>هاتف الزوج/ة</label>
+                <input type="tel" name="spouse_phone">
+            </div>
+            <div class="form-group">
+                <label>هل لديه/ا أطفال؟</label>
+                <select name="has_kids" onchange="document.getElementById('kidsSection').style.display=this.value==='yes'?'block':'none'">
+                    <option value="no">لا</option>
+                    <option value="yes">نعم</option>
+                </select>
+            </div>
+            <div class="form-group" id="kidsSection" style="display:none">
+                <label>عدد الأطفال</label>
+                <input type="number" name="kids_count" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>عدد الأطفال تحت 18 سنة</label>
+                <input type="number" name="kids_under_18_count" min="0" value="0">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section conditional-section" id="exSpouseSection">
+        <div class="form-section-title">بيانات الزوج/ة السابق/ة</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>اسم الزوج/ة السابق/ة</label>
+                <input type="text" name="ex_spouse_name">
+            </div>
+            <div class="form-group">
+                <label>هل يوجد أطفال من الزواج السابق؟</label>
+                <select name="has_kids_w" onchange="document.getElementById('kidsWSection').style.display=this.value==='yes'?'block':'none'">
+                    <option value="no">لا</option>
+                    <option value="yes">نعم</option>
+                </select>
+            </div>
+            <div class="form-group" id="kidsWSection" style="display:none">
+                <label>عدد الأطفال</label>
+                <input type="number" name="kids_count_w" min="0" value="0">
+            </div>
+        </div>
+    </div>
+
+    <div class="step-nav">
+        <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
+        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+    </div>
+</div>
+
+<!-- STEP 6: Socioeconomic & Health -->
+<div class="form-step" data-step="6">
+    <div class="form-section">
+        <div class="form-section-title">&#x1F3E0; البيانات السكنية والاقتصادية</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>العنوان الحالي <span class="required">*</span></label>
+                <input type="text" name="address" required placeholder="العنوان التفصيلي">
+            </div>
+            <div class="form-group">
+                <label>نوع السكن <span class="required">*</span></label>
+                <select name="housing_type" required>
+                    <option value="">-- اختر --</option>
+                    {% for h in HOUSING_TYPES %}
+                    <option value="{{ h }}">{{ h }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>مبلغ الإيجار (إن وُجد)</label>
+                <input type="text" name="rent_amount" placeholder="بالليرة السورية">
+            </div>
+            <div class="form-group">
+                <label>الوضع الوظيفي</label>
+                <input type="text" name="employment" placeholder="يعمل / لا يعمل">
+            </div>
+            <div class="form-group">
+                <label>المهنة</label>
+                <input type="text" name="profession">
+            </div>
+            <div class="form-group">
+                <label>جهة العمل</label>
+                <input type="text" name="employer">
+            </div>
+            <div class="form-group">
+                <label>المعيل</label>
+                <input type="text" name="breadwinner" placeholder="اسم المعيل">
+            </div>
+            <div class="form-group">
+                <label>مهنة المعيل</label>
+                <input type="text" name="breadwinner_job">
+            </div>
+            <div class="form-group">
+                <label>صلة المعيل بالضحية</label>
+                <select name="breadwinner_relation">
+                    <option value="">-- اختر --</option>
+                    {% for rel in REPORTER_RELATIONS %}
+                    <option value="{{ rel }}">{{ rel }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <div class="form-section-title">&#x1F3EB; التحصيل العلمي</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>المستوى التعليمي</label>
+                <select name="education">
+                    <option value="">-- اختر --</option>
+                    {% for e in EDUCATION_LEVELS %}
+                    <option value="{{ e }}">{{ e }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>نوع الدراسة</label>
+                <select name="edu_type">
+                    <option value="">-- اختر --</option>
+                    {% for e in EDU_TYPES %}
+                    <option value="{{ e }}">{{ e }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>الاختصاص</label>
+                <input type="text" name="edu_specialization">
+            </div>
+            <div class="form-group">
+                <label>الجامعة / المعهد</label>
+                <input type="text" name="edu_university">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <div class="form-section-title">&#x1F3E5; الحالة الصحية</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>أمراض مزمنة؟</label>
+                <select name="chronic">
+                    <option value="">-- اختر --</option>
+                    <option value="نعم">نعم</option>
+                    <option value="لا">لا</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="has_hypertension" value="1"> ضغط دم
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="has_diabetes" value="1"> سكري
+                </label>
+            </div>
+            <div class="form-group">
+                <label>أمراض أخرى</label>
+                <input type="text" name="other_diseases" placeholder="اذكر الأمراض الأخرى">
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="has_special_needs" value="1" onchange="document.getElementById('specialNeedsDetails').style.display=this.checked?'block':'none'">
+                    احتياجات خاصة
+                </label>
+            </div>
+            <div class="form-group" id="specialNeedsDetails" style="display:none">
+                <label>تفاصيل الاحتياجات الخاصة</label>
+                <input type="text" name="special_needs_details">
+            </div>
+        </div>
+    </div>
+
+    <div class="step-nav">
+        <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
+        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+    </div>
+</div>
+
+<!-- STEP 7: Legal & Notes -->
+<div class="form-step" data-step="7">
+    <div class="form-section">
+        <div class="form-section-title">&#x2696;&#xFE0F; الوضع القانوني والجمعيات</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>هل يوجد إجراء قانوني؟</label>
+                <select name="legal" onchange="document.getElementById('legalDetails').style.display=this.value==='نعم'?'block':'none'">
+                    <option value="">-- اختر --</option>
+                    <option value="نعم">نعم</option>
+                    <option value="لا">لا</option>
+                </select>
+            </div>
+            <div class="form-group" id="legalDetails" style="display:none">
+                <label>تفاصيل الإجراء القانوني</label>
+                <textarea name="legal_details" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+                <label>مسجل لدى جمعية؟</label>
+                <select name="assoc" onchange="document.getElementById('assocDetails').style.display=this.value==='نعم'?'block':'none'">
+                    <option value="">-- اختر --</option>
+                    <option value="نعم">نعم</option>
+                    <option value="لا">لا</option>
+                </select>
+            </div>
+            <div class="form-group" id="assocDetails" style="display:none">
+                <label>اسم الجمعية</label>
+                <input type="text" name="assoc_name">
+            </div>
+            <div class="form-group">
+                <label>نوع الخدمة المطلوبة</label>
+                <input type="text" name="service_type" placeholder="توثيق، مساعدة قانونية، إلخ">
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="is_officially_registered" value="1">
+                    مسجل رسمياً لدى الجهات المعنية
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <div class="form-section-title">&#x1F4DD; ملاحظات إضافية</div>
+        <div class="form-group full-width">
+            <textarea name="notes" rows="4" placeholder="أي ملاحظات إضافية أو معلومات لم تُذكر أعلاه..."></textarea>
+        </div>
+        <div class="form-group full-width">
+            <label>ملاحظات منهجية التوثيق</label>
+            <textarea name="methodology_notes" rows="3" placeholder="ملاحظات حول طريقة جمع البيانات وظروف المقابلة..."></textarea>
+        </div>
+    </div>
+
+    <div class="step-nav">
+        <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
+        <button type="submit" class="btn btn-success btn-lg btn-block">&#x2714; حفظ السجل</button>
+    </div>
+</div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentStep = 1;
+const totalSteps = 7;
+
+function updateStepIndicator() {
+    document.querySelectorAll('.step-dot').forEach(dot => {
+        const s = parseInt(dot.dataset.step);
+        dot.classList.remove('active', 'completed');
+        if (s === currentStep) dot.classList.add('active');
+        else if (s < currentStep) dot.classList.add('completed');
+    });
+    document.querySelectorAll('.form-step').forEach(step => {
+        step.classList.toggle('active', parseInt(step.dataset.step) === currentStep);
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function nextStep() {
+    if (currentStep < totalSteps) {
+        currentStep++;
+        updateStepIndicator();
+    }
+}
+
+function prevStep() {
+    if (currentStep > 1) {
+        currentStep--;
+        updateStepIndicator();
+    }
+}
+
+function handleStatusChange() {
+    const status = document.getElementById('statusSelect').value;
+    const caseType = document.getElementById('caseTypeSelect');
+    const releaseSection = document.getElementById('releaseSection');
+    const deathSection = document.getElementById('deathSection');
+
+    releaseSection.classList.remove('active');
+    deathSection.classList.remove('active');
+
+    caseType.innerHTML = '<option value="">-- اختر --</option>';
+
+    if (status === 'survivor') {
+        releaseSection.classList.add('active');
+        caseType.innerHTML += '<option value="survivor_documented">ناجٍ - لديه وثائق</option>';
+        caseType.innerHTML += '<option value="survivor_undocumented">ناجٍ - بدون وثائق</option>';
+    } else if (status === 'enforced') {
+        caseType.innerHTML += '<option value="enforced_disappearance_no_info">اختفاء قسري - لا معلومات بعد الاعتقال</option>';
+        caseType.innerHTML += '<option value="enforced_disappearance_leaked_not_confirmed">تسريبات تؤكد الوفاة - غير مؤكد بالنفوس</option>';
+        caseType.innerHTML += '<option value="enforced_disappearance_witnesses_alive_registry">شهود على الاعتقال - حي بالنفوس</option>';
+    } else if (status === 'deceased') {
+        deathSection.classList.add('active');
+        caseType.innerHTML += '<option value="enforced_disappearance_leaked_confirmed_dead">تسريبات + مؤكد بالنفوس</option>';
+        caseType.innerHTML += '<option value="enforced_disappearance_civil_registry_dead">متوفى بحسب النفوس فقط</option>';
+        caseType.innerHTML += '<option value="deceased_caesar_files">متوفى - ملفات قيصر</option>';
+    }
+}
+
+function handleDigitalEvidence() {
+    const type = document.getElementById('digitalEvidenceType').value;
+    document.getElementById('digitalEvidenceSection').classList.toggle('active', type !== '');
+}
+
+function handleCivilRegistry() {
+    // No conditional display needed here
+}
+
+function handleMarital() {
+    const val = document.getElementById('maritalSelect').value;
+    document.getElementById('spouseSection').classList.toggle('active', val === 'married' || val === 'widowed');
+    document.getElementById('exSpouseSection').classList.toggle('active', val === 'divorced');
+}
+
+// Witnesses
+let witnessCount = 0;
+function addWitness() {
+    witnessCount++;
+    const container = document.getElementById('witnessesContainer');
+    const div = document.createElement('div');
+    div.className = 'witness-entry';
+    div.id = 'witness-' + witnessCount;
+    div.innerHTML = `
+        <button type="button" class="remove-witness" onclick="this.parentElement.remove()">&times;</button>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>اسم الشاهد</label>
+                <input type="text" class="w-name" placeholder="الاسم الكامل">
+            </div>
+            <div class="form-group">
+                <label>هاتف الشاهد</label>
+                <input type="tel" class="w-phone" placeholder="رقم الهاتف">
+            </div>
+            <div class="form-group">
+                <label>صلة الشاهد</label>
+                <input type="text" class="w-relation" placeholder="صلته بالضحية">
+            </div>
+            <div class="form-group full-width">
+                <label>شهادته</label>
+                <textarea class="w-testimony" rows="2" placeholder="ماذا شهد هذا الشخص؟"></textarea>
+            </div>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+// Collect witnesses before submit
+document.getElementById('entryForm').addEventListener('submit', function() {
+    const witnesses = [];
+    document.querySelectorAll('.witness-entry').forEach(entry => {
+        const name = entry.querySelector('.w-name')?.value || '';
+        const phone = entry.querySelector('.w-phone')?.value || '';
+        const relation = entry.querySelector('.w-relation')?.value || '';
+        const testimony = entry.querySelector('.w-testimony')?.value || '';
+        if (name) witnesses.push({ name, phone, relation, testimony });
+    });
+    document.getElementById('witnessesData').value = JSON.stringify(witnesses);
+});
+</script>
+{% endblock %}

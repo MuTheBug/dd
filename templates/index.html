@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}حقنا - نظام توثيق الضحايا{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="حقنا" class="hero-logo">
+    <h1>نظام توثيق الضحايا</h1>
+    <p>نظام توثيق الناجين والمغيّبين قسراً والمتوفين وفق بروتوكول بيركلي للتحقيقات الرقمية مفتوحة المصدر</p>
+    <div class="hero-actions">
+        <a href="{{ url_for('entry_form') }}" class="btn btn-light btn-lg">إدخال حالة جديدة</a>
+        <a href="{{ url_for('admin_login') }}" class="btn btn-ghost btn-lg">دخول الإدارة</a>
+    </div>
+</div>
+
+<div class="info-cards">
+    <div class="info-card" style="border-top-color: var(--survivor);">
+        <h3>&#x1F7E2; ناجٍ</h3>
+        <p>شخص كان معتقلاً وأُفرج عنه أو هرب. يتم توثيق تجربته بما في ذلك مكان الاحتجاز ومدته وظروفه، سواء امتلك وثائق تثبت ذلك أم لا.</p>
+    </div>
+    <div class="info-card" style="border-top-color: var(--enforced);">
+        <h3>&#x1F7E0; مغيّب قسراً</h3>
+        <p>شخص اعتُقل أو اختفى قسرياً ولم يُعرف مصيره. يشمل ذلك من لم يرد أي خبر عنهم، أو وُجدت تسريبات متضاربة مع السجل المدني.</p>
+    </div>
+    <div class="info-card" style="border-top-color: var(--deceased);">
+        <h3>&#x1F534; متوفى</h3>
+        <p>شخص تم التأكد من وفاته سواء عبر تسريبات مؤكدة بالسجل المدني، أو ملفات قيصر، أو بيان قيد رسمي يثبت الوفاة.</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-icon">&#x1F4CB;</div>
+        <h2>بروتوكول بيركلي للتوثيق</h2>
+    </div>
+    <p style="font-size: 0.9rem; color: var(--text-light); line-height: 1.8;">
+        يعتمد هذا النظام على بروتوكول بيركلي للتحقيقات الرقمية مفتوحة المصدر الذي وضعه مكتب الأمم المتحدة لحقوق الإنسان ومركز حقوق الإنسان في كلية الحقوق بجامعة كاليفورنيا، بيركلي. يضمن هذا البروتوكول:
+    </p>
+    <ul style="margin: 0.8rem 1.5rem; font-size: 0.88rem; color: var(--text-light); line-height: 2;">
+        <li>توثيق مصدر المعلومات وعلاقته بالضحية</li>
+        <li>تسجيل سلسلة الأدلة والحفاظ على سلامتها</li>
+        <li>التحقق من المعلومات عبر مصادر متعددة</li>
+        <li>توثيق الأدلة الرقمية (تسريبات، لقطات شاشة، روابط)</li>
+        <li>مقارنة المعلومات مع السجل المدني (النفوس)</li>
+        <li>تسجيل شهادات الشهود مع بياناتهم</li>
+        <li>الحصول على موافقة المُبلِّغ الواعية</li>
+        <li>تصنيف مستوى الأدلة وحالة التحقق</li>
+    </ul>
+</div>
+{% endblock %}

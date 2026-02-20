@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+uploads/photos/*
+uploads/documents/*
+uploads/screenshots/*
+!uploads/photos/.gitkeep
+!uploads/documents/.gitkeep
+!uploads/screenshots/.gitkeep
+*.db-shm
+*.db-wal

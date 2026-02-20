@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+{% block title %}السجلات - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.3rem; color: var(--primary-dark);">
+        السجلات <span style="font-size: 0.85rem; color: var(--text-light);">({{ total_count }} سجل)</span>
+    </h1>
+    <div class="btn-group">
+        <a href="{{ url_for('records_list_pdf', **filter_params) }}" class="btn btn-outline btn-sm" target="_blank">&#x1F4C4; تصدير PDF</a>
+        <a href="{{ url_for('entry_form') }}" class="btn btn-primary btn-sm">+ إضافة حالة</a>
+    </div>
+</div>
+
+<!-- Filter Panel -->
+<div class="filter-panel">
+    <div class="filter-toggle" onclick="toggleFilters()">
+        &#x1F50D; الفلاتر والتصفية
+        <span class="arrow" id="filterArrow">&#x25BC;</span>
+    </div>
+    <div class="filter-body" id="filterBody" style="{% if not (filters.status or filters.province or filters.search or filters.gender or filters.arrest_authority) %}display:none{% endif %}">
+        <form method="GET" action="{{ url_for('admin_records') }}" id="filterForm">
+            <div class="filter-grid">
+                <div class="form-group">
+                    <label>&#x1F50E;&#xFE0F; بحث نصي</label>
+                    <input type="text" name="search" value="{{ filters.search }}" placeholder="اسم، رقم وطني، هاتف...">
+                </div>
+                <div class="form-group">
+                    <label>الحالة</label>
+                    <select name="status">
+                        <option value="">الكل</option>
+                        <option value="survivor" {{ 'selected' if filters.status=='survivor' }}>ناجٍ</option>
+                        <option value="enforced" {{ 'selected' if filters.status=='enforced' }}>مغيّب قسراً</option>
+                        <option value="deceased" {{ 'selected' if filters.status=='deceased' }}>متوفى</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>المحافظة</label>
+                    <select name="province">
+                        <option value="">الكل</option>
+                        {% for p in PROVINCES %}
+                        <option value="{{ p }}" {{ 'selected' if filters.province==p }}>{{ p }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>الجنس</label>
+                    <select name="gender">
+                        <option value="">الكل</option>
+                        <option value="male" {{ 'selected' if filters.gender=='male' }}>ذكر</option>
+                        <option value="female" {{ 'selected' if filters.gender=='female' }}>أنثى</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>جهة الاعتقال</label>
+                    <select name="arrest_authority">
+                        <option value="">الكل</option>
+                        {% for a in ARREST_AUTHORITIES %}
+                        <option value="{{ a }}" {{ 'selected' if filters.arrest_authority==a }}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>مكان الاحتجاز</label>
+                    <select name="arrest_place">
+                        <option value="">الكل</option>
+                        {% for f in DETENTION_FACILITIES %}
+                        <option value="{{ f }}" {{ 'selected' if filters.arrest_place==f }}>{{ f }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>سنة الاعتقال (من)</label>
+                    <input type="number" name="arrest_year_from" value="{{ filters.arrest_year_from }}" placeholder="2011" min="2000" max="2026">
+                </div>
+                <div class="form-group">
+                    <label>سنة الاعتقال (إلى)</label>
+                    <input type="number" name="arrest_year_to" value="{{ filters.arrest_year_to }}" placeholder="2024" min="2000" max="2026">
+                </div>
+                <div class="form-group">
+                    <label>سنة الميلاد (من)</label>
+                    <input type="number" name="birth_year_from" value="{{ filters.birth_year_from }}" placeholder="1970" min="1930" max="2010">
+                </div>
+                <div class="form-group">
+                    <label>سنة الميلاد (إلى)</label>
+                    <input type="number" name="birth_year_to" value="{{ filters.birth_year_to }}" placeholder="2000" min="1930" max="2010">
+                </div>
+                <div class="form-group">
+                    <label>الحالة الاجتماعية</label>
+                    <select name="marital">
+                        <option value="">الكل</option>
+                        {% for code, label in MARITAL_STATUSES %}
+                        <option value="{{ code }}" {{ 'selected' if filters.marital==code }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>التحصيل العلمي</label>
+                    <select name="education">
+                        <option value="">الكل</option>
+                        {% for e in EDUCATION_LEVELS %}
+                        <option value="{{ e }}" {{ 'selected' if filters.education==e }}>{{ e }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>نوع السكن</label>
+                    <select name="housing_type">
+                        <option value="">الكل</option>
+                        {% for h in HOUSING_TYPES %}
+                        <option value="{{ h }}" {{ 'selected' if filters.housing_type==h }}>{{ h }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>زمرة الدم</label>
+                    <select name="blood_type">
+                        <option value="">الكل</option>
+                        {% for bt in BLOOD_TYPES %}
+                        <option value="{{ bt }}" {{ 'selected' if filters.blood_type==bt }}>{{ bt }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>صورة شخصية</label>
+                    <select name="has_photo">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.has_photo=='yes' }}>يوجد صورة</option>
+                        <option value="no" {{ 'selected' if filters.has_photo=='no' }}>بدون صورة</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>وثيقة هوية</label>
+                    <select name="has_document">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.has_document=='yes' }}>يوجد وثيقة</option>
+                        <option value="no" {{ 'selected' if filters.has_document=='no' }}>بدون وثيقة</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>أطفال</label>
+                    <select name="has_kids">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.has_kids=='yes' }}>لديه أطفال</option>
+                        <option value="no" {{ 'selected' if filters.has_kids=='no' }}>بدون أطفال</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>نوع الحالة التفصيلي</label>
+                    <select name="case_type">
+                        <option value="">الكل</option>
+                        {% for code, label in CASE_TYPES %}
+                        <option value="{{ code }}" {{ 'selected' if filters.case_type==code }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>مستوى الأدلة</label>
+                    <select name="evidence_level">
+                        <option value="">الكل</option>
+                        {% for code, label in EVIDENCE_LEVELS %}
+                        <option value="{{ code }}" {{ 'selected' if filters.evidence_level==code }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>حالة التحقق</label>
+                    <select name="verification_status">
+                        <option value="">الكل</option>
+                        {% for code, label in VERIFICATION_STATUSES %}
+                        <option value="{{ code }}" {{ 'selected' if filters.verification_status==code }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>حالة السجل المدني</label>
+                    <select name="civil_registry_status">
+                        <option value="">الكل</option>
+                        {% for code, label in CIVIL_REGISTRY_STATUSES %}
+                        <option value="{{ code }}" {{ 'selected' if filters.civil_registry_status==code }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>نوع الدليل الرقمي</label>
+                    <select name="digital_evidence_type">
+                        <option value="">الكل</option>
+                        {% for code, label in DIGITAL_EVIDENCE_TYPES %}
+                        <option value="{{ code }}" {{ 'selected' if filters.digital_evidence_type==code }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>معلومات متضاربة</label>
+                    <select name="has_conflicting_info">
+                        <option value="">الكل</option>
+                        <option value="1" {{ 'selected' if filters.has_conflicting_info=='1' }}>يوجد تضارب</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>احتياجات خاصة</label>
+                    <select name="has_special_needs">
+                        <option value="">الكل</option>
+                        <option value="1" {{ 'selected' if filters.has_special_needs=='1' }}>نعم</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>أمراض مزمنة</label>
+                    <select name="chronic">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.chronic=='yes' }}>نعم</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-primary btn-sm">&#x1F50D; تطبيق الفلاتر</button>
+                <a href="{{ url_for('admin_records') }}" class="btn btn-outline btn-sm">&#x1F504; إعادة تعيين</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Active Filters -->
+    {% if filter_params %}
+    <div class="active-filters">
+        {% if filters.status %}
+        <span class="filter-tag">{{ STATUS_MAP.get(filters.status, filters.status) }}</span>
+        {% endif %}
+        {% if filters.province %}
+        <span class="filter-tag">{{ filters.province }}</span>
+        {% endif %}
+        {% if filters.gender %}
+        <span class="filter-tag">{{ 'ذكر' if filters.gender=='male' else 'أنثى' }}</span>
+        {% endif %}
+        {% if filters.search %}
+        <span class="filter-tag">بحث: {{ filters.search }}</span>
+        {% endif %}
+        {% if filters.arrest_authority %}
+        <span class="filter-tag">{{ filters.arrest_authority }}</span>
+        {% endif %}
+        {% if filters.education %}
+        <span class="filter-tag">{{ filters.education }}</span>
+        {% endif %}
+        {% if filters.marital %}
+        <span class="filter-tag">{% for c,l in MARITAL_STATUSES %}{% if c==filters.marital %}{{ l }}{% endif %}{% endfor %}</span>
+        {% endif %}
+        <a href="{{ url_for('admin_records') }}" style="font-size: 0.75rem; color: var(--deceased);">مسح الكل</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Records Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>
+                        <a href="{{ url_for('admin_records', sort='first_name', dir='asc' if sort_by != 'first_name' or sort_dir == 'desc' else 'desc', **filter_params) }}">
+                            الاسم {% if sort_by=='first_name' %}{{ '&#x25B2;' if sort_dir=='asc' else '&#x25BC;' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>الأب</th>
+                    <th>الكنية</th>
+                    <th>
+                        <a href="{{ url_for('admin_records', sort='status', dir='asc' if sort_by != 'status' or sort_dir == 'desc' else 'desc', **filter_params) }}">
+                            الحالة {% if sort_by=='status' %}{{ '&#x25B2;' if sort_dir=='asc' else '&#x25BC;' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('admin_records', sort='province', dir='asc' if sort_by != 'province' or sort_dir == 'desc' else 'desc', **filter_params) }}">
+                            المحافظة {% if sort_by=='province' %}{{ '&#x25B2;' if sort_dir=='asc' else '&#x25BC;' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('admin_records', sort='arrest_year', dir='asc' if sort_by != 'arrest_year' or sort_dir == 'desc' else 'desc', **filter_params) }}">
+                            سنة الاعتقال {% if sort_by=='arrest_year' %}{{ '&#x25B2;' if sort_dir=='asc' else '&#x25BC;' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>الجهة</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr>
+                    <td>{{ r.id }}</td>
+                    <td style="font-weight: 600;">{{ r.first_name }}</td>
+                    <td>{{ r.father_name }}</td>
+                    <td>{{ r.last_name }}</td>
+                    <td>
+                        {% if r.status == 'survivor' %}
+                        <span class="status-badge status-survivor">ناجٍ</span>
+                        {% elif r.status == 'enforced' %}
+                        <span class="status-badge status-enforced">مغيّب</span>
+                        {% elif r.status == 'deceased' %}
+                        <span class="status-badge status-deceased">متوفى</span>
+                        {% else %}
+                        <span class="status-badge" style="background:#eee;color:#666;">-</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ r.province }}</td>
+                    <td>{{ r.arrest_year if r.arrest_year else '-' }}</td>
+                    <td style="font-size: 0.75rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.arrest_authority or '-' }}</td>
+                    <td>
+                        <div class="btn-group" style="flex-wrap: nowrap;">
+                            <a href="{{ url_for('admin_record_detail', record_id=r.id) }}" class="btn btn-primary btn-sm" title="عرض">&#x1F441;</a>
+                            <a href="{{ url_for('admin_record_edit', record_id=r.id) }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                        لا توجد سجلات مطابقة للفلاتر المحددة
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if page > 1 %}
+    <a href="{{ url_for('admin_records', page=page-1, sort=sort_by, dir=sort_dir, **filter_params) }}">&#x2192;</a>
+    {% endif %}
+
+    {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+        <span class="active">{{ p }}</span>
+        {% elif p <= 3 or p >= total_pages - 2 or (p >= page - 2 and p <= page + 2) %}
+        <a href="{{ url_for('admin_records', page=p, sort=sort_by, dir=sort_dir, **filter_params) }}">{{ p }}</a>
+        {% elif p == 4 or p == total_pages - 3 %}
+        <span>...</span>
+        {% endif %}
+    {% endfor %}
+
+    {% if page < total_pages %}
+    <a href="{{ url_for('admin_records', page=page+1, sort=sort_by, dir=sort_dir, **filter_params) }}">&#x2190;</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleFilters() {
+    var fb = document.getElementById('filterBody');
+    var arrow = document.getElementById('filterArrow');
+    if (fb.style.display === 'none') {
+        fb.style.display = 'block';
+        arrow.innerHTML = '&#x25B2;';
+    } else {
+        fb.style.display = 'none';
+        arrow.innerHTML = '&#x25BC;';
+    }
+}
+</script>
+{% endblock %}

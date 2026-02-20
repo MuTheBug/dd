@@ -1,0 +1,617 @@
+{% extends "base.html" %}
+{% block title %}تعديل سجل {{ record.first_name }} {{ record.last_name }} - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <a href="{{ url_for('admin_record_detail', record_id=record.id) }}" class="btn btn-outline btn-sm">&#x2192; العودة للتفاصيل</a>
+    <h1 style="font-size: 1.2rem; color: var(--primary-dark);">تعديل سجل #{{ record.id }}</h1>
+</div>
+
+<form method="POST" enctype="multipart/form-data">
+
+<!-- Classification & Reporter -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F4DD; التصنيف وبيانات المُبلِّغ</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>تصنيف الحالة</label>
+            <select name="status" id="statusSelect" onchange="handleStatusChange()">
+                <option value="">-- اختر --</option>
+                <option value="survivor" {{ 'selected' if record.status=='survivor' }}>ناجٍ</option>
+                <option value="enforced" {{ 'selected' if record.status=='enforced' }}>مغيّب قسراً</option>
+                <option value="deceased" {{ 'selected' if record.status=='deceased' }}>متوفى</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>نوع الحالة التفصيلي</label>
+            <select name="case_type" id="caseTypeSelect">
+                <option value="">-- اختر --</option>
+                {% for code, label in CASE_TYPES %}
+                <option value="{{ code }}" {{ 'selected' if record.case_type==code }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>اسم المُبلِّغ</label>
+            <input type="text" name="reporter_name" value="{{ record.reporter_name or '' }}">
+        </div>
+        <div class="form-group">
+            <label>صلة المُبلِّغ</label>
+            <select name="reporter_relation">
+                <option value="">-- اختر --</option>
+                {% for rel in REPORTER_RELATIONS %}
+                <option value="{{ rel }}" {{ 'selected' if record.reporter_relation==rel }}>{{ rel }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>هاتف المُبلِّغ</label>
+            <input type="tel" name="reporter_phone" value="{{ record.reporter_phone or '' }}">
+        </div>
+        <div class="form-group">
+            <label>رقم هوية المُبلِّغ</label>
+            <input type="text" name="reporter_id" value="{{ record.reporter_id or '' }}">
+        </div>
+        <div class="form-group">
+            <label>جامع البيانات</label>
+            <input type="text" name="collector_name" value="{{ record.collector_name or '' }}">
+        </div>
+        <div class="form-group">
+            <label>تاريخ الجمع</label>
+            <input type="date" name="collection_date" value="{{ record.collection_date or '' }}">
+        </div>
+        <div class="form-group">
+            <label>حالة التحقق</label>
+            <select name="verification_status">
+                {% for code, label in VERIFICATION_STATUSES %}
+                <option value="{{ code }}" {{ 'selected' if record.verification_status==code }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>مستوى الأدلة</label>
+            <select name="evidence_level">
+                {% for code, label in EVIDENCE_LEVELS %}
+                <option value="{{ code }}" {{ 'selected' if record.evidence_level==code }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>عدد مصادر الأدلة</label>
+            <input type="number" name="evidence_sources_count" value="{{ record.evidence_sources_count or 0 }}">
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="informant_consent" value="1" {{ 'checked' if record.informant_consent }}>
+                موافقة واعية
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Personal Info -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F464; البيانات الشخصية</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>الاسم الأول</label>
+            <input type="text" name="first_name" value="{{ record.first_name }}" required>
+        </div>
+        <div class="form-group">
+            <label>اسم الأب</label>
+            <input type="text" name="father_name" value="{{ record.father_name }}" required>
+        </div>
+        <div class="form-group">
+            <label>الكنية</label>
+            <input type="text" name="last_name" value="{{ record.last_name }}" required>
+        </div>
+        <div class="form-group">
+            <label>اسم الأم</label>
+            <input type="text" name="mother_name" value="{{ record.mother_name }}" required>
+        </div>
+        <div class="form-group">
+            <label>الجنس</label>
+            <select name="gender" required>
+                <option value="male" {{ 'selected' if record.gender=='male' }}>ذكر</option>
+                <option value="female" {{ 'selected' if record.gender=='female' }}>أنثى</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>تاريخ الميلاد</label>
+            <div class="form-date-group">
+                <input type="number" name="birth_day" value="{{ record.birth_day or '' }}" placeholder="اليوم">
+                <input type="number" name="birth_month" value="{{ record.birth_month or '' }}" placeholder="الشهر">
+                <input type="number" name="birth_year" value="{{ record.birth_year or '' }}" placeholder="السنة">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>المحافظة</label>
+            <select name="province" required>
+                {% for p in PROVINCES %}
+                <option value="{{ p }}" {{ 'selected' if record.province==p }}>{{ p }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>الرقم الوطني</label>
+            <input type="text" name="national_id" value="{{ record.national_id }}" required>
+        </div>
+        <div class="form-group">
+            <label>الهاتف</label>
+            <input type="tel" name="phone" value="{{ record.phone or '' }}">
+        </div>
+        <div class="form-group">
+            <label>زمرة الدم</label>
+            <select name="blood_type">
+                <option value="">-- اختر --</option>
+                {% for bt in BLOOD_TYPES %}
+                <option value="{{ bt }}" {{ 'selected' if record.blood_type==bt }}>{{ bt }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>صورة شخصية {% if record.photo_path %}(موجودة){% endif %}</label>
+            <input type="file" name="photo" accept="image/*">
+        </div>
+        <div class="form-group">
+            <label>وثيقة هوية {% if record.document_path %}(موجودة){% endif %}</label>
+            <input type="file" name="document" accept="image/*,.pdf">
+        </div>
+    </div>
+</div>
+
+<!-- Arrest -->
+<div class="form-section">
+    <div class="form-section-title">&#x26D3;&#xFE0F; تفاصيل الاعتقال</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>تاريخ الاعتقال</label>
+            <div class="form-date-group">
+                <input type="number" name="arrest_day" value="{{ record.arrest_day or '' }}" placeholder="اليوم">
+                <input type="number" name="arrest_month" value="{{ record.arrest_month or '' }}" placeholder="الشهر">
+                <input type="number" name="arrest_year" value="{{ record.arrest_year or '' }}" placeholder="السنة">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>الجهة المعتقِلة</label>
+            <select name="arrest_authority" required>
+                <option value="">-- اختر --</option>
+                {% for a in ARREST_AUTHORITIES %}
+                <option value="{{ a }}" {{ 'selected' if record.arrest_authority and a in record.arrest_authority }}>{{ a }}</option>
+                {% endfor %}
+                {% if record.arrest_authority and record.arrest_authority not in ARREST_AUTHORITIES %}
+                <option value="{{ record.arrest_authority }}" selected>{{ record.arrest_authority }}</option>
+                {% endif %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>مكان الاحتجاز</label>
+            <select name="arrest_place">
+                <option value="">-- اختر --</option>
+                {% for f in DETENTION_FACILITIES %}
+                <option value="{{ f }}" {{ 'selected' if record.arrest_place==f }}>{{ f }}</option>
+                {% endfor %}
+                {% if record.arrest_place and record.arrest_place not in DETENTION_FACILITIES %}
+                <option value="{{ record.arrest_place }}" selected>{{ record.arrest_place }}</option>
+                {% endif %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>سبب الاعتقال</label>
+            <input type="text" name="arrest_reason" value="{{ record.arrest_reason }}" required>
+        </div>
+        <div class="form-group">
+            <label>المتسبب</label>
+            <input type="text" name="arrest_causer" value="{{ record.arrest_causer or '' }}">
+        </div>
+        <div class="form-group">
+            <label>آخر مكان معروف</label>
+            <input type="text" name="last_known_location" value="{{ record.last_known_location or '' }}">
+        </div>
+        <div class="form-group">
+            <label>آخر تاريخ عُرف أنه حي</label>
+            <input type="date" name="last_known_alive_date" value="{{ record.last_known_alive_date or '' }}">
+        </div>
+    </div>
+</div>
+
+<!-- Release (Survivor) -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F513; بيانات الإفراج</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>تاريخ الإفراج</label>
+            <div class="form-date-group">
+                <input type="number" name="release_day" value="{{ record.release_day or '' }}" placeholder="اليوم">
+                <input type="number" name="release_month" value="{{ record.release_month or '' }}" placeholder="الشهر">
+                <input type="number" name="release_year" value="{{ record.release_year or '' }}" placeholder="السنة">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>سيرة الناجي</label>
+            <input type="file" name="survivor_cv" accept="image/*,.pdf">
+        </div>
+        <div class="form-group full-width">
+            <label>وصف تجربة الاعتقال</label>
+            <textarea name="survivor_cv_text" rows="3">{{ record.survivor_cv_text or '' }}</textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Death -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F3F4; بيانات الوفاة</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>تاريخ الوفاة</label>
+            <div class="form-date-group">
+                <input type="number" name="death_day" value="{{ record.death_day or '' }}" placeholder="اليوم">
+                <input type="number" name="death_month" value="{{ record.death_month or '' }}" placeholder="الشهر">
+                <input type="number" name="death_year" value="{{ record.death_year or '' }}" placeholder="السنة">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>مكان الوفاة</label>
+            <input type="text" name="death_place" value="{{ record.death_place or '' }}">
+        </div>
+    </div>
+</div>
+
+<!-- Digital Evidence -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F50D; الأدلة الرقمية</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>نوع الدليل الرقمي</label>
+            <select name="digital_evidence_type">
+                <option value="">-- لا يوجد --</option>
+                {% for code, label in DIGITAL_EVIDENCE_TYPES %}
+                <option value="{{ code }}" {{ 'selected' if record.digital_evidence_type==code }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>رابط الدليل</label>
+            <input type="url" name="digital_evidence_url" value="{{ record.digital_evidence_url or '' }}">
+        </div>
+        <div class="form-group">
+            <label>حالة الرابط</label>
+            <select name="digital_evidence_url_status">
+                <option value="">-- اختر --</option>
+                <option value="active" {{ 'selected' if record.digital_evidence_url_status=='active' }}>فعّال</option>
+                <option value="deleted" {{ 'selected' if record.digital_evidence_url_status=='deleted' }}>محذوف</option>
+                <option value="archived" {{ 'selected' if record.digital_evidence_url_status=='archived' }}>مؤرشف</option>
+                <option value="unknown" {{ 'selected' if record.digital_evidence_url_status=='unknown' }}>غير معروف</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>لقطة شاشة {% if record.digital_evidence_screenshot_path %}(موجودة){% endif %}</label>
+            <input type="file" name="digital_evidence_screenshot" accept="image/*,.pdf">
+        </div>
+        <div class="form-group">
+            <label>تاريخ الدليل</label>
+            <input type="date" name="digital_evidence_date" value="{{ record.digital_evidence_date or '' }}">
+        </div>
+        <div class="form-group">
+            <label>الاسم في الدليل</label>
+            <input type="text" name="digital_evidence_person_name" value="{{ record.digital_evidence_person_name or '' }}">
+        </div>
+        <div class="form-group">
+            <label>تاريخ الوفاة في الدليل</label>
+            <input type="date" name="digital_evidence_death_date" value="{{ record.digital_evidence_death_date or '' }}">
+        </div>
+        <div class="form-group full-width">
+            <label>وصف الدليل</label>
+            <textarea name="digital_evidence_description" rows="2">{{ record.digital_evidence_description or '' }}</textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Civil Registry -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F4C4; السجل المدني</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>حالة السجل المدني</label>
+            <select name="civil_registry_status">
+                {% for code, label in CIVIL_REGISTRY_STATUSES %}
+                <option value="{{ code }}" {{ 'selected' if record.civil_registry_status==code }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>تاريخ المراجعة</label>
+            <input type="date" name="civil_registry_date" value="{{ record.civil_registry_date or '' }}">
+        </div>
+        <div class="form-group">
+            <label>وثيقة {% if record.civil_registry_document_path %}(موجودة){% endif %}</label>
+            <input type="file" name="civil_registry_document" accept="image/*,.pdf">
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="has_conflicting_info" value="1" {{ 'checked' if record.has_conflicting_info }}>
+                معلومات متضاربة
+            </label>
+        </div>
+        <div class="form-group full-width">
+            <label>تفاصيل التضارب</label>
+            <textarea name="conflicting_info_details" rows="2">{{ record.conflicting_info_details or '' }}</textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Witnesses -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F465; الشهود</div>
+    <div class="form-group full-width">
+        <label>بيانات الشهود (JSON)</label>
+        <textarea name="witnesses_data" rows="3">{{ record.witnesses_data or '[]' }}</textarea>
+        <span class="hint">تنسيق JSON: [{"name":"...","phone":"...","relation":"...","testimony":"..."}]</span>
+    </div>
+</div>
+
+<!-- Family -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F46A; البيانات العائلية</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>الحالة الاجتماعية</label>
+            <select name="marital">
+                <option value="">-- اختر --</option>
+                {% for code, label in MARITAL_STATUSES %}
+                <option value="{{ code }}" {{ 'selected' if record.marital==code }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>ولي الأمر</label>
+            <input type="text" name="guardian_name" value="{{ record.guardian_name or '' }}">
+        </div>
+        <div class="form-group">
+            <label>صلة ولي الأمر</label>
+            <input type="text" name="guardian_relation" value="{{ record.guardian_relation or '' }}">
+        </div>
+        <div class="form-group">
+            <label>هاتف ولي الأمر</label>
+            <input type="tel" name="guardian_phone" value="{{ record.guardian_phone or '' }}">
+        </div>
+        <div class="form-group">
+            <label>اسم الزوج/ة</label>
+            <input type="text" name="spouse_name" value="{{ record.spouse_name or '' }}">
+        </div>
+        <div class="form-group">
+            <label>هاتف الزوج/ة</label>
+            <input type="tel" name="spouse_phone" value="{{ record.spouse_phone or '' }}">
+        </div>
+        <div class="form-group">
+            <label>أطفال</label>
+            <select name="has_kids">
+                <option value="no" {{ 'selected' if record.has_kids!='yes' }}>لا</option>
+                <option value="yes" {{ 'selected' if record.has_kids=='yes' }}>نعم</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>عدد الأطفال</label>
+            <input type="number" name="kids_count" value="{{ record.kids_count or 0 }}">
+        </div>
+        <div class="form-group">
+            <label>أطفال تحت 18</label>
+            <input type="number" name="kids_under_18_count" value="{{ record.kids_under_18_count or 0 }}">
+        </div>
+        <div class="form-group">
+            <label>زوج/ة سابق/ة</label>
+            <input type="text" name="ex_spouse_name" value="{{ record.ex_spouse_name or '' }}">
+        </div>
+        <div class="form-group">
+            <label>أطفال من زواج سابق</label>
+            <select name="has_kids_w">
+                <option value="no" {{ 'selected' if record.has_kids_w!='yes' }}>لا</option>
+                <option value="yes" {{ 'selected' if record.has_kids_w=='yes' }}>نعم</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>عدد أطفال الزواج السابق</label>
+            <input type="number" name="kids_count_w" value="{{ record.kids_count_w or 0 }}">
+        </div>
+    </div>
+    <input type="hidden" name="children_data" value="{{ record.children_data or '[]' }}">
+    <input type="hidden" name="children_data_w" value="{{ record.children_data_w or '[]' }}">
+</div>
+
+<!-- Socioeconomic -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F3E0; البيانات السكنية والاقتصادية</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>العنوان</label>
+            <input type="text" name="address" value="{{ record.address }}" required>
+        </div>
+        <div class="form-group">
+            <label>نوع السكن</label>
+            <select name="housing_type" required>
+                {% for h in HOUSING_TYPES %}
+                <option value="{{ h }}" {{ 'selected' if record.housing_type==h }}>{{ h }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>مبلغ الإيجار</label>
+            <input type="text" name="rent_amount" value="{{ record.rent_amount or '' }}">
+        </div>
+        <div class="form-group">
+            <label>الوضع الوظيفي</label>
+            <input type="text" name="employment" value="{{ record.employment or '' }}">
+        </div>
+        <div class="form-group">
+            <label>المهنة</label>
+            <input type="text" name="profession" value="{{ record.profession or '' }}">
+        </div>
+        <div class="form-group">
+            <label>جهة العمل</label>
+            <input type="text" name="employer" value="{{ record.employer or '' }}">
+        </div>
+        <div class="form-group">
+            <label>المعيل</label>
+            <input type="text" name="breadwinner" value="{{ record.breadwinner or '' }}">
+        </div>
+        <div class="form-group">
+            <label>مهنة المعيل</label>
+            <input type="text" name="breadwinner_job" value="{{ record.breadwinner_job or '' }}">
+        </div>
+        <div class="form-group">
+            <label>صلة المعيل</label>
+            <select name="breadwinner_relation">
+                <option value="">-- اختر --</option>
+                {% for rel in REPORTER_RELATIONS %}
+                <option value="{{ rel }}" {{ 'selected' if record.breadwinner_relation==rel }}>{{ rel }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>أخرى</label>
+            <input type="text" name="breadwinner_relation_other" value="{{ record.breadwinner_relation_other or '' }}">
+        </div>
+    </div>
+</div>
+
+<!-- Education -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F3EB; التحصيل العلمي</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>المستوى التعليمي</label>
+            <select name="education">
+                <option value="">-- اختر --</option>
+                {% for e in EDUCATION_LEVELS %}
+                <option value="{{ e }}" {{ 'selected' if record.education==e }}>{{ e }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>النوع</label>
+            <select name="edu_type">
+                <option value="">-- اختر --</option>
+                {% for e in EDU_TYPES %}
+                <option value="{{ e }}" {{ 'selected' if record.edu_type==e }}>{{ e }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>الاختصاص</label>
+            <input type="text" name="edu_specialization" value="{{ record.edu_specialization or '' }}">
+        </div>
+        <div class="form-group">
+            <label>الجامعة</label>
+            <input type="text" name="edu_university" value="{{ record.edu_university or '' }}">
+        </div>
+    </div>
+</div>
+
+<!-- Health -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F3E5; الحالة الصحية</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>أمراض مزمنة</label>
+            <input type="text" name="chronic" value="{{ record.chronic or '' }}">
+        </div>
+        <div class="form-group">
+            <label>أمراض</label>
+            <input type="text" name="diseases" value="{{ record.diseases or '' }}">
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="has_hypertension" value="1" {{ 'checked' if record.has_hypertension }}>
+                ضغط دم
+            </label>
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="has_diabetes" value="1" {{ 'checked' if record.has_diabetes }}>
+                سكري
+            </label>
+        </div>
+        <div class="form-group">
+            <label>أمراض أخرى</label>
+            <input type="text" name="other_diseases" value="{{ record.other_diseases or '' }}">
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="has_special_needs" value="1" {{ 'checked' if record.has_special_needs }}>
+                احتياجات خاصة
+            </label>
+        </div>
+        <div class="form-group">
+            <label>تفاصيل</label>
+            <input type="text" name="special_needs_details" value="{{ record.special_needs_details or '' }}">
+        </div>
+    </div>
+</div>
+
+<!-- Legal -->
+<div class="form-section">
+    <div class="form-section-title">&#x2696;&#xFE0F; القانوني والجمعيات</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>إجراء قانوني</label>
+            <input type="text" name="legal" value="{{ record.legal or '' }}">
+        </div>
+        <div class="form-group full-width">
+            <label>تفاصيل قانونية</label>
+            <textarea name="legal_details" rows="2">{{ record.legal_details or '' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>جمعية</label>
+            <input type="text" name="assoc" value="{{ record.assoc or '' }}">
+        </div>
+        <div class="form-group">
+            <label>اسم الجمعية</label>
+            <input type="text" name="assoc_name" value="{{ record.assoc_name or '' }}">
+        </div>
+        <div class="form-group">
+            <label>نوع الخدمة</label>
+            <input type="text" name="service_type" value="{{ record.service_type or '' }}">
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="is_officially_registered" value="1" {{ 'checked' if record.is_officially_registered }}>
+                مسجل رسمياً
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Notes -->
+<div class="form-section">
+    <div class="form-section-title">&#x1F4DD; ملاحظات</div>
+    <div class="form-group full-width">
+        <textarea name="notes" rows="4">{{ record.notes or '' }}</textarea>
+    </div>
+    <div class="form-group full-width">
+        <label>ملاحظات منهجية</label>
+        <textarea name="methodology_notes" rows="3">{{ record.methodology_notes or '' }}</textarea>
+    </div>
+    <div class="form-group full-width">
+        <label>نوع المصدر</label>
+        <input type="text" name="source_type" value="{{ record.source_type or '' }}">
+    </div>
+</div>
+
+<!-- Hidden fields for data not shown in grid -->
+<input type="hidden" name="detention_facilities_data" value="{{ record.detention_facilities_data or '[]' }}">
+
+<div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+    <button type="submit" class="btn btn-success btn-lg">&#x2714; حفظ التعديلات</button>
+    <a href="{{ url_for('admin_record_detail', record_id=record.id) }}" class="btn btn-outline btn-lg">إلغاء</a>
+</div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function handleStatusChange() {
+    // Optional: could update case_type options dynamically like entry form
+}
+</script>
+{% endblock %}

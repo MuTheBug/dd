@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}حقنا - نظام التوثيق{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/logo.jpg') }}">
+    <style>
+        {% include 'styles.css' %}
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    {% block navbar %}
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-brand">
+                <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="حقنا" class="nav-logo">
+                <span class="nav-title">حقنا</span>
+            </a>
+            <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('active')" aria-label="القائمة">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}">الرئيسية</a>
+                <a href="{{ url_for('entry_form') }}">إدخال بيانات</a>
+                {% if session.get('is_admin') %}
+                <a href="{{ url_for('admin_dashboard') }}">لوحة التحكم</a>
+                <a href="{{ url_for('admin_records') }}">السجلات</a>
+                <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
+                {% else %}
+                <a href="{{ url_for('admin_login') }}">دخول الإدارة</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    {% endblock %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">
+            <span>{{ message }}</span>
+            <button onclick="this.parentElement.remove()" class="flash-close">&times;</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="حقنا" class="footer-logo">
+            <p>حقنا - جمعية اجتماعية ثقافية</p>
+            <p class="footer-sub">نظام التوثيق وفق بروتوكول بيركلي للتحقيقات الرقمية مفتوحة المصدر</p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

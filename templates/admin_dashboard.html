@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}لوحة التحكم - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">لوحة التحكم</h1>
+    <div class="btn-group">
+        <a href="{{ url_for('admin_records') }}" class="btn btn-primary btn-sm">&#x1F4CB; السجلات</a>
+        <a href="{{ url_for('entry_form') }}" class="btn btn-outline btn-sm">+ إضافة حالة</a>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card stat-total">
+        <div class="stat-number">{{ stats.total }}</div>
+        <div class="stat-label">إجمالي السجلات</div>
+    </div>
+    <div class="stat-card stat-survivor">
+        <div class="stat-number">{{ stats.survivors }}</div>
+        <div class="stat-label">ناجٍ</div>
+    </div>
+    <div class="stat-card stat-enforced">
+        <div class="stat-number">{{ stats.enforced }}</div>
+        <div class="stat-label">مغيّب قسراً</div>
+    </div>
+    <div class="stat-card stat-deceased">
+        <div class="stat-number">{{ stats.deceased }}</div>
+        <div class="stat-label">متوفى</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+    <!-- Gender Stats -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F464;</div>
+            <h3>التوزيع حسب الجنس</h3>
+        </div>
+        <div class="chart-bar-container">
+            <div class="chart-bar-item">
+                <span class="chart-bar-label">ذكور</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (stats.males / stats.total * 100) if stats.total else 0 }}%">
+                        {{ stats.males }}
+                    </div>
+                </div>
+            </div>
+            <div class="chart-bar-item">
+                <span class="chart-bar-label">إناث</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (stats.females / stats.total * 100) if stats.total else 0 }}%; background: linear-gradient(90deg, #e91e63, #f48fb1)">
+                        {{ stats.females }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Province Stats -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F3D9;&#xFE0F;</div>
+            <h3>التوزيع حسب المحافظة</h3>
+        </div>
+        <div class="chart-bar-container">
+            {% set max_prov = stats.province_stats[0][1] if stats.province_stats else 1 %}
+            {% for prov in stats.province_stats[:8] %}
+            <div class="chart-bar-item">
+                <span class="chart-bar-label">{{ prov[0] or 'غير محدد' }}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (prov[1] / max_prov * 100) }}%">
+                        {{ prov[1] }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Authority Stats -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F3DB;&#xFE0F;</div>
+            <h3>أبرز جهات الاعتقال</h3>
+        </div>
+        <div class="chart-bar-container">
+            {% set max_auth = stats.authority_stats[0][1] if stats.authority_stats else 1 %}
+            {% for auth in stats.authority_stats[:8] %}
+            <div class="chart-bar-item">
+                <span class="chart-bar-label">{{ auth[0] or 'غير محدد' }}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (auth[1] / max_auth * 100) }}%">
+                        {{ auth[1] }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Year Stats -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F4C5;</div>
+            <h3>التوزيع حسب سنة الاعتقال</h3>
+        </div>
+        <div class="chart-bar-container">
+            {% set max_year = 1 %}
+            {% for yr in stats.year_stats %}
+                {% if yr[1] > max_year %}{% set max_year = yr[1] %}{% endif %}
+            {% endfor %}
+            {% for yr in stats.year_stats %}
+            {% if yr[0] and yr[0] > 2000 %}
+            <div class="chart-bar-item">
+                <span class="chart-bar-label">{{ yr[0] }}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (yr[1] / max_year * 100) }}%">
+                        {{ yr[1] }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Quick Access -->
+<div class="card" style="margin-top: 1rem;">
+    <div class="card-header">
+        <div class="card-icon">&#x26A1;</div>
+        <h3>وصول سريع</h3>
+    </div>
+    <div class="btn-group" style="flex-wrap: wrap;">
+        <a href="{{ url_for('admin_records', status='survivor') }}" class="btn btn-success btn-sm">الناجون ({{ stats.survivors }})</a>
+        <a href="{{ url_for('admin_records', status='enforced') }}" class="btn btn-warning btn-sm">المغيّبون قسراً ({{ stats.enforced }})</a>
+        <a href="{{ url_for('admin_records', status='deceased') }}" class="btn btn-danger btn-sm">المتوفون ({{ stats.deceased }})</a>
+        <a href="{{ url_for('admin_records', has_photo='no') }}" class="btn btn-outline btn-sm">بدون صورة</a>
+        <a href="{{ url_for('admin_records', has_document='no') }}" class="btn btn-outline btn-sm">بدون وثائق</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% block title %}سجل {{ record.first_name }} {{ record.last_name }} - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <a href="{{ url_for('admin_records') }}" class="btn btn-outline btn-sm">&#x2192; العودة للسجلات</a>
+    <div class="btn-group">
+        <a href="{{ url_for('record_pdf', record_id=record.id) }}" class="btn btn-primary btn-sm" target="_blank">&#x1F4C4; تصدير PDF</a>
+        <a href="{{ url_for('admin_record_edit', record_id=record.id) }}" class="btn btn-outline btn-sm">&#x270F;&#xFE0F; تعديل</a>
+        <form method="POST" action="{{ url_for('admin_record_delete', record_id=record.id) }}" style="display:inline" onsubmit="return confirm('هل أنت متأكد من حذف هذا السجل؟')">
+            <button type="submit" class="btn btn-danger btn-sm">&#x1F5D1; حذف</button>
+        </form>
+    </div>
+</div>
+
+<!-- Header -->
+<div class="card">
+    <div class="detail-header">
+        {% if record.photo_path %}
+        <img src="{{ url_for('uploaded_file', filename='photos/' + record.photo_path) }}" alt="صورة" class="detail-photo">
+        {% else %}
+        <div class="detail-photo" style="display:flex; align-items:center; justify-content:center; background: var(--bg); color: var(--text-light); font-size: 2rem;">
+            &#x1F464;
+        </div>
+        {% endif %}
+        <div class="detail-info">
+            <div class="detail-name">{{ record.first_name }} {{ record.father_name }} {{ record.last_name }}</div>
+            <div class="detail-meta">
+                {% if record.status == 'survivor' %}
+                <span class="status-badge status-survivor">&#x1F7E2; ناجٍ</span>
+                {% elif record.status == 'enforced' %}
+                <span class="status-badge status-enforced">&#x1F7E0; مغيّب قسراً</span>
+                {% elif record.status == 'deceased' %}
+                <span class="status-badge status-deceased">&#x1F534; متوفى</span>
+                {% endif %}
+                <span>&#x1F4CD; {{ record.province }}</span>
+                <span>&#x1F4CB; رقم السجل: {{ record.id }}</span>
+                {% if record.national_id %}<span>&#x1F194; {{ record.national_id }}</span>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="detail-grid">
+    <!-- Personal Info -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F464;</div>
+            <h3>البيانات الشخصية</h3>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">الاسم الكامل</div>
+            <div class="detail-field-value">{{ record.first_name }} {{ record.father_name }} {{ record.last_name }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">اسم الأم</div>
+            <div class="detail-field-value">{{ record.mother_name or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">الجنس</div>
+            <div class="detail-field-value">{{ 'ذكر' if record.gender == 'male' else 'أنثى' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">تاريخ الميلاد</div>
+            <div class="detail-field-value">
+                {% if record.birth_year %}{{ record.birth_day or '?' }}/{{ record.birth_month or '?' }}/{{ record.birth_year }}{% else %}-{% endif %}
+            </div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">الرقم الوطني</div>
+            <div class="detail-field-value">{{ record.national_id or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">الهاتف</div>
+            <div class="detail-field-value">{{ record.phone or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">زمرة الدم</div>
+            <div class="detail-field-value">{{ record.blood_type or '-' }}</div>
+        </div>
+    </div>
+
+    <!-- Arrest Info -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x26D3;&#xFE0F;</div>
+            <h3>تفاصيل الاعتقال</h3>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">تاريخ الاعتقال</div>
+            <div class="detail-field-value">
+                {% if record.arrest_year %}{{ record.arrest_day or '?' }}/{{ record.arrest_month or '?' }}/{{ record.arrest_year }}{% else %}-{% endif %}
+            </div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">الجهة المعتقِلة</div>
+            <div class="detail-field-value">{{ record.arrest_authority or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">مكان الاحتجاز</div>
+            <div class="detail-field-value">{{ record.arrest_place or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">سبب الاعتقال</div>
+            <div class="detail-field-value">{{ record.arrest_reason or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">المتسبب بالاعتقال</div>
+            <div class="detail-field-value">{{ record.arrest_causer or '-' }}</div>
+        </div>
+        {% if record.status == 'survivor' %}
+        <div class="detail-field">
+            <div class="detail-field-label">تاريخ الإفراج</div>
+            <div class="detail-field-value">
+                {% if record.release_year %}{{ record.release_day or '?' }}/{{ record.release_month or '?' }}/{{ record.release_year }}{% else %}-{% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% if record.status == 'deceased' %}
+        <div class="detail-field">
+            <div class="detail-field-label">تاريخ الوفاة</div>
+            <div class="detail-field-value">
+                {% if record.death_year %}{{ record.death_day or '?' }}/{{ record.death_month or '?' }}/{{ record.death_year }}{% else %}-{% endif %}
+            </div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">مكان الوفاة</div>
+            <div class="detail-field-value">{{ record.death_place or '-' }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Berkeley Protocol - Evidence -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F50D;</div>
+            <h3>الأدلة والتحقق (بيركلي)</h3>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">نوع الحالة</div>
+            <div class="detail-field-value">
+                {% for code, label in CASE_TYPES %}
+                    {% if record.case_type == code %}{{ label }}{% endif %}
+                {% endfor %}
+                {{ '-' if not record.case_type }}
+            </div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">مستوى الأدلة</div>
+            <div class="detail-field-value">
+                {% for code, label in EVIDENCE_LEVELS %}
+                    {% if record.evidence_level == code %}{{ label }}{% endif %}
+                {% endfor %}
+                {{ '-' if not record.evidence_level }}
+            </div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">حالة التحقق</div>
+            <div class="detail-field-value">
+                {% for code, label in VERIFICATION_STATUSES %}
+                    {% if record.verification_status == code %}{{ label }}{% endif %}
+                {% endfor %}
+                {{ '-' if not record.verification_status }}
+            </div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">عدد مصادر الأدلة</div>
+            <div class="detail-field-value">{{ record.evidence_sources_count or 0 }}</div>
+        </div>
+        {% if record.digital_evidence_type %}
+        <div class="detail-field">
+            <div class="detail-field-label">نوع الدليل الرقمي</div>
+            <div class="detail-field-value">
+                {% for code, label in DIGITAL_EVIDENCE_TYPES %}
+                    {% if record.digital_evidence_type == code %}{{ label }}{% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% if record.digital_evidence_description %}
+        <div class="detail-field">
+            <div class="detail-field-label">وصف الدليل</div>
+            <div class="detail-field-value">{{ record.digital_evidence_description }}</div>
+        </div>
+        {% endif %}
+        {% endif %}
+        <div class="detail-field">
+            <div class="detail-field-label">حالة السجل المدني</div>
+            <div class="detail-field-value">
+                {% for code, label in CIVIL_REGISTRY_STATUSES %}
+                    {% if record.civil_registry_status == code %}{{ label }}{% endif %}
+                {% endfor %}
+                {{ '-' if not record.civil_registry_status }}
+            </div>
+        </div>
+        {% if record.has_conflicting_info %}
+        <div class="detail-field" style="background: #fff3cd; padding: 0.5rem; border-radius: 6px;">
+            <div class="detail-field-label" style="color: #856404;">&#x26A0;&#xFE0F; معلومات متضاربة</div>
+            <div class="detail-field-value" style="color: #856404;">{{ record.conflicting_info_details or 'نعم' }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Reporter Info -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F4DD;</div>
+            <h3>بيانات المُبلِّغ</h3>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">اسم المُبلِّغ</div>
+            <div class="detail-field-value">{{ record.reporter_name or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">صلة المُبلِّغ</div>
+            <div class="detail-field-value">{{ record.reporter_relation or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">هاتف المُبلِّغ</div>
+            <div class="detail-field-value">{{ record.reporter_phone or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">موافقة واعية</div>
+            <div class="detail-field-value">{{ 'نعم' if record.informant_consent else 'لا' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">جامع البيانات</div>
+            <div class="detail-field-value">{{ record.collector_name or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">تاريخ الجمع</div>
+            <div class="detail-field-value">{{ record.collection_date or record.created_at or '-' }}</div>
+        </div>
+        {% if record.witnesses_data and record.witnesses_data != '[]' %}
+        <div class="detail-field" style="margin-top: 0.8rem;">
+            <div class="detail-field-label">الشهود</div>
+            {% set witnesses = record.witnesses_data | tojson %}
+            <div class="detail-field-value" style="font-size: 0.82rem;">
+                {% for w in (record.witnesses_data | default('[]', true)) | safe | tojson %}
+                {% endfor %}
+                {{ record.witnesses_data }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Family Info -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F46A;</div>
+            <h3>البيانات العائلية</h3>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">الحالة الاجتماعية</div>
+            <div class="detail-field-value">
+                {% for code, label in MARITAL_STATUSES %}
+                    {% if record.marital == code %}{{ label }}{% endif %}
+                {% endfor %}
+                {{ '-' if not record.marital }}
+            </div>
+        </div>
+        {% if record.spouse_name %}
+        <div class="detail-field">
+            <div class="detail-field-label">اسم الزوج/ة</div>
+            <div class="detail-field-value">{{ record.spouse_name }}</div>
+        </div>
+        {% endif %}
+        <div class="detail-field">
+            <div class="detail-field-label">أطفال</div>
+            <div class="detail-field-value">{{ record.has_kids or 'لا' }} {% if record.kids_count %}({{ record.kids_count }}){% endif %}</div>
+        </div>
+        {% if record.guardian_name %}
+        <div class="detail-field">
+            <div class="detail-field-label">ولي الأمر</div>
+            <div class="detail-field-value">{{ record.guardian_name }} ({{ record.guardian_relation or '-' }})</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Socioeconomic -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F3E0;</div>
+            <h3>البيانات الاجتماعية والاقتصادية</h3>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">العنوان</div>
+            <div class="detail-field-value">{{ record.address or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">نوع السكن</div>
+            <div class="detail-field-value">{{ record.housing_type or '-' }} {% if record.rent_amount %}({{ record.rent_amount }} ل.س){% endif %}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">التحصيل العلمي</div>
+            <div class="detail-field-value">{{ record.education or '-' }} {% if record.edu_specialization %}- {{ record.edu_specialization }}{% endif %}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">المهنة</div>
+            <div class="detail-field-value">{{ record.profession or '-' }}</div>
+        </div>
+        <div class="detail-field">
+            <div class="detail-field-label">المعيل</div>
+            <div class="detail-field-value">{{ record.breadwinner or '-' }} {% if record.breadwinner_job %}({{ record.breadwinner_job }}){% endif %}</div>
+        </div>
+    </div>
+</div>
+
+{% if record.notes %}
+<div class="card" style="margin-top: 1rem;">
+    <div class="card-header">
+        <div class="card-icon">&#x1F4DD;</div>
+        <h3>ملاحظات</h3>
+    </div>
+    <p style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.8;">{{ record.notes }}</p>
+</div>
+{% endif %}
+{% endblock %}

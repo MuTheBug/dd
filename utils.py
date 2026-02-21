@@ -21,7 +21,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
 
-def generate_pdf(records, title, columns):
+def generate_pdf(records, title, columns, anonymize=False):
     # Register font
     font_path = os.path.join(os.getcwd(), 'static', 'fonts', 'Amiri-Regular.ttf')
     if os.path.exists(font_path):
@@ -61,10 +61,17 @@ def generate_pdf(records, title, columns):
     for record in records:
         row = []
         for col in columns:
-            val = getattr(record, col['field'])
-            if val is None:
-                val = ""
-            val = str(val)
+            if anonymize and col['field'] in ['first_name', 'father_name', 'last_name', 'mother_name', 'national_id', 'phone']:
+                if col['field'] == 'first_name':
+                    val = f"Record ID: {record.id}"
+                else:
+                    val = "---"
+            else:
+                val = getattr(record, col['field'])
+                if val is None:
+                    val = ""
+                val = str(val)
+
             # Reshape Arabic text
             reshaped_val = get_display(arabic_reshaper.reshape(val))
             row.append(reshaped_val)

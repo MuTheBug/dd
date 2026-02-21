@@ -82,6 +82,7 @@ class Record(db.Model):
     has_hypertension = db.Column(db.Integer)
     has_diabetes = db.Column(db.Integer)
     other_diseases = db.Column(db.String)
+    chronic_diseases_present = db.Column(db.Integer) # New: Boolean toggle
     has_special_needs = db.Column(db.Integer)
     special_needs_details = db.Column(db.String)
 

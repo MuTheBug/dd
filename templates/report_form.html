@@ -41,8 +41,14 @@
     </div>
 
     <div class="card mb-4">
-        <div class="card-header bg-secondary text-white">اختيار الأعمدة</div>
+        <div class="card-header bg-secondary text-white">إعدادات التقرير</div>
         <div class="card-body">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" name="anonymize" id="anonymizeCheck">
+                <label class="form-check-label" for="anonymizeCheck">حجب البيانات الشخصية (إخفاء الهوية)</label>
+            </div>
+            <hr>
+            <h5>اختيار الأعمدة</h5>
             <div class="row">
                 <div class="col-md-3">
                     <div class="form-check">
@@ -96,6 +102,24 @@
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" name="columns" value="national_id">
                         <label class="form-check-label">الرقم الوطني</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="chronic_diseases_present">
+                        <label class="form-check-label">أمراض مزمنة</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="has_special_needs">
+                        <label class="form-check-label">احتياجات خاصة</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="has_conflicting_info">
+                        <label class="form-check-label">تضارب معلومات</label>
                     </div>
                 </div>
             </div>

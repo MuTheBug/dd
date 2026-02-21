@@ -3,55 +3,134 @@
 <h2 class="mb-4">سجلات الضحايا</h2>
 
 <div class="card mb-4">
-    <div class="card-body">
-        <form method="GET" class="row g-3">
-            <div class="col-md-4">
-                <input type="text" class="form-control" name="q" placeholder="بحث بالاسم..." value="{{ request.args.get('q', '') }}">
-            </div>
-            <div class="col-md-3">
-                <select name="status" class="form-select">
-                    <option value="">كل الحالات</option>
-                    <option value="survivor" {% if request.args.get('status') == 'survivor' %}selected{% endif %}>ناج</option>
-                    <option value="deceased" {% if request.args.get('status') == 'deceased' %}selected{% endif %}>متوفي</option>
-                    <option value="disappeared" {% if request.args.get('status') == 'disappeared' %}selected{% endif %}>مغيب قسرا</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select name="province" class="form-select">
-                    <option value="">كل المحافظات</option>
-                    <option value="دمشق" {% if request.args.get('province') == 'دمشق' %}selected{% endif %}>دمشق</option>
-                    <option value="ريف دمشق" {% if request.args.get('province') == 'ريف دمشق' %}selected{% endif %}>ريف دمشق</option>
-                    <option value="حلب" {% if request.args.get('province') == 'حلب' %}selected{% endif %}>حلب</option>
-                    <option value="حمص" {% if request.args.get('province') == 'حمص' %}selected{% endif %}>حمص</option>
-                    <option value="حماة" {% if request.args.get('province') == 'حماة' %}selected{% endif %}>حماة</option>
-                    <option value="إدلب" {% if request.args.get('province') == 'إدلب' %}selected{% endif %}>إدلب</option>
-                    <option value="اللاذقية" {% if request.args.get('province') == 'اللاذقية' %}selected{% endif %}>اللاذقية</option>
-                    <option value="طـرطوس" {% if request.args.get('province') == 'طـرطوس' %}selected{% endif %}>طـرطوس</option>
-                    <option value="دير الزور" {% if request.args.get('province') == 'دير الزور' %}selected{% endif %}>دير الزور</option>
-                    <option value="الرقة" {% if request.args.get('province') == 'الرقة' %}selected{% endif %}>الرقة</option>
-                    <option value="الحسكة" {% if request.args.get('province') == 'الحسكة' %}selected{% endif %}>الحسكة</option>
-                    <option value="درعا" {% if request.args.get('province') == 'درعا' %}selected{% endif %}>درعا</option>
-                    <option value="السويداء" {% if request.args.get('province') == 'السويداء' %}selected{% endif %}>السويداء</option>
-                    <option value="القنيطرة" {% if request.args.get('province') == 'القنيطرة' %}selected{% endif %}>القنيطرة</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">بحث</button>
-            </div>
-        </form>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>بحث متقدم</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#advancedSearch">
+            إظهار/إخفاء الفلاتر
+        </button>
+    </div>
+    <div class="collapse show" id="advancedSearch">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <!-- Basic Search -->
+                <div class="col-md-4">
+                    <label class="form-label">بحث نصي</label>
+                    <input type="text" class="form-control" name="q" placeholder="الاسم، الرقم..." value="{{ request.args.get('q', '') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">الحالة</label>
+                    <select name="status" class="form-select">
+                        <option value="">كل الحالات</option>
+                        <option value="survivor" {% if request.args.get('status') == 'survivor' %}selected{% endif %}>ناج</option>
+                        <option value="deceased" {% if request.args.get('status') == 'deceased' %}selected{% endif %}>متوفي</option>
+                        <option value="disappeared" {% if request.args.get('status') == 'disappeared' %}selected{% endif %}>مغيب قسرا</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">المحافظة</label>
+                    <select name="province" class="form-select">
+                        <option value="">كل المحافظات</option>
+                        <option value="دمشق" {% if request.args.get('province') == 'دمشق' %}selected{% endif %}>دمشق</option>
+                        <option value="ريف دمشق" {% if request.args.get('province') == 'ريف دمشق' %}selected{% endif %}>ريف دمشق</option>
+                        <!-- Add other provinces as needed -->
+                    </select>
+                </div>
+
+                <!-- Health & Vulnerability -->
+                <div class="col-md-3">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" type="checkbox" name="chronic_diseases_present" value="1" {% if request.args.get('chronic_diseases_present') %}checked{% endif %}>
+                        <label class="form-check-label">أمراض مزمنة</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" type="checkbox" name="has_special_needs" value="1" {% if request.args.get('has_special_needs') %}checked{% endif %}>
+                        <label class="form-check-label">احتياجات خاصة</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" type="checkbox" name="kids_under_18" value="1" {% if request.args.get('kids_under_18') %}checked{% endif %}>
+                        <label class="form-check-label">لديه أطفال قاصرين</label>
+                    </div>
+                </div>
+
+                <!-- Detention Details -->
+                <div class="col-md-3">
+                    <label class="form-label">الجهة المعتقلة</label>
+                    <input type="text" class="form-control" name="arrest_authority" value="{{ request.args.get('arrest_authority', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">سنة الاعتقال (من)</label>
+                    <input type="number" class="form-control" name="date_range_start" value="{{ request.args.get('date_range_start', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">سنة الاعتقال (إلى)</label>
+                    <input type="number" class="form-control" name="date_range_end" value="{{ request.args.get('date_range_end', '') }}">
+                </div>
+
+                <!-- Verification -->
+                <div class="col-md-3">
+                    <label class="form-label">حالة التوثيق</label>
+                    <select name="verification_status" class="form-select">
+                        <option value="">الكل</option>
+                        <option value="verified" {% if request.args.get('verification_status') == 'verified' %}selected{% endif %}>موثق</option>
+                        <option value="unverified" {% if request.args.get('verification_status') == 'unverified' %}selected{% endif %}>غير موثق</option>
+                    </select>
+                </div>
+                 <div class="col-md-3">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" type="checkbox" name="has_conflicting_info" value="1" {% if request.args.get('has_conflicting_info') %}checked{% endif %}>
+                        <label class="form-check-label">تضارب معلومات</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input" type="checkbox" name="informant_consent" value="1" {% if request.args.get('informant_consent') %}checked{% endif %}>
+                        <label class="form-check-label">موافقة المصدر</label>
+                    </div>
+                </div>
+
+                <div class="col-12 text-end">
+                    <a href="{{ url_for('list_records') }}" class="btn btn-secondary">إلغاء الفلاتر</a>
+                    <button type="submit" class="btn btn-primary px-5">بحث وتطبيق الفلاتر</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="mb-2 text-end">
+    <div class="dropdown d-inline-block">
+        <button class="btn btn-outline-dark dropdown-toggle" type="button" id="columnToggle" data-bs-toggle="dropdown">
+            إظهار/إخفاء الأعمدة
+        </button>
+        <ul class="dropdown-menu p-2">
+            <li><label><input type="checkbox" class="col-toggle" data-column="col-chronic" checked> أمراض مزمنة</label></li>
+            <li><label><input type="checkbox" class="col-toggle" data-column="col-special" checked> احتياجات خاصة</label></li>
+            <li><label><input type="checkbox" class="col-toggle" data-column="col-conflict" checked> تضارب معلومات</label></li>
+        </ul>
+    </div>
+     <div class="form-check form-switch d-inline-block ms-3">
+        <input class="form-check-input" type="checkbox" id="anonymizeToggle">
+        <label class="form-check-label" for="anonymizeToggle">إخفاء الهوية (Anonymize)</label>
     </div>
 </div>
 
 <div class="table-responsive">
-    <table class="table table-striped table-hover">
+    <table class="table table-striped table-hover" id="recordsTable">
         <thead class="table-dark">
             <tr>
                 <th>#</th>
-                <th>الاسم الكامل</th>
+                <th class="col-name">الاسم الكامل</th>
                 <th>اسم الأم</th>
                 <th>المحافظة</th>
                 <th>الحالة</th>
                 <th>تاريخ الاعتقال</th>
+                <th class="col-chronic">أمراض مزمنة</th>
+                <th class="col-special">احتياجات خاصة</th>
+                <th class="col-conflict">تضارب</th>
                 <th>الإجراءات</th>
             </tr>
         </thead>
@@ -59,8 +138,13 @@
             {% for record in pagination.items %}
             <tr>
                 <td>{{ record.id }}</td>
-                <td>{{ record.first_name }} {{ record.father_name }} {{ record.last_name }}</td>
-                <td>{{ record.mother_name }}</td>
+                <td class="col-name" data-original="{{ record.first_name }} {{ record.father_name }} {{ record.last_name }}">
+                    {{ record.first_name }} {{ record.father_name }} {{ record.last_name }}
+                    {% if record.has_conflicting_info %}
+                        <span class="badge bg-danger ms-1" title="يوجد تضارب في المعلومات">!</span>
+                    {% endif %}
+                </td>
+                <td class="col-mother" data-original="{{ record.mother_name }}">{{ record.mother_name }}</td>
                 <td>{{ record.province }}</td>
                 <td>
                     {% if record.status == 'survivor' %}
@@ -74,16 +158,31 @@
                     {% endif %}
                 </td>
                 <td>{{ record.arrest_year }}</td>
+                <td class="col-chronic">
+                    {% if record.chronic_diseases_present %}
+                        <span class="badge bg-info text-dark">نعم</span>
+                    {% endif %}
+                </td>
+                <td class="col-special">
+                    {% if record.has_special_needs %}
+                        <span class="badge bg-info text-dark">نعم</span>
+                    {% endif %}
+                </td>
+                <td class="col-conflict">
+                     {% if record.has_conflicting_info %}
+                        <span class="badge bg-warning text-dark">نعم</span>
+                    {% endif %}
+                </td>
                 <td>
                     <a href="#" class="btn btn-sm btn-info">عرض</a>
                     {% if current_user.role == 'admin' %}
-                    <a href="#" class="btn btn-sm btn-warning">تعديل</a>
+                    <a href="{{ url_for('edit_record', id=record.id) }}" class="btn btn-sm btn-warning">تعديل</a>
                     {% endif %}
                 </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="7" class="text-center">لا توجد سجلات.</td>
+                <td colspan="10" class="text-center">لا توجد سجلات.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -122,5 +221,35 @@
     {% endif %}
   </ul>
 </nav>
+
+<script>
+    // Column Toggling
+    document.querySelectorAll('.col-toggle').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const colClass = this.getAttribute('data-column');
+            const display = this.checked ? '' : 'none';
+            document.querySelectorAll('.' + colClass).forEach(el => el.style.display = display);
+        });
+    });
+
+    // Anonymization Toggle (Client-side visual only for table)
+    document.getElementById('anonymizeToggle').addEventListener('change', function() {
+        const isAnonymized = this.checked;
+        document.querySelectorAll('.col-name').forEach(el => {
+            if (isAnonymized && el.tagName === 'TD') {
+                el.innerText = 'محجوب (هوية محمية)';
+            } else if (el.tagName === 'TD') {
+                el.innerHTML = el.getAttribute('data-original') + (el.innerHTML.includes('badge') ? ' <span class="badge bg-danger ms-1" title="يوجد تضارب في المعلومات">!</span>' : '');
+            }
+        });
+         document.querySelectorAll('.col-mother').forEach(el => {
+            if (isAnonymized && el.tagName === 'TD') {
+                el.innerText = '---';
+            } else if (el.tagName === 'TD') {
+                el.innerText = el.getAttribute('data-original');
+            }
+        });
+    });
+</script>
 
 {% endblock %}

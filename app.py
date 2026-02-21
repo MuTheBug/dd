@@ -16,6 +16,33 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SECRET_KEY'] = 'dev_secret_key' # In prod, use random bytes
 app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'uploads')
 
+def normalize_phone(phone):
+    if not phone:
+        return None
+    # Strip non-digit characters
+    digits = ''.join(filter(str.isdigit, phone))
+
+    # Ensure leading 0 if length is 9 (common case)
+    if len(digits) == 9 and not digits.startswith('0'):
+        digits = '0' + digits
+
+    # Max 10 digits
+    # If starts with 963, remove it
+    if digits.startswith('963') and len(digits) > 10:
+        digits = digits[3:]
+    elif digits.startswith('00963') and len(digits) > 12:
+        digits = digits[5:]
+
+    # Ensure leading 0 if length is 9 (common case)
+    if len(digits) == 9 and not digits.startswith('0'):
+        digits = '0' + digits
+
+    # Max 10 digits
+    if len(digits) > 10:
+        digits = digits[-10:]
+
+    return digits
+
 db.init_app(app)
 login_manager = LoginManager()
 login_manager.login_view = 'login'
@@ -60,6 +87,18 @@ def list_records():
     status_filter = request.args.get('status', '')
     province_filter = request.args.get('province', '')
 
+    # New Filters
+    chronic_filter = request.args.get('chronic_diseases_present')
+    special_needs_filter = request.args.get('has_special_needs')
+    kids_under_18_filter = request.args.get('kids_under_18')
+    arrest_authority_filter = request.args.get('arrest_authority', '')
+    date_start = request.args.get('date_range_start', '')
+    date_end = request.args.get('date_range_end', '')
+    conflicting_filter = request.args.get('has_conflicting_info')
+    verification_filter = request.args.get('verification_status', '')
+    evidence_filter = request.args.get('evidence_level', '')
+    consent_filter = request.args.get('informant_consent')
+
     query = Record.query
 
     if search_query:
@@ -67,7 +106,9 @@ def list_records():
             (Record.first_name.contains(search_query)) |
             (Record.last_name.contains(search_query)) |
             (Record.father_name.contains(search_query)) |
-            (Record.mother_name.contains(search_query))
+            (Record.mother_name.contains(search_query)) |
+            (Record.record_slug.contains(search_query)) |
+            (Record.cause_number.contains(search_query))
         )
 
     if status_filter:
@@ -75,6 +116,40 @@ def list_records():
 
     if province_filter:
         query = query.filter(Record.province == province_filter)
+
+    if chronic_filter:
+        query = query.filter(Record.chronic_diseases_present == 1)
+
+    if special_needs_filter:
+        query = query.filter(Record.has_special_needs == 1)
+
+    if kids_under_18_filter:
+        query = query.filter(Record.kids_under_18_count > 0)
+
+    if arrest_authority_filter:
+        query = query.filter(Record.arrest_authority.contains(arrest_authority_filter))
+
+    if date_start and date_end:
+        # Assuming filtering by arrest year for simplicity in range, or created_at
+        # Here implementing arrest year range
+        try:
+            start_year = int(date_start)
+            end_year = int(date_end)
+            query = query.filter(Record.arrest_year >= start_year, Record.arrest_year <= end_year)
+        except ValueError:
+            pass
+
+    if conflicting_filter:
+        query = query.filter(Record.has_conflicting_info == 1)
+
+    if verification_filter:
+        query = query.filter(Record.verification_status == verification_filter)
+
+    if evidence_filter:
+        query = query.filter(Record.evidence_level == evidence_filter)
+
+    if consent_filter:
+        query = query.filter(Record.informant_consent == 1)
 
     pagination = query.order_by(Record.created_at.desc()).paginate(page=page, per_page=20)
 
@@ -95,7 +170,7 @@ def new_record():
             record.birth_year = request.form.get('birth_year')
             record.province = request.form.get('province')
             record.national_id = request.form.get('national_id')
-            record.phone = request.form.get('phone')
+            record.phone = normalize_phone(request.form.get('phone'))
             record.address = request.form.get('address')
             record.housing_type = request.form.get('housing_type')
 
@@ -124,6 +199,14 @@ def new_record():
             record.civil_registry_status = request.form.get('civil_registry_status')
             record.has_conflicting_info = 1 if request.form.get('has_conflicting_info') else 0
             record.conflicting_info_details = request.form.get('conflicting_info_details')
+
+            # New Fields
+            record.chronic_diseases_present = 1 if request.form.get('chronic_diseases_present') else 0
+            record.reporter_name = request.form.get('reporter_name')
+            record.reporter_relation = request.form.get('reporter_relation')
+            record.reporter_phone = normalize_phone(request.form.get('reporter_phone'))
+            record.informant_consent = 1 if request.form.get('informant_consent') else 0
+            record.evidence_level = request.form.get('evidence_level')
 
             # Files
             if 'photo' in request.files:
@@ -173,7 +256,7 @@ def edit_record(id):
             record.birth_year = request.form.get('birth_year')
             record.province = request.form.get('province')
             record.national_id = request.form.get('national_id')
-            record.phone = request.form.get('phone')
+            record.phone = normalize_phone(request.form.get('phone'))
             record.address = request.form.get('address')
             record.housing_type = request.form.get('housing_type')
 
@@ -198,6 +281,14 @@ def edit_record(id):
             record.civil_registry_status = request.form.get('civil_registry_status')
             record.has_conflicting_info = 1 if request.form.get('has_conflicting_info') else 0
             record.conflicting_info_details = request.form.get('conflicting_info_details')
+
+            # New Fields
+            record.chronic_diseases_present = 1 if request.form.get('chronic_diseases_present') else 0
+            record.reporter_name = request.form.get('reporter_name')
+            record.reporter_relation = request.form.get('reporter_relation')
+            record.reporter_phone = normalize_phone(request.form.get('reporter_phone'))
+            record.informant_consent = 1 if request.form.get('informant_consent') else 0
+            record.evidence_level = request.form.get('evidence_level')
 
             if 'photo' in request.files:
                 file = request.files['photo']
@@ -242,6 +333,7 @@ def reports():
         records = query.all()
 
         selected_columns = request.form.getlist('columns')
+        anonymize = 1 if request.form.get('anonymize') else 0
 
         # Map of field name -> Arabic Label
         column_map = {
@@ -253,7 +345,10 @@ def reports():
             'status': 'الحالة',
             'arrest_year': 'سنة الاعتقال',
             'phone': 'الهاتف',
-            'national_id': 'الرقم الوطني'
+            'national_id': 'الرقم الوطني',
+            'chronic_diseases_present': 'أمراض مزمنة',
+            'has_special_needs': 'احتياجات خاصة',
+            'has_conflicting_info': 'تضارب معلومات'
         }
 
         columns_to_print = []
@@ -265,12 +360,65 @@ def reports():
             flash('الرجاء اختيار عمود واحد على الأقل', 'warning')
             return redirect(url_for('reports'))
 
-        pdf_buffer = generate_pdf(records, "تقرير السجلات", columns_to_print)
+        pdf_buffer = generate_pdf(records, "تقرير السجلات", columns_to_print, anonymize=anonymize)
         pdf_buffer.seek(0)
 
         return send_file(pdf_buffer, as_attachment=True, download_name='report.pdf', mimetype='application/pdf')
 
     return render_template('report_form.html')
+
+@app.route('/reports/export', methods=['POST'])
+@login_required
+def export_csv():
+    # Similar logic to reports filtering
+    status = request.form.get('status')
+    province = request.form.get('province')
+    anonymize = 1 if request.form.get('anonymize') else 0
+
+    query = Record.query
+    if status:
+        query = query.filter_by(status=status)
+    if province:
+        query = query.filter_by(province=province)
+
+    records = query.all()
+
+    # Columns to export
+    columns = [
+        'id', 'first_name', 'father_name', 'last_name', 'mother_name',
+        'province', 'status', 'arrest_year', 'phone', 'national_id',
+        'chronic_diseases_present', 'has_special_needs', 'has_conflicting_info'
+    ]
+
+    import csv
+    from io import StringIO
+
+    si = StringIO()
+    cw = csv.writer(si)
+    cw.writerow(columns) # Header
+
+    for record in records:
+        row = []
+        for col in columns:
+            if anonymize and col in ['first_name', 'father_name', 'last_name', 'mother_name', 'national_id', 'phone']:
+                if col == 'first_name':
+                    row.append(f"Record ID: {record.id}")
+                else:
+                    row.append("---")
+            else:
+                val = getattr(record, col)
+                row.append(val if val is not None else "")
+        cw.writerow(row)
+
+    output = si.getvalue()
+    si.close()
+
+    from flask import Response
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=export.csv"}
+    )
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

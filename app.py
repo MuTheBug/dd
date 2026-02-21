@@ -33,7 +33,7 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB per request
 
 ADMIN_PASSWORD = 'haqquna2024'
 
@@ -206,11 +206,29 @@ REPORTER_RELATIONS = [
 # ---------------------------------------------------------------------------
 def get_db():
     if 'db' not in g:
-        g.db = sqlite3.connect(DB_PATH)
+        g.db = sqlite3.connect(DB_PATH, timeout=30)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA journal_mode=WAL")
         g.db.execute("PRAGMA foreign_keys=ON")
+        g.db.execute("PRAGMA busy_timeout=15000")
     return g.db
+
+
+def db_execute_with_retry(db, sql, params=None, max_retries=3):
+    """Execute DB query with retry logic for concurrent access."""
+    for attempt in range(max_retries):
+        try:
+            if params:
+                result = db.execute(sql, params)
+            else:
+                result = db.execute(sql)
+            db.commit()
+            return result
+        except sqlite3.OperationalError as e:
+            if 'locked' in str(e) and attempt < max_retries - 1:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            raise
 
 
 @app.teardown_appcontext
@@ -343,6 +361,33 @@ def inject_constants():
         'PDF_COLUMNS': PDF_COLUMNS,
         'DEFAULT_PDF_COLS': DEFAULT_PDF_COLS,
     }
+
+
+# ---------------------------------------------------------------------------
+# Error handlers
+# ---------------------------------------------------------------------------
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': False, 'error': 'حجم الملفات كبير جداً. الحد الأقصى 15MB لكل ملف.'}), 413
+    flash('حجم الملفات كبير جداً. الحد الأقصى 15MB لكل ملف. يرجى تقليل حجم الصور قبل الرفع.', 'error')
+    return redirect(url_for('entry_form'))
+
+
+@app.errorhandler(400)
+def bad_request(error):
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': False, 'error': 'طلب غير صالح. يرجى التحقق من البيانات المدخلة.'}), 400
+    flash('حدث خطأ في البيانات المرسلة. يرجى المحاولة مرة أخرى.', 'error')
+    return redirect(url_for('entry_form'))
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': False, 'error': 'خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.'}), 500
+    flash('حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.', 'error')
+    return redirect(url_for('entry_form'))
 
 
 # ---------------------------------------------------------------------------
@@ -520,7 +565,21 @@ def entry_submit():
         slug, photo_hash, doc_hash,
         cv_path, form.get('survivor_cv_text', ''), cv_photo_path
     ))
-    db.commit()
+
+    # Use retry logic for concurrent access
+    for attempt in range(3):
+        try:
+            db.commit()
+            break
+        except sqlite3.OperationalError as e:
+            if 'locked' in str(e) and attempt < 2:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            raise
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    if is_ajax:
+        return jsonify({'success': True, 'message': 'تم حفظ السجل بنجاح. شكراً لمساهمتك في التوثيق.'})
 
     flash('تم حفظ السجل بنجاح. شكراً لمساهمتك في التوثيق.', 'success')
     return redirect(url_for('entry_form'))
@@ -1357,4 +1416,4 @@ if __name__ == '__main__':
     print(f"  Data Entry: http://0.0.0.0:5000/entry")
     print(f"  Password:   {ADMIN_PASSWORD}")
     print("="*60 + "\n")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

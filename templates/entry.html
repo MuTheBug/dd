@@ -2,40 +2,188 @@
 {% block title %}إدخال حالة جديدة - حقنا{% endblock %}
 
 {% block content %}
-<div class="entry-header">
+<style>
+/* Entry form specific styles */
+.entry-page { max-width: 900px; margin: 0 auto; }
+.entry-hero {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    color: white;
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+}
+.entry-hero img { width: 70px; height: 70px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.3); margin-bottom: 0.5rem; }
+.entry-hero h1 { font-size: 1.5rem; margin-bottom: 0.3rem; }
+.entry-hero p { font-size: 0.95rem; opacity: 0.9; }
+
+/* Step progress bar */
+.step-progress { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.5rem; padding: 0 0.5rem; }
+.step-item { display: flex; flex-direction: column; align-items: center; position: relative; flex: 1; }
+.step-circle {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; font-weight: 700; z-index: 2;
+    background: var(--card); color: var(--text-light); border: 3px solid var(--border);
+    transition: all 0.3s ease;
+}
+.step-item.active .step-circle { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(13,115,119,0.2); }
+.step-item.completed .step-circle { background: var(--survivor); color: white; border-color: var(--survivor); }
+.step-label { font-size: 0.72rem; color: var(--text-light); margin-top: 0.3rem; text-align: center; max-width: 80px; }
+.step-item.active .step-label { color: var(--primary); font-weight: 600; }
+.step-item.completed .step-label { color: var(--survivor); }
+.step-line {
+    position: absolute; top: 20px; right: -50%; left: 50%; height: 3px;
+    background: var(--border); z-index: 1;
+}
+.step-item.completed .step-line { background: var(--survivor); }
+.step-item:last-child .step-line { display: none; }
+
+/* Section cards */
+.entry-section {
+    background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border);
+}
+.entry-section-title {
+    font-size: 1.15rem; font-weight: 700; color: var(--primary-dark);
+    margin-bottom: 1rem; padding-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem;
+    border-bottom: 2px solid var(--primary-light);
+}
+.entry-section-desc {
+    font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem;
+    padding: 0.6rem 0.8rem; background: rgba(13,115,119,0.05); border-radius: var(--radius-sm);
+    border-right: 3px solid var(--primary);
+}
+
+/* File upload */
+.file-upload-area {
+    border: 2px dashed var(--border); border-radius: var(--radius-sm);
+    padding: 1rem; text-align: center; cursor: pointer;
+    transition: all 0.3s ease; position: relative;
+}
+.file-upload-area:hover { border-color: var(--primary); background: rgba(13,115,119,0.03); }
+.file-upload-area.has-file { border-color: var(--survivor); background: rgba(39,174,96,0.05); }
+.file-upload-icon { font-size: 1.8rem; margin-bottom: 0.3rem; }
+.file-upload-text { font-size: 0.9rem; color: var(--text-light); }
+.file-upload-limit { font-size: 0.8rem; color: var(--text-light); opacity: 0.7; margin-top: 0.2rem; }
+.file-upload-name { font-size: 0.85rem; color: var(--survivor); font-weight: 600; margin-top: 0.3rem; }
+.file-upload-area input[type="file"] {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+
+/* Step navigation */
+.step-actions {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);
+}
+.step-actions .step-counter { font-size: 0.9rem; color: var(--text-light); }
+
+/* Submit overlay */
+.submit-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6); z-index: 2000;
+    justify-content: center; align-items: center;
+}
+.submit-overlay.active { display: flex; }
+.submit-box {
+    background: var(--card); border-radius: var(--radius); padding: 2rem;
+    text-align: center; max-width: 400px; width: 90%; box-shadow: var(--shadow-lg);
+    color: var(--text);
+}
+.submit-spinner {
+    width: 50px; height: 50px; border: 4px solid var(--border);
+    border-top: 4px solid var(--primary); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.submit-progress { width: 100%; height: 8px; background: var(--border); border-radius: 4px; margin: 1rem 0; overflow: hidden; }
+.submit-progress-bar { height: 100%; background: var(--primary); border-radius: 4px; transition: width 0.3s; width: 0%; }
+.submit-status { font-size: 0.95rem; color: var(--text); margin-top: 0.5rem; }
+
+/* Result message */
+.result-msg {
+    display: none; padding: 1rem 1.2rem; border-radius: var(--radius-sm);
+    margin-bottom: 1rem; font-size: 0.95rem; font-weight: 600;
+}
+.result-msg.success { display: block; background: rgba(39,174,96,0.12); color: var(--survivor); border: 1px solid var(--survivor); }
+.result-msg.error { display: block; background: rgba(192,57,43,0.12); color: var(--deceased); border: 1px solid var(--deceased); }
+
+/* Children entry redesign */
+.child-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 1rem; margin-bottom: 0.6rem; position: relative;
+    border-right: 3px solid var(--primary-light);
+}
+.child-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border);
+}
+.child-card-title { font-size: 0.95rem; font-weight: 600; color: var(--primary-dark); }
+.child-remove {
+    background: var(--deceased); color: white; border: none; border-radius: var(--radius-sm);
+    padding: 0.25rem 0.6rem; cursor: pointer; font-size: 0.82rem; transition: all 0.2s;
+}
+.child-remove:hover { background: #a93226; }
+
+/* Draft saved indicator */
+.draft-indicator {
+    position: fixed; bottom: 1rem; left: 1rem; padding: 0.5rem 1rem;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 0.82rem; color: var(--text-light);
+    box-shadow: var(--shadow); z-index: 100; opacity: 0; transition: opacity 0.3s;
+}
+.draft-indicator.show { opacity: 1; }
+
+/* Kids counter */
+.kids-counter {
+    display: inline-flex; align-items: center; gap: 0.8rem; padding: 0.5rem 0.8rem;
+    background: rgba(13,115,119,0.06); border-radius: var(--radius-sm);
+    font-size: 0.92rem; margin-bottom: 0.7rem;
+}
+.kids-counter strong { color: var(--primary); }
+
+@media (max-width: 600px) {
+    .step-label { display: none; }
+    .step-circle { width: 34px; height: 34px; font-size: 0.8rem; }
+    .entry-section { padding: 1rem; }
+}
+</style>
+
+<div class="entry-page">
+
+<div class="entry-hero">
     <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="حقنا">
     <h1>نموذج إدخال حالة جديدة</h1>
     <p>وفق بروتوكول بيركلي للتحقيقات الرقمية مفتوحة المصدر</p>
 </div>
 
-<!-- Step Indicator -->
-<div class="form-step-indicator" id="stepIndicator">
-    <div class="step-dot active" data-step="1">1</div>
-    <div class="step-connector"></div>
-    <div class="step-dot" data-step="2">2</div>
-    <div class="step-connector"></div>
-    <div class="step-dot" data-step="3">3</div>
-    <div class="step-connector"></div>
-    <div class="step-dot" data-step="4">4</div>
-    <div class="step-connector"></div>
-    <div class="step-dot" data-step="5">5</div>
-    <div class="step-connector"></div>
-    <div class="step-dot" data-step="6">6</div>
-    <div class="step-connector"></div>
-    <div class="step-dot" data-step="7">7</div>
+<!-- Result Message -->
+<div id="resultMsg" class="result-msg"></div>
+
+<!-- Step Progress -->
+<div class="step-progress" id="stepProgress">
+    <div class="step-item active" data-step="1"><div class="step-line"></div><div class="step-circle">1</div><div class="step-label">المُبلِّغ</div></div>
+    <div class="step-item" data-step="2"><div class="step-line"></div><div class="step-circle">2</div><div class="step-label">البيانات الشخصية</div></div>
+    <div class="step-item" data-step="3"><div class="step-line"></div><div class="step-circle">3</div><div class="step-label">الاعتقال</div></div>
+    <div class="step-item" data-step="4"><div class="step-line"></div><div class="step-circle">4</div><div class="step-label">الأدلة</div></div>
+    <div class="step-item" data-step="5"><div class="step-line"></div><div class="step-circle">5</div><div class="step-label">العائلة</div></div>
+    <div class="step-item" data-step="6"><div class="step-line"></div><div class="step-circle">6</div><div class="step-label">السكن والصحة</div></div>
+    <div class="step-item" data-step="7"><div class="step-circle">7</div><div class="step-label">القانوني</div></div>
 </div>
 
 <form method="POST" action="{{ url_for('entry_submit') }}" enctype="multipart/form-data" id="entryForm">
 
 <!-- STEP 1: Reporter & Classification -->
 <div class="form-step active" data-step="1">
-    <div class="form-section">
-        <div class="form-section-title">&#x1F4DD; بيانات المُبلِّغ وتصنيف الحالة</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F4DD; بيانات المُبلِّغ وتصنيف الحالة</div>
+        <div class="entry-section-desc">حدد تصنيف الحالة أولاً، ثم أدخل بيانات المُبلِّغ. الحقول المرمّزة بـ <span class="required">*</span> إلزامية.</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>تصنيف الحالة <span class="required">*</span></label>
                 <select name="status" id="statusSelect" required onchange="handleStatusChange()">
-                    <option value="">-- اختر --</option>
+                    <option value="">-- اختر التصنيف --</option>
                     <option value="survivor">ناجٍ (شخص أُفرج عنه / هرب)</option>
                     <option value="enforced">مغيّب قسراً (لا يُعرف مصيره)</option>
                     <option value="deceased">متوفى (مؤكد الوفاة)</option>
@@ -44,9 +192,9 @@
             <div class="form-group">
                 <label>نوع الحالة التفصيلي</label>
                 <select name="case_type" id="caseTypeSelect">
-                    <option value="">-- اختر بعد تحديد التصنيف --</option>
+                    <option value="">-- اختر التصنيف أولاً --</option>
                 </select>
-                <span class="hint">سيتم تحديث الخيارات بناءً على التصنيف</span>
+                <span class="hint">سيتم تحديث الخيارات تلقائياً بناءً على التصنيف</span>
             </div>
             <div class="form-group">
                 <label>اسم المُبلِّغ <span class="required">*</span></label>
@@ -55,7 +203,7 @@
             <div class="form-group">
                 <label>صلة المُبلِّغ بالضحية <span class="required">*</span></label>
                 <select name="reporter_relation" required>
-                    <option value="">-- اختر --</option>
+                    <option value="">-- اختر الصلة --</option>
                     {% for rel in REPORTER_RELATIONS %}
                     <option value="{{ rel }}">{{ rel }}</option>
                     {% endfor %}
@@ -85,16 +233,17 @@
             </div>
         </div>
     </div>
-    <div class="step-nav">
-        <span></span>
-        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+    <div class="step-actions">
+        <span class="step-counter">الخطوة 1 من 7</span>
+        <button type="button" class="btn btn-primary btn-lg" onclick="nextStep()">التالي &#x2190;</button>
     </div>
 </div>
 
 <!-- STEP 2: Personal Information -->
 <div class="form-step" data-step="2">
-    <div class="form-section">
-        <div class="form-section-title">&#x1F464; البيانات الشخصية للضحية</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F464; البيانات الشخصية للضحية</div>
+        <div class="entry-section-desc">أدخل البيانات الشخصية للضحية. هذه البيانات أساسية للتوثيق والمطابقة.</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>الاسم الأول <span class="required">*</span></label>
@@ -131,7 +280,7 @@
             <div class="form-group">
                 <label>المحافظة <span class="required">*</span></label>
                 <select name="province" required>
-                    <option value="">-- اختر --</option>
+                    <option value="">-- اختر المحافظة --</option>
                     {% for p in PROVINCES %}
                     <option value="{{ p }}">{{ p }}</option>
                     {% endfor %}
@@ -154,26 +303,49 @@
                     {% endfor %}
                 </select>
             </div>
+        </div>
+    </div>
+
+    <!-- File uploads in dedicated section -->
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F4CE; المرفقات</div>
+        <div class="entry-section-desc">الحد الأقصى لحجم كل ملف: 15 ميغابايت. الصيغ المقبولة: JPG, PNG, PDF.</div>
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
             <div class="form-group">
                 <label>صورة شخصية</label>
-                <input type="file" name="photo" accept="image/*">
+                <div class="file-upload-area" id="photoArea">
+                    <div class="file-upload-icon">&#x1F4F7;</div>
+                    <div class="file-upload-text">اضغط لاختيار صورة</div>
+                    <div class="file-upload-limit">JPG, PNG - حتى 15MB</div>
+                    <div class="file-upload-name" id="photoName"></div>
+                    <input type="file" name="photo" accept="image/*" onchange="handleFileSelect(this, 'photoArea', 'photoName', 15)">
+                </div>
             </div>
             <div class="form-group">
-                <label>وثيقة هوية (صورة)</label>
-                <input type="file" name="document" accept="image/*,.pdf">
+                <label>وثيقة هوية</label>
+                <div class="file-upload-area" id="docArea">
+                    <div class="file-upload-icon">&#x1F4C4;</div>
+                    <div class="file-upload-text">اضغط لاختيار وثيقة</div>
+                    <div class="file-upload-limit">JPG, PNG, PDF - حتى 15MB</div>
+                    <div class="file-upload-name" id="docName"></div>
+                    <input type="file" name="document" accept="image/*,.pdf" onchange="handleFileSelect(this, 'docArea', 'docName', 15)">
+                </div>
             </div>
         </div>
     </div>
-    <div class="step-nav">
+
+    <div class="step-actions">
         <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
-        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+        <span class="step-counter">الخطوة 2 من 7</span>
+        <button type="button" class="btn btn-primary btn-lg" onclick="nextStep()">التالي &#x2190;</button>
     </div>
 </div>
 
 <!-- STEP 3: Arrest & Detention Details -->
 <div class="form-step" data-step="3">
-    <div class="form-section">
-        <div class="form-section-title">&#x26D3;&#xFE0F; تفاصيل الاعتقال والاحتجاز</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x26D3;&#xFE0F; تفاصيل الاعتقال والاحتجاز</div>
+        <div class="entry-section-desc">أدخل تفاصيل الاعتقال. إن لم تكن متأكداً من بعض التفاصيل اتركها فارغة.</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>تاريخ الاعتقال</label>
@@ -221,8 +393,8 @@
     </div>
 
     <!-- Survivor: Release info -->
-    <div class="form-section conditional-section" id="releaseSection">
-        <div class="form-section-title">&#x1F513; بيانات الإفراج (للناجين)</div>
+    <div class="entry-section conditional-section" id="releaseSection">
+        <div class="entry-section-title">&#x1F513; بيانات الإفراج (للناجين)</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>تاريخ الإفراج</label>
@@ -233,12 +405,24 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>صورة عن السيرة الذاتية / ملخص التجربة</label>
-                <input type="file" name="survivor_cv" accept="image/*,.pdf,.doc,.docx">
+                <label>ملخص التجربة / السيرة الذاتية</label>
+                <div class="file-upload-area" id="cvArea">
+                    <div class="file-upload-icon">&#x1F4C3;</div>
+                    <div class="file-upload-text">اضغط لاختيار ملف</div>
+                    <div class="file-upload-limit">صورة أو PDF - حتى 15MB</div>
+                    <div class="file-upload-name" id="cvName"></div>
+                    <input type="file" name="survivor_cv" accept="image/*,.pdf,.doc,.docx" onchange="handleFileSelect(this, 'cvArea', 'cvName', 15)">
+                </div>
             </div>
             <div class="form-group">
-                <label>صورة شخصية بعد الإفراج</label>
-                <input type="file" name="survivor_cv_photo" accept="image/*">
+                <label>صورة بعد الإفراج</label>
+                <div class="file-upload-area" id="cvPhotoArea">
+                    <div class="file-upload-icon">&#x1F4F7;</div>
+                    <div class="file-upload-text">اضغط لاختيار صورة</div>
+                    <div class="file-upload-limit">حتى 15MB</div>
+                    <div class="file-upload-name" id="cvPhotoName"></div>
+                    <input type="file" name="survivor_cv_photo" accept="image/*" onchange="handleFileSelect(this, 'cvPhotoArea', 'cvPhotoName', 15)">
+                </div>
             </div>
             <div class="form-group full-width">
                 <label>وصف تجربة الاعتقال</label>
@@ -248,8 +432,8 @@
     </div>
 
     <!-- Deceased: Death info -->
-    <div class="form-section conditional-section" id="deathSection">
-        <div class="form-section-title">&#x1F3F4; بيانات الوفاة</div>
+    <div class="entry-section conditional-section" id="deathSection">
+        <div class="entry-section-title">&#x1F3F4; بيانات الوفاة</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>تاريخ الوفاة</label>
@@ -266,16 +450,18 @@
         </div>
     </div>
 
-    <div class="step-nav">
+    <div class="step-actions">
         <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
-        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+        <span class="step-counter">الخطوة 3 من 7</span>
+        <button type="button" class="btn btn-primary btn-lg" onclick="nextStep()">التالي &#x2190;</button>
     </div>
 </div>
 
-<!-- STEP 4: Evidence & Verification (Berkeley Protocol) -->
+<!-- STEP 4: Evidence & Verification -->
 <div class="form-step" data-step="4">
-    <div class="form-section">
-        <div class="form-section-title">&#x1F50D; الأدلة والتحقق - بروتوكول بيركلي</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F50D; الأدلة والتحقق - بروتوكول بيركلي</div>
+        <div class="entry-section-desc">وثّق أي أدلة رقمية متوفرة. هذا يعزز مصداقية الحالة.</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>نوع الدليل الرقمي</label>
@@ -302,8 +488,8 @@
     </div>
 
     <!-- Digital Evidence Details -->
-    <div class="form-section conditional-section" id="digitalEvidenceSection">
-        <div class="form-section-title">&#x1F4F1; تفاصيل الدليل الرقمي</div>
+    <div class="entry-section conditional-section" id="digitalEvidenceSection">
+        <div class="entry-section-title">&#x1F4F1; تفاصيل الدليل الرقمي</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>رابط الدليل (إن وُجد)</label>
@@ -321,8 +507,13 @@
             </div>
             <div class="form-group">
                 <label>لقطة شاشة للدليل</label>
-                <input type="file" name="digital_evidence_screenshot" accept="image/*,.pdf">
-                <span class="hint">مهم جداً في حال كان الرابط محذوفاً</span>
+                <div class="file-upload-area" id="screenshotArea">
+                    <div class="file-upload-icon">&#x1F4F1;</div>
+                    <div class="file-upload-text">اضغط لاختيار لقطة شاشة</div>
+                    <div class="file-upload-limit">مهم في حال كان الرابط محذوفاً - حتى 15MB</div>
+                    <div class="file-upload-name" id="screenshotName"></div>
+                    <input type="file" name="digital_evidence_screenshot" accept="image/*,.pdf" onchange="handleFileSelect(this, 'screenshotArea', 'screenshotName', 15)">
+                </div>
             </div>
             <div class="form-group">
                 <label>تاريخ الدليل الرقمي</label>
@@ -344,12 +535,12 @@
     </div>
 
     <!-- Civil Registry -->
-    <div class="form-section">
-        <div class="form-section-title">&#x1F4C4; حالة السجل المدني (النفوس)</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F4C4; حالة السجل المدني (النفوس)</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>حالة السجل المدني</label>
-                <select name="civil_registry_status" id="civilRegistryStatus" onchange="handleCivilRegistry()">
+                <select name="civil_registry_status">
                     {% for code, label in CIVIL_REGISTRY_STATUSES %}
                     <option value="{{ code }}">{{ label }}</option>
                     {% endfor %}
@@ -360,15 +551,21 @@
                 <input type="date" name="civil_registry_date">
             </div>
             <div class="form-group">
-                <label>وثيقة من النفوس (إخراج قيد)</label>
-                <input type="file" name="civil_registry_document" accept="image/*,.pdf">
+                <label>وثيقة من النفوس</label>
+                <div class="file-upload-area" id="civilArea">
+                    <div class="file-upload-icon">&#x1F4C4;</div>
+                    <div class="file-upload-text">اضغط لرفع إخراج قيد</div>
+                    <div class="file-upload-limit">حتى 15MB</div>
+                    <div class="file-upload-name" id="civilName"></div>
+                    <input type="file" name="civil_registry_document" accept="image/*,.pdf" onchange="handleFileSelect(this, 'civilArea', 'civilName', 15)">
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Conflicting Info -->
-    <div class="form-section">
-        <div class="form-section-title">&#x26A0;&#xFE0F; معلومات متضاربة</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x26A0;&#xFE0F; معلومات متضاربة</div>
         <div class="form-grid">
             <div class="form-group">
                 <label class="checkbox-label">
@@ -385,25 +582,25 @@
     </div>
 
     <!-- Witnesses -->
-    <div class="form-section">
-        <div class="form-section-title">&#x1F465; الشهود</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F465; الشهود</div>
+        <div class="entry-section-desc">أضف شهوداً لتعزيز مصداقية الحالة (اختياري).</div>
         <div id="witnessesContainer"></div>
-        <button type="button" class="btn btn-outline btn-sm" onclick="addWitness()" style="margin-top: 0.5rem;">
-            + إضافة شاهد
-        </button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addWitness()" style="margin-top: 0.5rem;">+ إضافة شاهد</button>
         <input type="hidden" name="witnesses_data" id="witnessesData" value="[]">
     </div>
 
-    <div class="step-nav">
+    <div class="step-actions">
         <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
-        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+        <span class="step-counter">الخطوة 4 من 7</span>
+        <button type="button" class="btn btn-primary btn-lg" onclick="nextStep()">التالي &#x2190;</button>
     </div>
 </div>
 
 <!-- STEP 5: Family & Social -->
 <div class="form-step" data-step="5">
-    <div class="form-section">
-        <div class="form-section-title">&#x1F46A; البيانات العائلية والاجتماعية</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F46A; البيانات العائلية والاجتماعية</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>الحالة الاجتماعية</label>
@@ -429,8 +626,8 @@
         </div>
     </div>
 
-    <div class="form-section conditional-section" id="spouseSection">
-        <div class="form-section-title">&#x1F48D; بيانات الزوج/ة</div>
+    <div class="entry-section conditional-section" id="spouseSection">
+        <div class="entry-section-title">&#x1F48D; بيانات الزوج/ة</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>اسم الزوج/ة</label>
@@ -444,21 +641,23 @@
     </div>
 
     <!-- Dynamic Children Social Survey -->
-    <div class="form-section">
-        <div class="form-section-title">&#x1F476; المسح الاجتماعي للأطفال</div>
-        <div style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">
-            أضف بيانات كل طفل على حدة. عدد الأطفال: <strong id="entryKidsCount">0</strong> | قاصرين: <strong id="entryKidsUnder18">0</strong>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F476; المسح الاجتماعي للأطفال</div>
+        <div class="entry-section-desc">أضف بيانات كل طفل على حدة. يمكنك إضافة أكثر من طفل.</div>
+        <div class="kids-counter">
+            عدد الأطفال: <strong id="entryKidsCount">0</strong>
+            &nbsp;|&nbsp; قاصرين (أقل من 18): <strong id="entryKidsUnder18">0</strong>
         </div>
         <div id="entryChildrenContainer"></div>
-        <button type="button" class="btn btn-outline btn-sm" onclick="addEntryChild()" style="margin-top: 0.5rem;">+ إضافة طفل</button>
+        <button type="button" class="btn btn-outline" onclick="addEntryChild()" style="margin-top: 0.5rem;">+ إضافة طفل</button>
         <input type="hidden" name="children_data" id="entryChildrenData" value="[]">
         <input type="hidden" name="has_kids" id="entryHasKids" value="no">
         <input type="hidden" name="kids_count" id="entryKidsCountInput" value="0">
         <input type="hidden" name="kids_under_18_count" id="entryKidsUnder18Input" value="0">
     </div>
 
-    <div class="form-section conditional-section" id="exSpouseSection">
-        <div class="form-section-title">بيانات الزوج/ة السابق/ة</div>
+    <div class="entry-section conditional-section" id="exSpouseSection">
+        <div class="entry-section-title">بيانات الزوج/ة السابق/ة</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>اسم الزوج/ة السابق/ة</label>
@@ -478,16 +677,17 @@
         </div>
     </div>
 
-    <div class="step-nav">
+    <div class="step-actions">
         <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
-        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+        <span class="step-counter">الخطوة 5 من 7</span>
+        <button type="button" class="btn btn-primary btn-lg" onclick="nextStep()">التالي &#x2190;</button>
     </div>
 </div>
 
 <!-- STEP 6: Socioeconomic & Health -->
 <div class="form-step" data-step="6">
-    <div class="form-section">
-        <div class="form-section-title">&#x1F3E0; البيانات السكنية والاقتصادية</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F3E0; البيانات السكنية والاقتصادية</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>العنوان الحالي <span class="required">*</span></label>
@@ -538,8 +738,8 @@
         </div>
     </div>
 
-    <div class="form-section">
-        <div class="form-section-title">&#x1F3EB; التحصيل العلمي</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F3EB; التحصيل العلمي</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>المستوى التعليمي</label>
@@ -570,8 +770,8 @@
         </div>
     </div>
 
-    <div class="form-section">
-        <div class="form-section-title">&#x1F3E5; الحالة الصحية</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F3E5; الحالة الصحية</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>أمراض مزمنة؟</label>
@@ -608,16 +808,17 @@
         </div>
     </div>
 
-    <div class="step-nav">
+    <div class="step-actions">
         <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
-        <button type="button" class="btn btn-primary" onclick="nextStep()">التالي &#x2190;</button>
+        <span class="step-counter">الخطوة 6 من 7</span>
+        <button type="button" class="btn btn-primary btn-lg" onclick="nextStep()">التالي &#x2190;</button>
     </div>
 </div>
 
 <!-- STEP 7: Legal & Notes -->
 <div class="form-step" data-step="7">
-    <div class="form-section">
-        <div class="form-section-title">&#x2696;&#xFE0F; الوضع القانوني والجمعيات</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x2696;&#xFE0F; الوضع القانوني والجمعيات</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>هل يوجد إجراء قانوني؟</label>
@@ -656,71 +857,101 @@
         </div>
     </div>
 
-    <div class="form-section">
-        <div class="form-section-title">&#x1F4DD; ملاحظات إضافية</div>
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F4DD; ملاحظات إضافية</div>
         <div class="form-group full-width">
             <textarea name="notes" rows="4" placeholder="أي ملاحظات إضافية أو معلومات لم تُذكر أعلاه..."></textarea>
         </div>
-        <div class="form-group full-width">
+        <div class="form-group full-width" style="margin-top: 0.8rem;">
             <label>ملاحظات منهجية التوثيق</label>
             <textarea name="methodology_notes" rows="3" placeholder="ملاحظات حول طريقة جمع البيانات وظروف المقابلة..."></textarea>
         </div>
     </div>
 
-    <div class="step-nav">
+    <div class="step-actions">
         <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
-        <button type="submit" class="btn btn-success btn-lg btn-block">&#x2714; حفظ السجل</button>
+        <span class="step-counter">الخطوة 7 من 7</span>
+        <button type="button" class="btn btn-success btn-lg" onclick="submitForm()" id="submitBtn">&#x2714; حفظ السجل</button>
     </div>
 </div>
 
 </form>
+
+<!-- Submit overlay -->
+<div class="submit-overlay" id="submitOverlay">
+    <div class="submit-box">
+        <div class="submit-spinner"></div>
+        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">جاري حفظ السجل...</div>
+        <div class="submit-progress"><div class="submit-progress-bar" id="submitProgressBar"></div></div>
+        <div class="submit-status" id="submitStatus">جاري رفع البيانات والملفات...</div>
+    </div>
+</div>
+
+<!-- Draft saved indicator -->
+<div class="draft-indicator" id="draftIndicator">&#x1F4BE; تم حفظ المسودة تلقائياً</div>
+
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-let currentStep = 1;
-const totalSteps = 7;
+var currentStep = 1;
+var totalSteps = 7;
+var isSubmitting = false;
 
-function updateStepIndicator() {
-    document.querySelectorAll('.step-dot').forEach(dot => {
-        const s = parseInt(dot.dataset.step);
-        dot.classList.remove('active', 'completed');
-        if (s === currentStep) dot.classList.add('active');
-        else if (s < currentStep) dot.classList.add('completed');
+// === Step Navigation ===
+function updateStepUI() {
+    document.querySelectorAll('.step-item').forEach(function(item) {
+        var s = parseInt(item.dataset.step);
+        item.classList.remove('active', 'completed');
+        if (s === currentStep) item.classList.add('active');
+        else if (s < currentStep) item.classList.add('completed');
     });
-    document.querySelectorAll('.form-step').forEach(step => {
+    document.querySelectorAll('.form-step').forEach(function(step) {
         step.classList.toggle('active', parseInt(step.dataset.step) === currentStep);
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    saveDraft();
 }
 
 function nextStep() {
-    if (currentStep < totalSteps) {
-        currentStep++;
-        updateStepIndicator();
-    }
+    if (currentStep < totalSteps) { currentStep++; updateStepUI(); }
 }
-
 function prevStep() {
-    if (currentStep > 1) {
-        currentStep--;
-        updateStepIndicator();
+    if (currentStep > 1) { currentStep--; updateStepUI(); }
+}
+
+// === File upload handler ===
+function handleFileSelect(input, areaId, nameId, maxSizeMB) {
+    var area = document.getElementById(areaId);
+    var nameEl = document.getElementById(nameId);
+    if (input.files && input.files[0]) {
+        var file = input.files[0];
+        var sizeMB = file.size / (1024 * 1024);
+        if (sizeMB > maxSizeMB) {
+            alert('حجم الملف (' + sizeMB.toFixed(1) + 'MB) أكبر من الحد المسموح (' + maxSizeMB + 'MB). يرجى اختيار ملف أصغر.');
+            input.value = '';
+            area.classList.remove('has-file');
+            nameEl.textContent = '';
+            return;
+        }
+        area.classList.add('has-file');
+        nameEl.textContent = file.name + ' (' + sizeMB.toFixed(1) + 'MB)';
+    } else {
+        area.classList.remove('has-file');
+        nameEl.textContent = '';
     }
 }
 
+// === Status change handler ===
 function handleStatusChange() {
-    const status = document.getElementById('statusSelect').value;
-    const caseType = document.getElementById('caseTypeSelect');
-    const releaseSection = document.getElementById('releaseSection');
-    const deathSection = document.getElementById('deathSection');
-
-    releaseSection.classList.remove('active');
-    deathSection.classList.remove('active');
-
+    var status = document.getElementById('statusSelect').value;
+    var caseType = document.getElementById('caseTypeSelect');
+    document.getElementById('releaseSection').classList.remove('active');
+    document.getElementById('deathSection').classList.remove('active');
     caseType.innerHTML = '<option value="">-- اختر --</option>';
-
     if (status === 'survivor') {
-        releaseSection.classList.add('active');
+        document.getElementById('releaseSection').classList.add('active');
         caseType.innerHTML += '<option value="survivor_documented">ناجٍ - لديه وثائق</option>';
         caseType.innerHTML += '<option value="survivor_undocumented">ناجٍ - بدون وثائق</option>';
     } else if (status === 'enforced') {
@@ -728,7 +959,7 @@ function handleStatusChange() {
         caseType.innerHTML += '<option value="enforced_disappearance_leaked_not_confirmed">تسريبات تؤكد الوفاة - غير مؤكد بالنفوس</option>';
         caseType.innerHTML += '<option value="enforced_disappearance_witnesses_alive_registry">شهود على الاعتقال - حي بالنفوس</option>';
     } else if (status === 'deceased') {
-        deathSection.classList.add('active');
+        document.getElementById('deathSection').classList.add('active');
         caseType.innerHTML += '<option value="enforced_disappearance_leaked_confirmed_dead">تسريبات + مؤكد بالنفوس</option>';
         caseType.innerHTML += '<option value="enforced_disappearance_civil_registry_dead">متوفى بحسب النفوس فقط</option>';
         caseType.innerHTML += '<option value="deceased_caesar_files">متوفى - ملفات قيصر</option>';
@@ -736,54 +967,35 @@ function handleStatusChange() {
 }
 
 function handleDigitalEvidence() {
-    const type = document.getElementById('digitalEvidenceType').value;
+    var type = document.getElementById('digitalEvidenceType').value;
     document.getElementById('digitalEvidenceSection').classList.toggle('active', type !== '');
 }
 
-function handleCivilRegistry() {
-    // No conditional display needed here
-}
-
 function handleMarital() {
-    const val = document.getElementById('maritalSelect').value;
+    var val = document.getElementById('maritalSelect').value;
     document.getElementById('spouseSection').classList.toggle('active', val === 'married' || val === 'widowed');
     document.getElementById('exSpouseSection').classList.toggle('active', val === 'divorced');
 }
 
-// Witnesses
-let witnessCount = 0;
+// === Witnesses ===
+var witnessCount = 0;
 function addWitness() {
     witnessCount++;
-    const container = document.getElementById('witnessesContainer');
-    const div = document.createElement('div');
+    var container = document.getElementById('witnessesContainer');
+    var div = document.createElement('div');
     div.className = 'witness-entry';
-    div.id = 'witness-' + witnessCount;
-    div.innerHTML = `
-        <button type="button" class="remove-witness" onclick="this.parentElement.remove()">&times;</button>
-        <div class="form-grid">
-            <div class="form-group">
-                <label>اسم الشاهد</label>
-                <input type="text" class="w-name" placeholder="الاسم الكامل">
-            </div>
-            <div class="form-group">
-                <label>هاتف الشاهد</label>
-                <input type="tel" class="w-phone" placeholder="رقم الهاتف">
-            </div>
-            <div class="form-group">
-                <label>صلة الشاهد</label>
-                <input type="text" class="w-relation" placeholder="صلته بالضحية">
-            </div>
-            <div class="form-group full-width">
-                <label>شهادته</label>
-                <textarea class="w-testimony" rows="2" placeholder="ماذا شهد هذا الشخص؟"></textarea>
-            </div>
-        </div>
-    `;
+    div.innerHTML = '<button type="button" class="remove-witness" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div class="form-grid">' +
+        '<div class="form-group"><label>اسم الشاهد</label><input type="text" class="w-name" placeholder="الاسم الكامل"></div>' +
+        '<div class="form-group"><label>هاتف الشاهد</label><input type="tel" class="w-phone" placeholder="رقم الهاتف"></div>' +
+        '<div class="form-group"><label>صلة الشاهد</label><input type="text" class="w-relation" placeholder="صلته بالضحية"></div>' +
+        '<div class="form-group full-width"><label>شهادته</label><textarea class="w-testimony" rows="2" placeholder="ماذا شهد هذا الشخص؟"></textarea></div>' +
+        '</div>';
     container.appendChild(div);
 }
 
-// Children form
-var entryEduLevels = ['أمّي','ابتدائية','إعدادية','ثانوية','معهد','بكالوريوس','ماجستير','دكتوراه'];
+// === Children ===
+var entryEduLevels = ['\u0623\u0645\u0651\u064a','\u0627\u0628\u062a\u062f\u0627\u0626\u064a\u0629','\u0625\u0639\u062f\u0627\u062f\u064a\u0629','\u062b\u0627\u0646\u0648\u064a\u0629','\u0645\u0639\u0647\u062f','\u0628\u0643\u0627\u0644\u0648\u0631\u064a\u0648\u0633','\u0645\u0627\u062c\u0633\u062a\u064a\u0631','\u062f\u0643\u062a\u0648\u0631\u0627\u0647'];
 var entryCurrentYear = new Date().getFullYear();
 
 function addEntryChild(data) {
@@ -791,41 +1003,40 @@ function addEntryChild(data) {
     var container = document.getElementById('entryChildrenContainer');
     var idx = container.children.length;
     var div = document.createElement('div');
-    div.className = 'child-entry';
-    div.style.cssText = 'background: #fafafa; border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem; margin-bottom: 0.5rem; position: relative;';
+    div.className = 'child-card';
 
-    var eduOpts = '<option value="">--</option>';
+    var eduOpts = '<option value="">-- اختر --</option>';
     for (var i = 0; i < entryEduLevels.length; i++) {
         var sel = (data.education === entryEduLevels[i]) ? ' selected' : '';
         eduOpts += '<option value="' + entryEduLevels[i] + '"' + sel + '>' + entryEduLevels[i] + '</option>';
     }
 
-    div.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">' +
-        '<strong style="font-size:0.8rem;color:#095355;">طفل #' + (idx+1) + '</strong>' +
-        '<button type="button" onclick="removeEntryChild(this)" style="background:#c0392b;color:white;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.75rem;">حذف</button></div>' +
-        '<div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.4rem;">' +
-        '<div class="form-group"><label style="font-size:0.7rem;">الاسم</label><input type="text" class="ec-name" value="' + (data.name||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
-        '<div class="form-group"><label style="font-size:0.7rem;">الجنس</label><select class="ec-gender" style="font-size:0.8rem;padding:4px 6px;"><option value="">--</option><option value="male"' + (data.gender==='male'?' selected':'') + '>ذكر</option><option value="female"' + (data.gender==='female'?' selected':'') + '>أنثى</option></select></div>' +
-        '<div class="form-group"><label style="font-size:0.7rem;">سنة الميلاد</label><input type="number" class="ec-birth" value="' + (data.birth_year||'') + '" min="1990" max="2026" style="font-size:0.8rem;padding:4px 6px;"></div>' +
-        '<div class="form-group"><label style="font-size:0.7rem;">التحصيل العلمي</label><select class="ec-edu" style="font-size:0.8rem;padding:4px 6px;">' + eduOpts + '</select></div>' +
-        '<div class="form-group"><label style="font-size:0.7rem;">المدرسة/الجامعة</label><input type="text" class="ec-school" value="' + (data.school||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
-        '<div class="form-group"><label style="font-size:0.7rem;">العمل</label><input type="text" class="ec-work" value="' + (data.employment||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
-        '<div class="form-group"><label style="font-size:0.7rem;">ملاحظات صحية</label><input type="text" class="ec-health" value="' + (data.health_notes||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
-        '<div class="form-group"><label style="font-size:0.7rem;">احتياجات خاصة</label><input type="text" class="ec-special" value="' + (data.special_needs||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+    div.innerHTML = '<div class="child-card-header">' +
+        '<span class="child-card-title">\u0637\u0641\u0644 #' + (idx+1) + '</span>' +
+        '<button type="button" class="child-remove" onclick="removeEntryChild(this)">\u062d\u0630\u0641</button></div>' +
+        '<div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.6rem;">' +
+        '<div class="form-group"><label>\u0627\u0644\u0627\u0633\u0645</label><input type="text" class="ec-name" value="' + (data.name||'') + '"></div>' +
+        '<div class="form-group"><label>\u0627\u0644\u062c\u0646\u0633</label><select class="ec-gender"><option value="">--</option><option value="male"' + (data.gender==='male'?' selected':'') + '>\u0630\u0643\u0631</option><option value="female"' + (data.gender==='female'?' selected':'') + '>\u0623\u0646\u062b\u0649</option></select></div>' +
+        '<div class="form-group"><label>\u0633\u0646\u0629 \u0627\u0644\u0645\u064a\u0644\u0627\u062f</label><input type="number" class="ec-birth" value="' + (data.birth_year||'') + '" min="1990" max="2026"></div>' +
+        '<div class="form-group"><label>\u0627\u0644\u062a\u062d\u0635\u064a\u0644 \u0627\u0644\u0639\u0644\u0645\u064a</label><select class="ec-edu">' + eduOpts + '</select></div>' +
+        '<div class="form-group"><label>\u0627\u0644\u0645\u062f\u0631\u0633\u0629/\u0627\u0644\u062c\u0627\u0645\u0639\u0629</label><input type="text" class="ec-school" value="' + (data.school||'') + '"></div>' +
+        '<div class="form-group"><label>\u0627\u0644\u0639\u0645\u0644</label><input type="text" class="ec-work" value="' + (data.employment||'') + '"></div>' +
+        '<div class="form-group"><label>\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0635\u062d\u064a\u0629</label><input type="text" class="ec-health" value="' + (data.health_notes||'') + '"></div>' +
+        '<div class="form-group"><label>\u0627\u062d\u062a\u064a\u0627\u062c\u0627\u062a \u062e\u0627\u0635\u0629</label><input type="text" class="ec-special" value="' + (data.special_needs||'') + '"></div>' +
         '</div>';
     container.appendChild(div);
     updateEntryChildren();
 }
 
 function removeEntryChild(btn) {
-    btn.closest('.child-entry').remove();
-    var entries = document.querySelectorAll('#entryChildrenContainer .child-entry');
-    for (var i = 0; i < entries.length; i++) entries[i].querySelector('strong').textContent = 'طفل #' + (i+1);
+    btn.closest('.child-card').remove();
+    var entries = document.querySelectorAll('#entryChildrenContainer .child-card');
+    for (var i = 0; i < entries.length; i++) entries[i].querySelector('.child-card-title').textContent = '\u0637\u0641\u0644 #' + (i+1);
     updateEntryChildren();
 }
 
 function updateEntryChildren() {
-    var entries = document.querySelectorAll('#entryChildrenContainer .child-entry');
+    var entries = document.querySelectorAll('#entryChildrenContainer .child-card');
     var children = []; var u18 = 0;
     for (var i = 0; i < entries.length; i++) {
         var e = entries[i]; var by = parseInt(e.querySelector('.ec-birth').value) || 0;
@@ -843,17 +1054,175 @@ function updateEntryChildren() {
 document.getElementById('entryChildrenContainer').addEventListener('input', updateEntryChildren);
 document.getElementById('entryChildrenContainer').addEventListener('change', updateEntryChildren);
 
-// Collect witnesses before submit
-document.getElementById('entryForm').addEventListener('submit', function() {
-    const witnesses = [];
-    document.querySelectorAll('.witness-entry').forEach(entry => {
-        const name = entry.querySelector('.w-name')?.value || '';
-        const phone = entry.querySelector('.w-phone')?.value || '';
-        const relation = entry.querySelector('.w-relation')?.value || '';
-        const testimony = entry.querySelector('.w-testimony')?.value || '';
-        if (name) witnesses.push({ name, phone, relation, testimony });
+// === AJAX Form Submission ===
+function submitForm() {
+    if (isSubmitting) return;
+
+    // Collect witnesses
+    var witnesses = [];
+    document.querySelectorAll('.witness-entry').forEach(function(entry) {
+        var name = (entry.querySelector('.w-name') || {}).value || '';
+        var phone = (entry.querySelector('.w-phone') || {}).value || '';
+        var relation = (entry.querySelector('.w-relation') || {}).value || '';
+        var testimony = (entry.querySelector('.w-testimony') || {}).value || '';
+        if (name) witnesses.push({ name: name, phone: phone, relation: relation, testimony: testimony });
     });
     document.getElementById('witnessesData').value = JSON.stringify(witnesses);
-});
+
+    // Collect children
+    updateEntryChildren();
+
+    // Validate total file size
+    var totalSize = 0;
+    var fileInputs = document.querySelectorAll('#entryForm input[type="file"]');
+    for (var i = 0; i < fileInputs.length; i++) {
+        if (fileInputs[i].files && fileInputs[i].files[0]) {
+            totalSize += fileInputs[i].files[0].size;
+        }
+    }
+    if (totalSize > 90 * 1024 * 1024) {
+        alert('حجم الملفات الإجمالي كبير جداً (' + (totalSize / (1024*1024)).toFixed(1) + 'MB). الحد الأقصى 90MB. يرجى تقليل حجم بعض الملفات.');
+        return;
+    }
+
+    isSubmitting = true;
+    var overlay = document.getElementById('submitOverlay');
+    var progressBar = document.getElementById('submitProgressBar');
+    var statusEl = document.getElementById('submitStatus');
+    overlay.classList.add('active');
+
+    var formData = new FormData(document.getElementById('entryForm'));
+    var xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', function(e) {
+        if (e.lengthComputable) {
+            var pct = Math.round((e.loaded / e.total) * 90);
+            progressBar.style.width = pct + '%';
+            if (pct < 30) statusEl.textContent = '\u062c\u0627\u0631\u064a \u0631\u0641\u0639 \u0627\u0644\u0645\u0644\u0641\u0627\u062a...';
+            else if (pct < 70) statusEl.textContent = '\u062c\u0627\u0631\u064a \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a...';
+            else statusEl.textContent = '\u062c\u0627\u0631\u064a \u0627\u0644\u0645\u0639\u0627\u0644\u062c\u0629...';
+        }
+    });
+
+    xhr.addEventListener('load', function() {
+        progressBar.style.width = '100%';
+        overlay.classList.remove('active');
+        isSubmitting = false;
+
+        var resultMsg = document.getElementById('resultMsg');
+        if (xhr.status === 200) {
+            try {
+                var resp = JSON.parse(xhr.responseText);
+                if (resp.success) {
+                    resultMsg.className = 'result-msg success';
+                    resultMsg.textContent = resp.message || '\u062a\u0645 \u062d\u0641\u0638 \u0627\u0644\u0633\u062c\u0644 \u0628\u0646\u062c\u0627\u062d.';
+                    document.getElementById('entryForm').reset();
+                    currentStep = 1;
+                    updateStepUI();
+                    clearDraft();
+                } else {
+                    resultMsg.className = 'result-msg error';
+                    resultMsg.textContent = resp.error || '\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.';
+                }
+            } catch(e) {
+                // If not JSON, it was a redirect (regular form submit success)
+                resultMsg.className = 'result-msg success';
+                resultMsg.textContent = '\u062a\u0645 \u062d\u0641\u0638 \u0627\u0644\u0633\u062c\u0644 \u0628\u0646\u062c\u0627\u062d.';
+                document.getElementById('entryForm').reset();
+                currentStep = 1;
+                updateStepUI();
+                clearDraft();
+            }
+        } else {
+            resultMsg.className = 'result-msg error';
+            try {
+                var resp = JSON.parse(xhr.responseText);
+                resultMsg.textContent = resp.error || '\u062e\u0637\u0623 (' + xhr.status + '). \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.';
+            } catch(e) {
+                if (xhr.status === 413) {
+                    resultMsg.textContent = '\u062d\u062c\u0645 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0643\u0628\u064a\u0631 \u062c\u062f\u0627\u064b. \u064a\u0631\u062c\u0649 \u062a\u0642\u0644\u064a\u0644 \u062d\u062c\u0645 \u0627\u0644\u0645\u0644\u0641\u0627\u062a.';
+                } else {
+                    resultMsg.textContent = '\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u062e\u0627\u062f\u0645 (' + xhr.status + '). \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0644\u0627\u062d\u0642\u0627\u064b.';
+                }
+            }
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    xhr.addEventListener('error', function() {
+        overlay.classList.remove('active');
+        isSubmitting = false;
+        var resultMsg = document.getElementById('resultMsg');
+        resultMsg.className = 'result-msg error';
+        resultMsg.textContent = '\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0628\u0627\u0644\u062e\u0627\u062f\u0645. \u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0648\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    xhr.addEventListener('timeout', function() {
+        overlay.classList.remove('active');
+        isSubmitting = false;
+        var resultMsg = document.getElementById('resultMsg');
+        resultMsg.className = 'result-msg error';
+        resultMsg.textContent = '\u0627\u0646\u062a\u0647\u062a \u0645\u0647\u0644\u0629 \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u0642\u062f \u064a\u0643\u0648\u0646 \u0627\u0644\u062e\u0627\u062f\u0645 \u0645\u0634\u063a\u0648\u0644\u0627\u064b. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    xhr.open('POST', document.getElementById('entryForm').action, true);
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.timeout = 120000; // 2 minute timeout
+    xhr.send(formData);
+}
+
+// === Auto-save draft to localStorage ===
+var draftKey = 'haqquna_entry_draft';
+function saveDraft() {
+    try {
+        var form = document.getElementById('entryForm');
+        var data = {};
+        var inputs = form.querySelectorAll('input:not([type=file]), select, textarea');
+        for (var i = 0; i < inputs.length; i++) {
+            var el = inputs[i];
+            if (el.name) {
+                if (el.type === 'checkbox') data[el.name] = el.checked;
+                else data[el.name] = el.value;
+            }
+        }
+        data._step = currentStep;
+        localStorage.setItem(draftKey, JSON.stringify(data));
+        var indicator = document.getElementById('draftIndicator');
+        indicator.classList.add('show');
+        setTimeout(function() { indicator.classList.remove('show'); }, 2000);
+    } catch(e) {}
+}
+
+function loadDraft() {
+    try {
+        var saved = localStorage.getItem(draftKey);
+        if (!saved) return;
+        var data = JSON.parse(saved);
+        var form = document.getElementById('entryForm');
+        for (var key in data) {
+            if (key === '_step') continue;
+            var el = form.querySelector('[name="' + key + '"]');
+            if (el) {
+                if (el.type === 'checkbox') el.checked = data[key];
+                else el.value = data[key];
+            }
+        }
+        if (data._step) { currentStep = data._step; updateStepUI(); }
+        if (data.status) handleStatusChange();
+        if (data.marital) handleMarital();
+    } catch(e) {}
+}
+
+function clearDraft() {
+    try { localStorage.removeItem(draftKey); } catch(e) {}
+}
+
+// Auto-save every 30 seconds
+setInterval(saveDraft, 30000);
+
+// Load draft on page load
+loadDraft();
 </script>
 {% endblock %}

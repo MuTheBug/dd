@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">إنشاء تقرير</h2>
+
+<form method="POST">
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">تصفية السجلات</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">الحالة</label>
+                    <select class="form-select" name="status">
+                        <option value="">الكل</option>
+                        <option value="survivor">ناج</option>
+                        <option value="deceased">متوفي</option>
+                        <option value="disappeared">مغيب قسرا</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">المحافظة</label>
+                    <select class="form-select" name="province">
+                        <option value="">الكل</option>
+                        <option value="دمشق">دمشق</option>
+                        <option value="ريف دمشق">ريف دمشق</option>
+                        <option value="حلب">حلب</option>
+                        <option value="حمص">حمص</option>
+                        <option value="حماة">حماة</option>
+                        <option value="إدلب">إدلب</option>
+                        <option value="اللاذقية">اللاذقية</option>
+                        <option value="طـرطوس">طـرطوس</option>
+                        <option value="دير الزور">دير الزور</option>
+                        <option value="الرقة">الرقة</option>
+                        <option value="الحسكة">الحسكة</option>
+                        <option value="درعا">درعا</option>
+                        <option value="السويداء">السويداء</option>
+                        <option value="القنيطرة">القنيطرة</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">اختيار الأعمدة</div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="first_name" checked>
+                        <label class="form-check-label">الاسم الأول</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="father_name" checked>
+                        <label class="form-check-label">اسم الأب</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="last_name" checked>
+                        <label class="form-check-label">الكنية</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="mother_name" checked>
+                        <label class="form-check-label">اسم الأم</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="province" checked>
+                        <label class="form-check-label">المحافظة</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="status" checked>
+                        <label class="form-check-label">الحالة</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="arrest_year" checked>
+                        <label class="form-check-label">سنة الاعتقال</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="phone">
+                        <label class="form-check-label">الهاتف</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="columns" value="national_id">
+                        <label class="form-check-label">الرقم الوطني</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg">توليد التقرير PDF</button>
+</form>
+{% endblock %}

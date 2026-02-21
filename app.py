@@ -16,6 +16,7 @@ import time
 from datetime import datetime
 from functools import wraps
 from io import BytesIO
+from urllib.parse import quote
 
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
@@ -546,9 +547,12 @@ def admin_records():
         'birth_year_to': request.args.get('birth_year_to', ''),
         'marital': request.args.get('marital', ''),
         'education': request.args.get('education', ''),
+        'education_max': request.args.get('education_max', ''),
         'housing_type': request.args.get('housing_type', ''),
         'blood_type': request.args.get('blood_type', ''),
         'has_kids': request.args.get('has_kids', ''),
+        'has_kids_under_18': request.args.get('has_kids_under_18', ''),
+        'kids_max_age': request.args.get('kids_max_age', ''),
         'has_photo': request.args.get('has_photo', ''),
         'has_document': request.args.get('has_document', ''),
         'case_type': request.args.get('case_type', ''),
@@ -561,6 +565,14 @@ def admin_records():
         'has_special_needs': request.args.get('has_special_needs', ''),
         'chronic': request.args.get('chronic', ''),
         'breadwinner': request.args.get('breadwinner', ''),
+        'has_hypertension': request.args.get('has_hypertension', ''),
+        'has_diabetes': request.args.get('has_diabetes', ''),
+        'is_registered': request.args.get('is_registered', ''),
+        'has_legal': request.args.get('has_legal', ''),
+        'has_assoc': request.args.get('has_assoc', ''),
+        'reporter_relation': request.args.get('reporter_relation', ''),
+        'widows_filter': request.args.get('widows_filter', ''),
+        'spouse_search': request.args.get('spouse_search', ''),
     }
 
     if filters['status']:
@@ -596,6 +608,17 @@ def admin_records():
     if filters['education']:
         conditions.append("education = ?")
         params.append(filters['education'])
+    if filters['education_max']:
+        # Education levels ordered from lowest to highest
+        edu_order = ['أمّي', 'ابتدائية', 'إعدادية', 'ثانوية', 'معهد', 'بكالوريوس', 'ماجستير', 'دكتوراه']
+        try:
+            max_idx = edu_order.index(filters['education_max'])
+            included = edu_order[:max_idx + 1]
+            placeholders = ','.join(['?'] * len(included))
+            conditions.append(f"education IN ({placeholders})")
+            params.extend(included)
+        except ValueError:
+            pass
     if filters['housing_type']:
         conditions.append("housing_type = ?")
         params.append(filters['housing_type'])
@@ -606,6 +629,18 @@ def admin_records():
         conditions.append("has_kids = 'yes'")
     elif filters['has_kids'] == 'no':
         conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
+    if filters['has_kids_under_18'] == 'yes':
+        conditions.append("kids_under_18_count > 0")
+    elif filters['has_kids_under_18'] == 'no':
+        conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
+    if filters['kids_max_age']:
+        # Children born after (current_year - max_age) are under that age
+        current_year = datetime.now().year
+        min_birth_year = current_year - int(filters['kids_max_age'])
+        # Check children_data JSON for children with birth year >= min_birth_year
+        # Since children_data is JSON, we check kids_under_18_count as proxy
+        # and also filter by the age threshold using birth year calculation
+        conditions.append("kids_under_18_count > 0")
     if filters['has_photo'] == 'yes':
         conditions.append("photo_path IS NOT NULL AND photo_path != ''")
     elif filters['has_photo'] == 'no':
@@ -638,6 +673,36 @@ def admin_records():
     if filters['breadwinner']:
         conditions.append("breadwinner LIKE ?")
         params.append(f"%{filters['breadwinner']}%")
+    if filters['has_hypertension'] == '1':
+        conditions.append("has_hypertension = 1")
+    if filters['has_diabetes'] == '1':
+        conditions.append("has_diabetes = 1")
+    if filters['is_registered'] == '1':
+        conditions.append("is_officially_registered = 1")
+    elif filters['is_registered'] == '0':
+        conditions.append("(is_officially_registered = 0 OR is_officially_registered IS NULL)")
+    if filters['has_legal'] == 'yes':
+        conditions.append("legal = 'نعم'")
+    if filters['has_assoc'] == 'yes':
+        conditions.append("assoc = 'نعم'")
+    if filters['reporter_relation']:
+        conditions.append("reporter_relation = ?")
+        params.append(filters['reporter_relation'])
+    if filters['widows_filter'] == 'widows_deceased':
+        # Widows of deceased detainees: male detainee died + was married
+        conditions.append("status IN ('deceased') AND gender = 'male' AND marital = 'married'")
+    elif filters['widows_filter'] == 'widows_enforced':
+        # Wives of forcibly disappeared: male detainee enforced + married
+        conditions.append("status = 'enforced' AND gender = 'male' AND marital = 'married'")
+    elif filters['widows_filter'] == 'widows_all':
+        # All widows (deceased or enforced, married males)
+        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married'")
+    elif filters['widows_filter'] == 'widows_with_minors':
+        # Widows with minor children
+        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married' AND kids_under_18_count > 0")
+    if filters['spouse_search']:
+        conditions.append("spouse_name LIKE ?")
+        params.append(f"%{filters['spouse_search']}%")
     if filters['search']:
         search_term = f"%{filters['search']}%"
         conditions.append("""(
@@ -711,6 +776,16 @@ def admin_record_edit(record_id):
         civil_doc_path = record['civil_registry_document_path'] or ''
         cv_path = record['survivor_cv_path'] or ''
         cv_photo_path = record['survivor_cv_photo_path'] or ''
+
+        # Allow URL-based photo/document paths (for old DB records with URLs)
+        photo_url = form.get('photo_url', '').strip()
+        doc_url = form.get('document_url', '').strip()
+        if photo_url:
+            photo_path = photo_url
+            photo_hash = ''
+        if doc_url:
+            doc_path = doc_url
+            doc_hash = ''
 
         if 'photo' in request.files and request.files['photo'].filename:
             new_photo, new_hash = save_upload(request.files['photo'], 'photos')
@@ -882,24 +957,30 @@ def record_pdf(record_id):
         with open(logo_path, 'rb') as f:
             logo_b64 = base64.b64encode(f.read()).decode()
 
-    # Read photo as base64 if exists
+    # Read photo as base64 if exists (local file only; URLs won't work in PDF)
     photo_b64 = ''
+    photo_url = ''
     if record['photo_path']:
-        photo_file = os.path.join(UPLOAD_FOLDER, 'photos', record['photo_path'])
-        if os.path.exists(photo_file):
-            with open(photo_file, 'rb') as f:
-                photo_b64 = base64.b64encode(f.read()).decode()
+        if record['photo_path'].startswith('http://') or record['photo_path'].startswith('https://'):
+            photo_url = record['photo_path']
+        else:
+            photo_file = os.path.join(UPLOAD_FOLDER, 'photos', record['photo_path'])
+            if os.path.exists(photo_file):
+                with open(photo_file, 'rb') as f:
+                    photo_b64 = base64.b64encode(f.read()).decode()
 
     html = render_template('pdf_record.html',
-        record=record, logo_b64=logo_b64, photo_b64=photo_b64)
+        record=record, logo_b64=logo_b64, photo_b64=photo_b64, photo_url=photo_url)
 
     from weasyprint import HTML
     pdf_bytes = HTML(string=html, base_url=BASE_DIR).write_pdf()
 
     response = make_response(pdf_bytes)
     name = f"{record['first_name']}_{record['last_name']}_{record['id']}"
+    safe_name = f"record_{record['id']}"
+    encoded_name = quote(f"record_{name}.pdf")
     response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'inline; filename=record_{name}.pdf'
+    response.headers['Content-Disposition'] = f"inline; filename={safe_name}.pdf; filename*=UTF-8''{encoded_name}"
     return response
 
 
@@ -922,6 +1003,9 @@ def records_list_pdf():
     if request.args.get('arrest_authority'):
         conditions.append("arrest_authority LIKE ?")
         params.append(f"%{request.args['arrest_authority']}%")
+    if request.args.get('arrest_place'):
+        conditions.append("arrest_place LIKE ?")
+        params.append(f"%{request.args['arrest_place']}%")
     if request.args.get('search'):
         s = f"%{request.args['search']}%"
         conditions.append("(first_name LIKE ? OR last_name LIKE ? OR national_id LIKE ?)")
@@ -932,6 +1016,57 @@ def records_list_pdf():
     if request.args.get('arrest_year_to'):
         conditions.append("arrest_year <= ?")
         params.append(int(request.args['arrest_year_to']))
+    if request.args.get('birth_year_from'):
+        conditions.append("birth_year >= ?")
+        params.append(int(request.args['birth_year_from']))
+    if request.args.get('birth_year_to'):
+        conditions.append("birth_year <= ?")
+        params.append(int(request.args['birth_year_to']))
+    if request.args.get('has_kids') == 'yes':
+        conditions.append("has_kids = 'yes'")
+    if request.args.get('has_kids_under_18') == 'yes':
+        conditions.append("kids_under_18_count > 0")
+    if request.args.get('has_special_needs') == '1':
+        conditions.append("has_special_needs = 1")
+    if request.args.get('chronic') == 'yes':
+        conditions.append("chronic = 'نعم'")
+    if request.args.get('has_hypertension') == '1':
+        conditions.append("has_hypertension = 1")
+    if request.args.get('has_diabetes') == '1':
+        conditions.append("has_diabetes = 1")
+    if request.args.get('has_conflicting_info') == '1':
+        conditions.append("has_conflicting_info = 1")
+    if request.args.get('is_registered') == '1':
+        conditions.append("is_officially_registered = 1")
+    if request.args.get('has_legal') == 'yes':
+        conditions.append("legal = 'نعم'")
+    if request.args.get('has_assoc') == 'yes':
+        conditions.append("assoc = 'نعم'")
+    if request.args.get('reporter_relation'):
+        conditions.append("reporter_relation = ?")
+        params.append(request.args['reporter_relation'])
+    if request.args.get('education_max'):
+        edu_order = ['أمّي', 'ابتدائية', 'إعدادية', 'ثانوية', 'معهد', 'بكالوريوس', 'ماجستير', 'دكتوراه']
+        try:
+            max_idx = edu_order.index(request.args['education_max'])
+            included = edu_order[:max_idx + 1]
+            placeholders = ','.join(['?'] * len(included))
+            conditions.append(f"education IN ({placeholders})")
+            params.extend(included)
+        except ValueError:
+            pass
+    widows_f = request.args.get('widows_filter', '')
+    if widows_f == 'widows_deceased':
+        conditions.append("status IN ('deceased') AND gender = 'male' AND marital = 'married'")
+    elif widows_f == 'widows_enforced':
+        conditions.append("status = 'enforced' AND gender = 'male' AND marital = 'married'")
+    elif widows_f == 'widows_all':
+        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married'")
+    elif widows_f == 'widows_with_minors':
+        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married' AND kids_under_18_count > 0")
+    if request.args.get('spouse_search'):
+        conditions.append("spouse_name LIKE ?")
+        params.append(f"%{request.args['spouse_search']}%")
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
     records = db.execute(
@@ -952,6 +1087,30 @@ def records_list_pdf():
         filter_desc.append(f"المحافظة: {request.args['province']}")
     if request.args.get('gender'):
         filter_desc.append(f"الجنس: {'ذكر' if request.args['gender']=='male' else 'أنثى'}")
+    if request.args.get('marital'):
+        marital_map = dict(MARITAL_STATUSES)
+        filter_desc.append(f"الحالة الاجتماعية: {marital_map.get(request.args['marital'], request.args['marital'])}")
+    if request.args.get('education') or request.args.get('education_max'):
+        edu_val = request.args.get('education') or f"حتى {request.args.get('education_max')}"
+        filter_desc.append(f"التحصيل العلمي: {edu_val}")
+    if request.args.get('has_kids_under_18') == 'yes':
+        filter_desc.append("لديه أطفال قاصرين")
+    if request.args.get('has_special_needs') == '1':
+        filter_desc.append("ذوي احتياجات خاصة")
+    if widows_f:
+        widows_labels = {
+            'widows_deceased': 'أرامل الشهداء',
+            'widows_enforced': 'زوجات المغيّبين',
+            'widows_all': 'جميع الأرامل',
+            'widows_with_minors': 'أرامل لديهم قاصرين',
+        }
+        filter_desc.append(widows_labels.get(widows_f, widows_f))
+    if request.args.get('has_hypertension') == '1':
+        filter_desc.append("ضغط دم")
+    if request.args.get('has_diabetes') == '1':
+        filter_desc.append("سكري")
+    if request.args.get('chronic') == 'yes':
+        filter_desc.append("أمراض مزمنة")
 
     html = render_template('pdf_list.html',
         records=records, logo_b64=logo_b64, filter_desc=filter_desc,

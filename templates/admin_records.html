@@ -18,9 +18,29 @@
         &#x1F50D; الفلاتر والتصفية
         <span class="arrow" id="filterArrow">&#x25BC;</span>
     </div>
-    <div class="filter-body" id="filterBody" style="{% if not (filters.status or filters.province or filters.search or filters.gender or filters.arrest_authority) %}display:none{% endif %}">
+    <div class="filter-body" id="filterBody" style="{% if not (filters.status or filters.province or filters.search or filters.gender or filters.arrest_authority or filters.widows_filter or filters.has_special_needs or filters.education_max) %}display:none{% endif %}">
         <form method="GET" action="{{ url_for('admin_records') }}" id="filterForm">
+
+            <!-- Quick Presets - Common organizational requests -->
+            <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f0f7f7; border-radius: 8px; border: 1px solid #d0e8e8;">
+                <div style="font-size: 0.8rem; font-weight: 600; color: #095355; margin-bottom: 0.5rem;">&#x26A1; فلاتر سريعة (الطلبات الأكثر شيوعاً)</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                    <a href="{{ url_for('admin_records', widows_filter='widows_with_minors') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">أرامل لديهم قاصرين</a>
+                    <a href="{{ url_for('admin_records', widows_filter='widows_deceased') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">أرامل الشهداء</a>
+                    <a href="{{ url_for('admin_records', widows_filter='widows_enforced') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">زوجات المغيّبين</a>
+                    <a href="{{ url_for('admin_records', widows_filter='widows_all') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">جميع الأرامل</a>
+                    <a href="{{ url_for('admin_records', has_special_needs='1') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">ذوي الاحتياجات الخاصة</a>
+                    <a href="{{ url_for('admin_records', chronic='yes') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">أمراض مزمنة</a>
+                    <a href="{{ url_for('admin_records', education_max='إعدادية') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">تحصيل علمي منخفض</a>
+                    <a href="{{ url_for('admin_records', has_kids_under_18='yes') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">لديهم أطفال قاصرين</a>
+                    <a href="{{ url_for('admin_records', status='survivor') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">الناجون</a>
+                    <a href="{{ url_for('admin_records', status='enforced') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">المغيّبون</a>
+                    <a href="{{ url_for('admin_records', status='deceased') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">المتوفون</a>
+                </div>
+            </div>
+
             <div class="filter-grid">
+                <!-- Basic search & status -->
                 <div class="form-group">
                     <label>&#x1F50E;&#xFE0F; بحث نصي</label>
                     <input type="text" name="search" value="{{ filters.search }}" placeholder="اسم، رقم وطني، هاتف...">
@@ -51,6 +71,46 @@
                         <option value="female" {{ 'selected' if filters.gender=='female' }}>أنثى</option>
                     </select>
                 </div>
+
+                <!-- Widows & Family Filters -->
+                <div class="form-group">
+                    <label>&#x1F46A; فلتر الأرامل/ذوي الضحايا</label>
+                    <select name="widows_filter">
+                        <option value="">الكل</option>
+                        <option value="widows_deceased" {{ 'selected' if filters.widows_filter=='widows_deceased' }}>أرامل الشهداء (أزواج توفوا في المعتقلات)</option>
+                        <option value="widows_enforced" {{ 'selected' if filters.widows_filter=='widows_enforced' }}>زوجات المغيّبين قسراً</option>
+                        <option value="widows_all" {{ 'selected' if filters.widows_filter=='widows_all' }}>جميع الأرامل (شهداء + مغيّبين)</option>
+                        <option value="widows_with_minors" {{ 'selected' if filters.widows_filter=='widows_with_minors' }}>أرامل لديهم أطفال قاصرين</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>بحث باسم الزوج/ة</label>
+                    <input type="text" name="spouse_search" value="{{ filters.spouse_search }}" placeholder="اسم الزوج/ة...">
+                </div>
+
+                <!-- Children Filters -->
+                <div class="form-group">
+                    <label>أطفال</label>
+                    <select name="has_kids">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.has_kids=='yes' }}>لديه أطفال</option>
+                        <option value="no" {{ 'selected' if filters.has_kids=='no' }}>بدون أطفال</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>أطفال قاصرين (تحت 18)</label>
+                    <select name="has_kids_under_18">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.has_kids_under_18=='yes' }}>لديه قاصرين</option>
+                        <option value="no" {{ 'selected' if filters.has_kids_under_18=='no' }}>بدون قاصرين</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>الحد الأقصى لعمر الأطفال</label>
+                    <input type="number" name="kids_max_age" value="{{ filters.kids_max_age }}" placeholder="مثال: 15" min="1" max="18">
+                </div>
+
+                <!-- Arrest Info -->
                 <div class="form-group">
                     <label>جهة الاعتقال</label>
                     <select name="arrest_authority">
@@ -85,6 +145,8 @@
                     <label>سنة الميلاد (إلى)</label>
                     <input type="number" name="birth_year_to" value="{{ filters.birth_year_to }}" placeholder="2000" min="1930" max="2010">
                 </div>
+
+                <!-- Social & Family -->
                 <div class="form-group">
                     <label>الحالة الاجتماعية</label>
                     <select name="marital">
@@ -94,8 +156,10 @@
                         {% endfor %}
                     </select>
                 </div>
+
+                <!-- Education - exact and max -->
                 <div class="form-group">
-                    <label>التحصيل العلمي</label>
+                    <label>التحصيل العلمي (بالضبط)</label>
                     <select name="education">
                         <option value="">الكل</option>
                         {% for e in EDUCATION_LEVELS %}
@@ -103,6 +167,17 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>التحصيل العلمي (حتى مستوى)</label>
+                    <select name="education_max">
+                        <option value="">الكل</option>
+                        {% for e in EDUCATION_LEVELS %}
+                        <option value="{{ e }}" {{ 'selected' if filters.education_max==e }}>حتى {{ e }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Housing & Economic -->
                 <div class="form-group">
                     <label>نوع السكن</label>
                     <select name="housing_type">
@@ -112,6 +187,38 @@
                         {% endfor %}
                     </select>
                 </div>
+
+                <!-- Health Filters -->
+                <div class="form-group">
+                    <label>&#x1F3E5; أمراض مزمنة</label>
+                    <select name="chronic">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.chronic=='yes' }}>نعم</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>ضغط الدم</label>
+                    <select name="has_hypertension">
+                        <option value="">الكل</option>
+                        <option value="1" {{ 'selected' if filters.has_hypertension=='1' }}>نعم</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>السكري</label>
+                    <select name="has_diabetes">
+                        <option value="">الكل</option>
+                        <option value="1" {{ 'selected' if filters.has_diabetes=='1' }}>نعم</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&#x267F; احتياجات خاصة / إعاقة</label>
+                    <select name="has_special_needs">
+                        <option value="">الكل</option>
+                        <option value="1" {{ 'selected' if filters.has_special_needs=='1' }}>نعم</option>
+                    </select>
+                </div>
+
+                <!-- Documents & Registration -->
                 <div class="form-group">
                     <label>زمرة الدم</label>
                     <select name="blood_type">
@@ -138,13 +245,42 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>أطفال</label>
-                    <select name="has_kids">
+                    <label>مسجل رسمياً</label>
+                    <select name="is_registered">
                         <option value="">الكل</option>
-                        <option value="yes" {{ 'selected' if filters.has_kids=='yes' }}>لديه أطفال</option>
-                        <option value="no" {{ 'selected' if filters.has_kids=='no' }}>بدون أطفال</option>
+                        <option value="1" {{ 'selected' if filters.is_registered=='1' }}>نعم</option>
+                        <option value="0" {{ 'selected' if filters.is_registered=='0' }}>لا</option>
                     </select>
                 </div>
+
+                <!-- Legal & Associations -->
+                <div class="form-group">
+                    <label>&#x2696;&#xFE0F; إجراء قانوني</label>
+                    <select name="has_legal">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.has_legal=='yes' }}>نعم</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>مسجل لدى جمعية</label>
+                    <select name="has_assoc">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.has_assoc=='yes' }}>نعم</option>
+                    </select>
+                </div>
+
+                <!-- Reporter/Informant -->
+                <div class="form-group">
+                    <label>صلة المُبلِّغ</label>
+                    <select name="reporter_relation">
+                        <option value="">الكل</option>
+                        {% for rel in REPORTER_RELATIONS %}
+                        <option value="{{ rel }}" {{ 'selected' if filters.reporter_relation==rel }}>{{ rel }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Case & Evidence -->
                 <div class="form-group">
                     <label>نوع الحالة التفصيلي</label>
                     <select name="case_type">
@@ -197,20 +333,6 @@
                         <option value="1" {{ 'selected' if filters.has_conflicting_info=='1' }}>يوجد تضارب</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>احتياجات خاصة</label>
-                    <select name="has_special_needs">
-                        <option value="">الكل</option>
-                        <option value="1" {{ 'selected' if filters.has_special_needs=='1' }}>نعم</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>أمراض مزمنة</label>
-                    <select name="chronic">
-                        <option value="">الكل</option>
-                        <option value="yes" {{ 'selected' if filters.chronic=='yes' }}>نعم</option>
-                    </select>
-                </div>
             </div>
             <div class="filter-actions">
                 <button type="submit" class="btn btn-primary btn-sm">&#x1F50D; تطبيق الفلاتر</button>
@@ -238,10 +360,55 @@
         <span class="filter-tag">{{ filters.arrest_authority }}</span>
         {% endif %}
         {% if filters.education %}
-        <span class="filter-tag">{{ filters.education }}</span>
+        <span class="filter-tag">تعليم: {{ filters.education }}</span>
+        {% endif %}
+        {% if filters.education_max %}
+        <span class="filter-tag">تعليم حتى: {{ filters.education_max }}</span>
         {% endif %}
         {% if filters.marital %}
         <span class="filter-tag">{% for c,l in MARITAL_STATUSES %}{% if c==filters.marital %}{{ l }}{% endif %}{% endfor %}</span>
+        {% endif %}
+        {% if filters.widows_filter %}
+        <span class="filter-tag" style="background: #fff3cd; color: #856404;">
+            {% if filters.widows_filter=='widows_deceased' %}أرامل الشهداء
+            {% elif filters.widows_filter=='widows_enforced' %}زوجات المغيّبين
+            {% elif filters.widows_filter=='widows_all' %}جميع الأرامل
+            {% elif filters.widows_filter=='widows_with_minors' %}أرامل + قاصرين
+            {% endif %}
+        </span>
+        {% endif %}
+        {% if filters.has_kids_under_18 == 'yes' %}
+        <span class="filter-tag">أطفال قاصرين</span>
+        {% endif %}
+        {% if filters.kids_max_age %}
+        <span class="filter-tag">عمر أقصى: {{ filters.kids_max_age }}</span>
+        {% endif %}
+        {% if filters.has_special_needs == '1' %}
+        <span class="filter-tag" style="background: #e8f4fd; color: #0d7377;">ذوي احتياجات خاصة</span>
+        {% endif %}
+        {% if filters.chronic == 'yes' %}
+        <span class="filter-tag">أمراض مزمنة</span>
+        {% endif %}
+        {% if filters.has_hypertension == '1' %}
+        <span class="filter-tag">ضغط دم</span>
+        {% endif %}
+        {% if filters.has_diabetes == '1' %}
+        <span class="filter-tag">سكري</span>
+        {% endif %}
+        {% if filters.has_legal == 'yes' %}
+        <span class="filter-tag">إجراء قانوني</span>
+        {% endif %}
+        {% if filters.has_assoc == 'yes' %}
+        <span class="filter-tag">مسجل بجمعية</span>
+        {% endif %}
+        {% if filters.is_registered == '1' %}
+        <span class="filter-tag">مسجل رسمياً</span>
+        {% endif %}
+        {% if filters.reporter_relation %}
+        <span class="filter-tag">صلة المبلغ: {{ filters.reporter_relation }}</span>
+        {% endif %}
+        {% if filters.spouse_search %}
+        <span class="filter-tag">زوج/ة: {{ filters.spouse_search }}</span>
         {% endif %}
         <a href="{{ url_for('admin_records') }}" style="font-size: 0.75rem; color: var(--deceased);">مسح الكل</a>
     </div>
@@ -278,6 +445,8 @@
                         </a>
                     </th>
                     <th>الجهة</th>
+                    <th>الزوج/ة</th>
+                    <th>قاصرين</th>
                     <th>إجراءات</th>
                 </tr>
             </thead>
@@ -302,6 +471,8 @@
                     <td>{{ r.province }}</td>
                     <td>{{ r.arrest_year if r.arrest_year else '-' }}</td>
                     <td style="font-size: 0.75rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.arrest_authority or '-' }}</td>
+                    <td style="font-size: 0.75rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.spouse_name or '-' }}</td>
+                    <td>{{ r.kids_under_18_count if r.kids_under_18_count else '-' }}</td>
                     <td>
                         <div class="btn-group" style="flex-wrap: nowrap;">
                             <a href="{{ url_for('admin_record_detail', record_id=r.id) }}" class="btn btn-primary btn-sm" title="عرض">&#x1F441;</a>
@@ -311,7 +482,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-light);">
                         لا توجد سجلات مطابقة للفلاتر المحددة
                     </td>
                 </tr>

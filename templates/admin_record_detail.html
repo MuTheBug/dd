@@ -17,7 +17,13 @@
 <div class="card">
     <div class="detail-header">
         {% if record.photo_path %}
-        <img src="{{ url_for('uploaded_file', filename='photos/' + record.photo_path) }}" alt="صورة" class="detail-photo">
+            {% if record.photo_path.startswith('http://') or record.photo_path.startswith('https://') %}
+            <img src="{{ record.photo_path }}" alt="صورة" class="detail-photo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <div class="detail-photo" style="display:none; align-items:center; justify-content:center; background: var(--bg); color: var(--text-light); font-size: 2rem;">&#x1F464;</div>
+            {% else %}
+            <img src="{{ url_for('uploaded_file', filename='photos/' + record.photo_path) }}" alt="صورة" class="detail-photo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <div class="detail-photo" style="display:none; align-items:center; justify-content:center; background: var(--bg); color: var(--text-light); font-size: 2rem;">&#x1F464;</div>
+            {% endif %}
         {% else %}
         <div class="detail-photo" style="display:flex; align-items:center; justify-content:center; background: var(--bg); color: var(--text-light); font-size: 2rem;">
             &#x1F464;
@@ -303,6 +309,93 @@
             <div class="detail-field-value">{{ record.breadwinner or '-' }} {% if record.breadwinner_job %}({{ record.breadwinner_job }}){% endif %}</div>
         </div>
     </div>
+</div>
+
+    <!-- Documents & Files -->
+    {% if record.photo_path or record.document_path %}
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F4C1;</div>
+            <h3>الملفات والوثائق</h3>
+        </div>
+        {% if record.photo_path %}
+        <div class="detail-field">
+            <div class="detail-field-label">مسار الصورة الشخصية</div>
+            <div class="detail-field-value">
+                {% if record.photo_path.startswith('http://') or record.photo_path.startswith('https://') %}
+                <a href="{{ record.photo_path }}" target="_blank" style="word-break: break-all;">{{ record.photo_path }}</a>
+                {% else %}
+                <a href="{{ url_for('uploaded_file', filename='photos/' + record.photo_path) }}" target="_blank">{{ record.photo_path }}</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% if record.document_path %}
+        <div class="detail-field">
+            <div class="detail-field-label">مسار الوثيقة</div>
+            <div class="detail-field-value">
+                {% if record.document_path.startswith('http://') or record.document_path.startswith('https://') %}
+                <a href="{{ record.document_path }}" target="_blank" style="word-break: break-all;">{{ record.document_path }}</a>
+                {% else %}
+                <a href="{{ url_for('uploaded_file', filename='documents/' + record.document_path) }}" target="_blank">{{ record.document_path }}</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% if record.photo_hash %}
+        <div class="detail-field">
+            <div class="detail-field-label">تجزئة الصورة SHA-256</div>
+            <div class="detail-field-value" style="font-family: monospace; font-size: 0.75rem; word-break: break-all;">{{ record.photo_hash }}</div>
+        </div>
+        {% endif %}
+        {% if record.document_hash %}
+        <div class="detail-field">
+            <div class="detail-field-label">تجزئة الوثيقة SHA-256</div>
+            <div class="detail-field-value" style="font-family: monospace; font-size: 0.75rem; word-break: break-all;">{{ record.document_hash }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Health Info -->
+    {% if record.has_special_needs or record.chronic or record.has_hypertension or record.has_diabetes or record.other_diseases %}
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F3E5;</div>
+            <h3>الحالة الصحية</h3>
+        </div>
+        {% if record.chronic %}
+        <div class="detail-field">
+            <div class="detail-field-label">أمراض مزمنة</div>
+            <div class="detail-field-value">{{ record.chronic }}</div>
+        </div>
+        {% endif %}
+        {% if record.has_hypertension %}
+        <div class="detail-field">
+            <div class="detail-field-label">ضغط الدم</div>
+            <div class="detail-field-value">نعم</div>
+        </div>
+        {% endif %}
+        {% if record.has_diabetes %}
+        <div class="detail-field">
+            <div class="detail-field-label">السكري</div>
+            <div class="detail-field-value">نعم</div>
+        </div>
+        {% endif %}
+        {% if record.other_diseases %}
+        <div class="detail-field">
+            <div class="detail-field-label">أمراض أخرى</div>
+            <div class="detail-field-value">{{ record.other_diseases }}</div>
+        </div>
+        {% endif %}
+        {% if record.has_special_needs %}
+        <div class="detail-field" style="background: #e8f4fd; padding: 0.5rem; border-radius: 6px;">
+            <div class="detail-field-label" style="color: #0d7377;">&#x267F; احتياجات خاصة</div>
+            <div class="detail-field-value">{{ record.special_needs_details or 'نعم' }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 {% if record.notes %}

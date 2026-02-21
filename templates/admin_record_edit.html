@@ -152,10 +152,26 @@
         <div class="form-group">
             <label>صورة شخصية {% if record.photo_path %}(موجودة){% endif %}</label>
             <input type="file" name="photo" accept="image/*">
+            {% if record.photo_path %}
+            <span class="hint">الحالي: <a href="{% if record.photo_path.startswith('http') %}{{ record.photo_path }}{% else %}{{ url_for('uploaded_file', filename='photos/' + record.photo_path) }}{% endif %}" target="_blank">{{ record.photo_path[:60] }}{% if record.photo_path|length > 60 %}...{% endif %}</a></span>
+            {% endif %}
+        </div>
+        <div class="form-group">
+            <label>أو رابط الصورة (URL)</label>
+            <input type="url" name="photo_url" value="" placeholder="https://example.com/photo.jpg">
+            <span class="hint">يمكنك إدخال رابط خارجي للصورة بدلاً من رفع ملف</span>
         </div>
         <div class="form-group">
             <label>وثيقة هوية {% if record.document_path %}(موجودة){% endif %}</label>
             <input type="file" name="document" accept="image/*,.pdf">
+            {% if record.document_path %}
+            <span class="hint">الحالي: <a href="{% if record.document_path.startswith('http') %}{{ record.document_path }}{% else %}{{ url_for('uploaded_file', filename='documents/' + record.document_path) }}{% endif %}" target="_blank">{{ record.document_path[:60] }}{% if record.document_path|length > 60 %}...{% endif %}</a></span>
+            {% endif %}
+        </div>
+        <div class="form-group">
+            <label>أو رابط الوثيقة (URL)</label>
+            <input type="url" name="document_url" value="" placeholder="https://example.com/document.pdf">
+            <span class="hint">يمكنك إدخال رابط خارجي للوثيقة بدلاً من رفع ملف</span>
         </div>
     </div>
 </div>

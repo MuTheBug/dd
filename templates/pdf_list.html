@@ -153,7 +153,9 @@ tr:nth-child(even) { background: #fafafa; }
             <th>سنة الاعتقال</th>
             <th>الجهة</th>
             <th>مكان الاحتجاز</th>
-            <th>السكن</th>
+            <th>الزوج/ة</th>
+            <th>أطفال</th>
+            <th>قاصرين</th>
             <th>التعليم</th>
         </tr>
     </thead>
@@ -175,7 +177,9 @@ tr:nth-child(even) { background: #fafafa; }
             <td>{{ r.arrest_year if r.arrest_year else '-' }}</td>
             <td style="font-size:7pt;">{{ r.arrest_authority or '-' }}</td>
             <td style="font-size:7pt;">{{ r.arrest_place or '-' }}</td>
-            <td>{{ r.housing_type or '-' }}</td>
+            <td style="font-size:7pt;">{{ r.spouse_name or '-' }}</td>
+            <td>{{ r.kids_count if r.has_kids == 'yes' else '-' }}</td>
+            <td>{{ r.kids_under_18_count if r.kids_under_18_count else '-' }}</td>
             <td>{{ r.education or '-' }}</td>
         </tr>
         {% endfor %}

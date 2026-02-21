@@ -153,6 +153,8 @@ body {
 <div class="person-header">
     {% if photo_b64 %}
     <img src="data:image/jpeg;base64,{{ photo_b64 }}" class="person-photo" alt="صورة">
+    {% elif photo_url %}
+    <img src="{{ photo_url }}" class="person-photo" alt="صورة">
     {% else %}
     <div class="person-photo-placeholder">?</div>
     {% endif %}

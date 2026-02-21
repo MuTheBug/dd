@@ -31,6 +31,7 @@
                 {% else %}
                 <a href="{{ url_for('admin_login') }}">دخول الإدارة</a>
                 {% endif %}
+                <button class="theme-toggle" onclick="toggleTheme()" title="الوضع الليلي / النهاري" id="themeBtn">&#x1F319;</button>
             </div>
         </div>
     </nav>
@@ -61,6 +62,24 @@
         </div>
     </footer>
 
+    <script>
+    function toggleTheme() {
+        var html = document.documentElement;
+        var current = html.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('haqquna-theme', next);
+        document.getElementById('themeBtn').textContent = next === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    }
+    (function() {
+        var saved = localStorage.getItem('haqquna-theme');
+        if (saved === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            var btn = document.getElementById('themeBtn');
+            if (btn) btn.textContent = '\u2600\uFE0F';
+        }
+    })();
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

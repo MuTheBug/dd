@@ -4,7 +4,7 @@
 {% block content %}
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
     <a href="{{ url_for('admin_record_detail', record_id=record.id) }}" class="btn btn-outline btn-sm">&#x2192; العودة للتفاصيل</a>
-    <h1 style="font-size: 1.2rem; color: var(--primary-dark);">تعديل سجل #{{ record.id }}</h1>
+    <h1 style="font-size: 1.3rem; color: var(--primary-dark);">تعديل سجل #{{ record.id }}</h1>
 </div>
 
 <form method="POST" enctype="multipart/form-data">

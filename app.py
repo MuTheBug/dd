@@ -634,6 +634,21 @@ def admin_records():
         'spouse_search': request.args.get('spouse_search', ''),
         'child_name_search': request.args.get('child_name_search', ''),
         'child_education': request.args.get('child_education', ''),
+        'employment': request.args.get('employment', ''),
+        'profession': request.args.get('profession', ''),
+        'address_search': request.args.get('address_search', ''),
+        'arrest_reason': request.args.get('arrest_reason', ''),
+        'death_year_from': request.args.get('death_year_from', ''),
+        'death_year_to': request.args.get('death_year_to', ''),
+        'release_year_from': request.args.get('release_year_from', ''),
+        'release_year_to': request.args.get('release_year_to', ''),
+        'notes_search': request.args.get('notes_search', ''),
+        'employer': request.args.get('employer', ''),
+        'breadwinner_relation': request.args.get('breadwinner_relation', ''),
+        'age_from': request.args.get('age_from', ''),
+        'age_to': request.args.get('age_to', ''),
+        'has_guardian': request.args.get('has_guardian', ''),
+        'digital_evidence_url_status': request.args.get('digital_evidence_url_status', ''),
     }
 
     if filters['status']:
@@ -770,6 +785,56 @@ def admin_records():
     if filters['child_education']:
         conditions.append("children_data LIKE ?")
         params.append(f"%{filters['child_education']}%")
+    if filters['employment']:
+        conditions.append("employment LIKE ?")
+        params.append(f"%{filters['employment']}%")
+    if filters['profession']:
+        conditions.append("profession LIKE ?")
+        params.append(f"%{filters['profession']}%")
+    if filters['address_search']:
+        conditions.append("address LIKE ?")
+        params.append(f"%{filters['address_search']}%")
+    if filters['arrest_reason']:
+        conditions.append("arrest_reason LIKE ?")
+        params.append(f"%{filters['arrest_reason']}%")
+    if filters['death_year_from']:
+        conditions.append("death_year >= ?")
+        params.append(int(filters['death_year_from']))
+    if filters['death_year_to']:
+        conditions.append("death_year <= ?")
+        params.append(int(filters['death_year_to']))
+    if filters['release_year_from']:
+        conditions.append("release_year >= ?")
+        params.append(int(filters['release_year_from']))
+    if filters['release_year_to']:
+        conditions.append("release_year <= ?")
+        params.append(int(filters['release_year_to']))
+    if filters['notes_search']:
+        conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
+        params.extend([f"%{filters['notes_search']}%"] * 2)
+    if filters['employer']:
+        conditions.append("employer LIKE ?")
+        params.append(f"%{filters['employer']}%")
+    if filters['breadwinner_relation']:
+        conditions.append("breadwinner_relation = ?")
+        params.append(filters['breadwinner_relation'])
+    if filters['age_from']:
+        current_year = datetime.now().year
+        max_birth_year = current_year - int(filters['age_from'])
+        conditions.append("birth_year <= ? AND birth_year > 0")
+        params.append(max_birth_year)
+    if filters['age_to']:
+        current_year = datetime.now().year
+        min_birth_year = current_year - int(filters['age_to'])
+        conditions.append("birth_year >= ?")
+        params.append(min_birth_year)
+    if filters['has_guardian'] == 'yes':
+        conditions.append("guardian_name IS NOT NULL AND guardian_name != ''")
+    elif filters['has_guardian'] == 'no':
+        conditions.append("(guardian_name IS NULL OR guardian_name = '')")
+    if filters['digital_evidence_url_status']:
+        conditions.append("digital_evidence_url_status = ?")
+        params.append(filters['digital_evidence_url_status'])
     if filters['search']:
         search_term = f"%{filters['search']}%"
         conditions.append("""(
@@ -1140,6 +1205,54 @@ def records_list_pdf():
     if request.args.get('child_education'):
         conditions.append("children_data LIKE ?")
         params.append(f"%{request.args['child_education']}%")
+    if request.args.get('employment'):
+        conditions.append("employment LIKE ?")
+        params.append(f"%{request.args['employment']}%")
+    if request.args.get('profession'):
+        conditions.append("profession LIKE ?")
+        params.append(f"%{request.args['profession']}%")
+    if request.args.get('address_search'):
+        conditions.append("address LIKE ?")
+        params.append(f"%{request.args['address_search']}%")
+    if request.args.get('arrest_reason'):
+        conditions.append("arrest_reason LIKE ?")
+        params.append(f"%{request.args['arrest_reason']}%")
+    if request.args.get('death_year_from'):
+        conditions.append("death_year >= ?")
+        params.append(int(request.args['death_year_from']))
+    if request.args.get('death_year_to'):
+        conditions.append("death_year <= ?")
+        params.append(int(request.args['death_year_to']))
+    if request.args.get('release_year_from'):
+        conditions.append("release_year >= ?")
+        params.append(int(request.args['release_year_from']))
+    if request.args.get('release_year_to'):
+        conditions.append("release_year <= ?")
+        params.append(int(request.args['release_year_to']))
+    if request.args.get('notes_search'):
+        conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
+        params.extend([f"%{request.args['notes_search']}%"] * 2)
+    if request.args.get('employer'):
+        conditions.append("employer LIKE ?")
+        params.append(f"%{request.args['employer']}%")
+    if request.args.get('breadwinner_relation'):
+        conditions.append("breadwinner_relation = ?")
+        params.append(request.args['breadwinner_relation'])
+    if request.args.get('age_from'):
+        current_year = datetime.now().year
+        max_birth_year = current_year - int(request.args['age_from'])
+        conditions.append("birth_year <= ? AND birth_year > 0")
+        params.append(max_birth_year)
+    if request.args.get('age_to'):
+        current_year = datetime.now().year
+        min_birth_year = current_year - int(request.args['age_to'])
+        conditions.append("birth_year >= ?")
+        params.append(min_birth_year)
+    if request.args.get('has_guardian') == 'yes':
+        conditions.append("guardian_name IS NOT NULL AND guardian_name != ''")
+    if request.args.get('digital_evidence_url_status'):
+        conditions.append("digital_evidence_url_status = ?")
+        params.append(request.args['digital_evidence_url_status'])
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
     records = db.execute(

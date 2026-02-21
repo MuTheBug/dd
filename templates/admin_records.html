@@ -3,8 +3,8 @@
 
 {% block content %}
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
-    <h1 style="font-size: 1.3rem; color: var(--primary-dark);">
-        السجلات <span style="font-size: 0.85rem; color: var(--text-light);">({{ total_count }} سجل)</span>
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+        السجلات <span style="font-size: 0.95rem; color: var(--text-light);">({{ total_count }} سجل)</span>
     </h1>
     <div class="btn-group">
         <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('pdfColModal').style.display='flex'">&#x1F4C4; تصدير PDF</button>
@@ -22,20 +22,20 @@
         <form method="GET" action="{{ url_for('admin_records') }}" id="filterForm">
 
             <!-- Quick Presets - Common organizational requests -->
-            <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f0f7f7; border-radius: 8px; border: 1px solid #d0e8e8;">
-                <div style="font-size: 0.8rem; font-weight: 600; color: #095355; margin-bottom: 0.5rem;">&#x26A1; فلاتر سريعة (الطلبات الأكثر شيوعاً)</div>
+            <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--filter-preset-bg); border-radius: 8px; border: 1px solid var(--filter-preset-border);">
+                <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.5rem;">&#x26A1; فلاتر سريعة (الطلبات الأكثر شيوعاً)</div>
                 <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-                    <a href="{{ url_for('admin_records', widows_filter='widows_with_minors') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">أرامل لديهم قاصرين</a>
-                    <a href="{{ url_for('admin_records', widows_filter='widows_deceased') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">أرامل الشهداء</a>
-                    <a href="{{ url_for('admin_records', widows_filter='widows_enforced') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">زوجات المغيّبين</a>
-                    <a href="{{ url_for('admin_records', widows_filter='widows_all') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">جميع الأرامل</a>
-                    <a href="{{ url_for('admin_records', has_special_needs='1') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">ذوي الاحتياجات الخاصة</a>
-                    <a href="{{ url_for('admin_records', chronic='yes') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">أمراض مزمنة</a>
-                    <a href="{{ url_for('admin_records', education_max='إعدادية') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">تحصيل علمي منخفض</a>
-                    <a href="{{ url_for('admin_records', has_kids_under_18='yes') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">لديهم أطفال قاصرين</a>
-                    <a href="{{ url_for('admin_records', status='survivor') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">الناجون</a>
-                    <a href="{{ url_for('admin_records', status='enforced') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">المغيّبون</a>
-                    <a href="{{ url_for('admin_records', status='deceased') }}" class="btn btn-outline btn-sm" style="font-size: 0.7rem;">المتوفون</a>
+                    <a href="{{ url_for('admin_records', widows_filter='widows_with_minors') }}" class="btn btn-outline btn-sm">أرامل لديهم قاصرين</a>
+                    <a href="{{ url_for('admin_records', widows_filter='widows_deceased') }}" class="btn btn-outline btn-sm">أرامل الشهداء</a>
+                    <a href="{{ url_for('admin_records', widows_filter='widows_enforced') }}" class="btn btn-outline btn-sm">زوجات المغيّبين</a>
+                    <a href="{{ url_for('admin_records', widows_filter='widows_all') }}" class="btn btn-outline btn-sm">جميع الأرامل</a>
+                    <a href="{{ url_for('admin_records', has_special_needs='1') }}" class="btn btn-outline btn-sm">ذوي الاحتياجات الخاصة</a>
+                    <a href="{{ url_for('admin_records', chronic='yes') }}" class="btn btn-outline btn-sm">أمراض مزمنة</a>
+                    <a href="{{ url_for('admin_records', education_max='إعدادية') }}" class="btn btn-outline btn-sm">تحصيل علمي منخفض</a>
+                    <a href="{{ url_for('admin_records', has_kids_under_18='yes') }}" class="btn btn-outline btn-sm">لديهم أطفال قاصرين</a>
+                    <a href="{{ url_for('admin_records', status='survivor') }}" class="btn btn-outline btn-sm">الناجون</a>
+                    <a href="{{ url_for('admin_records', status='enforced') }}" class="btn btn-outline btn-sm">المغيّبون</a>
+                    <a href="{{ url_for('admin_records', status='deceased') }}" class="btn btn-outline btn-sm">المتوفون</a>
                 </div>
             </div>
 
@@ -295,6 +295,95 @@
                     </select>
                 </div>
 
+                <!-- Employment & Address -->
+                <div class="form-group">
+                    <label>&#x1F4BC; الوضع الوظيفي</label>
+                    <input type="text" name="employment" value="{{ filters.employment }}" placeholder="يعمل، لا يعمل...">
+                </div>
+                <div class="form-group">
+                    <label>المهنة</label>
+                    <input type="text" name="profession" value="{{ filters.profession }}" placeholder="بحث بالمهنة...">
+                </div>
+                <div class="form-group">
+                    <label>جهة العمل</label>
+                    <input type="text" name="employer" value="{{ filters.employer }}" placeholder="اسم جهة العمل...">
+                </div>
+                <div class="form-group">
+                    <label>&#x1F4CD; بحث بالعنوان</label>
+                    <input type="text" name="address_search" value="{{ filters.address_search }}" placeholder="حي، شارع، منطقة...">
+                </div>
+
+                <!-- Age Range -->
+                <div class="form-group">
+                    <label>العمر (من)</label>
+                    <input type="number" name="age_from" value="{{ filters.age_from }}" placeholder="مثال: 20" min="1" max="120">
+                </div>
+                <div class="form-group">
+                    <label>العمر (إلى)</label>
+                    <input type="number" name="age_to" value="{{ filters.age_to }}" placeholder="مثال: 50" min="1" max="120">
+                </div>
+
+                <!-- Arrest Reason -->
+                <div class="form-group">
+                    <label>سبب الاعتقال</label>
+                    <input type="text" name="arrest_reason" value="{{ filters.arrest_reason }}" placeholder="بحث بسبب الاعتقال...">
+                </div>
+
+                <!-- Death/Release Year Ranges -->
+                <div class="form-group">
+                    <label>سنة الوفاة (من)</label>
+                    <input type="number" name="death_year_from" value="{{ filters.death_year_from }}" placeholder="2011" min="2000" max="2026">
+                </div>
+                <div class="form-group">
+                    <label>سنة الوفاة (إلى)</label>
+                    <input type="number" name="death_year_to" value="{{ filters.death_year_to }}" placeholder="2024" min="2000" max="2026">
+                </div>
+                <div class="form-group">
+                    <label>سنة الإفراج (من)</label>
+                    <input type="number" name="release_year_from" value="{{ filters.release_year_from }}" placeholder="2011" min="2000" max="2026">
+                </div>
+                <div class="form-group">
+                    <label>سنة الإفراج (إلى)</label>
+                    <input type="number" name="release_year_to" value="{{ filters.release_year_to }}" placeholder="2024" min="2000" max="2026">
+                </div>
+
+                <!-- Guardian & Breadwinner -->
+                <div class="form-group">
+                    <label>ولي أمر</label>
+                    <select name="has_guardian">
+                        <option value="">الكل</option>
+                        <option value="yes" {{ 'selected' if filters.has_guardian=='yes' }}>لديه ولي أمر</option>
+                        <option value="no" {{ 'selected' if filters.has_guardian=='no' }}>بدون ولي أمر</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>صلة المعيل</label>
+                    <select name="breadwinner_relation">
+                        <option value="">الكل</option>
+                        {% for rel in REPORTER_RELATIONS %}
+                        <option value="{{ rel }}" {{ 'selected' if filters.breadwinner_relation==rel }}>{{ rel }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Notes Search -->
+                <div class="form-group">
+                    <label>&#x1F4DD; بحث بالملاحظات</label>
+                    <input type="text" name="notes_search" value="{{ filters.notes_search }}" placeholder="بحث في الملاحظات...">
+                </div>
+
+                <!-- Digital Evidence URL Status -->
+                <div class="form-group">
+                    <label>حالة رابط الدليل</label>
+                    <select name="digital_evidence_url_status">
+                        <option value="">الكل</option>
+                        <option value="active" {{ 'selected' if filters.digital_evidence_url_status=='active' }}>فعّال</option>
+                        <option value="deleted" {{ 'selected' if filters.digital_evidence_url_status=='deleted' }}>محذوف</option>
+                        <option value="archived" {{ 'selected' if filters.digital_evidence_url_status=='archived' }}>مؤرشف</option>
+                        <option value="unknown" {{ 'selected' if filters.digital_evidence_url_status=='unknown' }}>غير معروف</option>
+                    </select>
+                </div>
+
                 <!-- Case & Evidence -->
                 <div class="form-group">
                     <label>نوع الحالة التفصيلي</label>
@@ -431,7 +520,54 @@
         {% if filters.child_education %}
         <span class="filter-tag">تحصيل أطفال: {{ filters.child_education }}</span>
         {% endif %}
-        <a href="{{ url_for('admin_records') }}" style="font-size: 0.75rem; color: var(--deceased);">مسح الكل</a>
+        {% if filters.employment %}
+        <span class="filter-tag">وظيفة: {{ filters.employment }}</span>
+        {% endif %}
+        {% if filters.profession %}
+        <span class="filter-tag">مهنة: {{ filters.profession }}</span>
+        {% endif %}
+        {% if filters.employer %}
+        <span class="filter-tag">جهة عمل: {{ filters.employer }}</span>
+        {% endif %}
+        {% if filters.address_search %}
+        <span class="filter-tag">عنوان: {{ filters.address_search }}</span>
+        {% endif %}
+        {% if filters.age_from %}
+        <span class="filter-tag">عمر من: {{ filters.age_from }}</span>
+        {% endif %}
+        {% if filters.age_to %}
+        <span class="filter-tag">عمر إلى: {{ filters.age_to }}</span>
+        {% endif %}
+        {% if filters.arrest_reason %}
+        <span class="filter-tag">سبب الاعتقال: {{ filters.arrest_reason }}</span>
+        {% endif %}
+        {% if filters.death_year_from %}
+        <span class="filter-tag">وفاة من: {{ filters.death_year_from }}</span>
+        {% endif %}
+        {% if filters.death_year_to %}
+        <span class="filter-tag">وفاة إلى: {{ filters.death_year_to }}</span>
+        {% endif %}
+        {% if filters.release_year_from %}
+        <span class="filter-tag">إفراج من: {{ filters.release_year_from }}</span>
+        {% endif %}
+        {% if filters.release_year_to %}
+        <span class="filter-tag">إفراج إلى: {{ filters.release_year_to }}</span>
+        {% endif %}
+        {% if filters.has_guardian == 'yes' %}
+        <span class="filter-tag">لديه ولي أمر</span>
+        {% elif filters.has_guardian == 'no' %}
+        <span class="filter-tag">بدون ولي أمر</span>
+        {% endif %}
+        {% if filters.breadwinner_relation %}
+        <span class="filter-tag">صلة المعيل: {{ filters.breadwinner_relation }}</span>
+        {% endif %}
+        {% if filters.notes_search %}
+        <span class="filter-tag">ملاحظات: {{ filters.notes_search }}</span>
+        {% endif %}
+        {% if filters.digital_evidence_url_status %}
+        <span class="filter-tag">حالة رابط: {{ filters.digital_evidence_url_status }}</span>
+        {% endif %}
+        <a href="{{ url_for('admin_records') }}" style="font-size: 0.82rem; color: var(--deceased);">مسح الكل</a>
     </div>
     {% endif %}
 </div>
@@ -491,8 +627,8 @@
                     </td>
                     <td>{{ r.province }}</td>
                     <td>{{ r.arrest_year if r.arrest_year else '-' }}</td>
-                    <td style="font-size: 0.75rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.arrest_authority or '-' }}</td>
-                    <td style="font-size: 0.75rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.spouse_name or '-' }}</td>
+                    <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.arrest_authority or '-' }}</td>
+                    <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.spouse_name or '-' }}</td>
                     <td>{{ r.kids_under_18_count if r.kids_under_18_count else '-' }}</td>
                     <td>
                         <div class="btn-group" style="flex-wrap: nowrap;">
@@ -537,18 +673,18 @@
 {% endif %}
 <!-- PDF Column Selector Modal -->
 <div id="pdfColModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:1rem;">
-    <div style="background:white; border-radius:12px; max-width:600px; width:100%; max-height:80vh; overflow-y:auto; padding:1.5rem; position:relative;">
-        <button onclick="document.getElementById('pdfColModal').style.display='none'" style="position:absolute; top:10px; left:10px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#666;">&times;</button>
-        <h3 style="color:#095355; margin-bottom:0.5rem;">&#x1F4C4; اختر أعمدة التقرير</h3>
-        <p style="font-size:0.8rem; color:#666; margin-bottom:1rem;">حدد الأعمدة التي تريد إظهارها في ملف PDF</p>
+    <div style="background:var(--card); border-radius:12px; max-width:650px; width:100%; max-height:80vh; overflow-y:auto; padding:1.5rem; position:relative; color:var(--text);">
+        <button onclick="document.getElementById('pdfColModal').style.display='none'" style="position:absolute; top:10px; left:10px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
+        <h3 style="color:var(--primary-dark); margin-bottom:0.5rem;">&#x1F4C4; اختر أعمدة التقرير</h3>
+        <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:1rem;">حدد الأعمدة التي تريد إظهارها في ملف PDF</p>
         <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
-            <button type="button" onclick="toggleAllCols(true)" class="btn btn-outline btn-sm" style="font-size:0.7rem;">تحديد الكل</button>
-            <button type="button" onclick="toggleAllCols(false)" class="btn btn-outline btn-sm" style="font-size:0.7rem;">إلغاء الكل</button>
-            <button type="button" onclick="resetDefaultCols()" class="btn btn-outline btn-sm" style="font-size:0.7rem;">الافتراضي</button>
+            <button type="button" onclick="toggleAllCols(true)" class="btn btn-outline btn-sm">تحديد الكل</button>
+            <button type="button" onclick="toggleAllCols(false)" class="btn btn-outline btn-sm">إلغاء الكل</button>
+            <button type="button" onclick="resetDefaultCols()" class="btn btn-outline btn-sm">الافتراضي</button>
         </div>
-        <div id="pdfColGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:0.3rem; margin-bottom:1rem;">
+        <div id="pdfColGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap:0.4rem; margin-bottom:1rem;">
             {% for col_key, col_label in PDF_COLUMNS %}
-            <label style="display:flex; align-items:center; gap:4px; font-size:0.8rem; padding:4px 6px; border:1px solid #eee; border-radius:4px; cursor:pointer;">
+            <label style="display:flex; align-items:center; gap:5px; font-size:0.88rem; padding:5px 8px; border:1px solid var(--border); border-radius:4px; cursor:pointer;">
                 <input type="checkbox" class="pdf-col-check" value="{{ col_key }}" {{ 'checked' if col_key in DEFAULT_PDF_COLS }}>
                 {{ col_label }}
             </label>

@@ -37,6 +37,63 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
 
 ADMIN_PASSWORD = 'haqquna2024'
 
+# Register JSON filter for templates
+@app.template_filter('from_json')
+def from_json_filter(value):
+    """Parse JSON string to Python object in templates."""
+    try:
+        return json.loads(value) if value else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+# All available PDF columns definition
+PDF_COLUMNS = [
+    ('id', '#'),
+    ('first_name', 'الاسم'),
+    ('father_name', 'الأب'),
+    ('last_name', 'الكنية'),
+    ('mother_name', 'اسم الأم'),
+    ('status', 'الحالة'),
+    ('province', 'المحافظة'),
+    ('national_id', 'الرقم الوطني'),
+    ('phone', 'الهاتف'),
+    ('gender', 'الجنس'),
+    ('birth_year', 'سنة الميلاد'),
+    ('arrest_year', 'سنة الاعتقال'),
+    ('arrest_authority', 'الجهة'),
+    ('arrest_place', 'مكان الاحتجاز'),
+    ('arrest_reason', 'سبب الاعتقال'),
+    ('spouse_name', 'الزوج/ة'),
+    ('spouse_phone', 'هاتف الزوج/ة'),
+    ('kids_count', 'عدد الأطفال'),
+    ('kids_under_18_count', 'قاصرين'),
+    ('education', 'التعليم'),
+    ('edu_specialization', 'الاختصاص'),
+    ('address', 'العنوان'),
+    ('housing_type', 'السكن'),
+    ('rent_amount', 'الإيجار'),
+    ('employment', 'العمل'),
+    ('profession', 'المهنة'),
+    ('marital', 'الحالة الاجتماعية'),
+    ('blood_type', 'زمرة الدم'),
+    ('chronic', 'أمراض مزمنة'),
+    ('has_special_needs', 'احتياجات خاصة'),
+    ('breadwinner', 'المعيل'),
+    ('case_type', 'نوع الحالة'),
+    ('evidence_level', 'مستوى الأدلة'),
+    ('reporter_name', 'المبلغ'),
+    ('reporter_relation', 'صلة المبلغ'),
+    ('assoc_name', 'الجمعية'),
+    ('children_summary', 'تفاصيل الأطفال'),
+]
+
+# Default columns for PDF
+DEFAULT_PDF_COLS = [
+    'id', 'first_name', 'father_name', 'last_name', 'status',
+    'province', 'national_id', 'arrest_year', 'arrest_authority',
+    'arrest_place', 'spouse_name', 'kids_count', 'kids_under_18_count', 'education'
+]
+
 # ---------------------------------------------------------------------------
 # Syrian provinces and authorities constants
 # ---------------------------------------------------------------------------
@@ -283,6 +340,8 @@ def inject_constants():
         'MARITAL_STATUSES': MARITAL_STATUSES,
         'HOUSING_TYPES': HOUSING_TYPES,
         'REPORTER_RELATIONS': REPORTER_RELATIONS,
+        'PDF_COLUMNS': PDF_COLUMNS,
+        'DEFAULT_PDF_COLS': DEFAULT_PDF_COLS,
     }
 
 
@@ -573,6 +632,8 @@ def admin_records():
         'reporter_relation': request.args.get('reporter_relation', ''),
         'widows_filter': request.args.get('widows_filter', ''),
         'spouse_search': request.args.get('spouse_search', ''),
+        'child_name_search': request.args.get('child_name_search', ''),
+        'child_education': request.args.get('child_education', ''),
     }
 
     if filters['status']:
@@ -703,6 +764,12 @@ def admin_records():
     if filters['spouse_search']:
         conditions.append("spouse_name LIKE ?")
         params.append(f"%{filters['spouse_search']}%")
+    if filters['child_name_search']:
+        conditions.append("children_data LIKE ?")
+        params.append(f"%{filters['child_name_search']}%")
+    if filters['child_education']:
+        conditions.append("children_data LIKE ?")
+        params.append(f"%{filters['child_education']}%")
     if filters['search']:
         search_term = f"%{filters['search']}%"
         conditions.append("""(
@@ -1067,6 +1134,12 @@ def records_list_pdf():
     if request.args.get('spouse_search'):
         conditions.append("spouse_name LIKE ?")
         params.append(f"%{request.args['spouse_search']}%")
+    if request.args.get('child_name_search'):
+        conditions.append("children_data LIKE ?")
+        params.append(f"%{request.args['child_name_search']}%")
+    if request.args.get('child_education'):
+        conditions.append("children_data LIKE ?")
+        params.append(f"%{request.args['child_education']}%")
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
     records = db.execute(
@@ -1078,6 +1151,15 @@ def records_list_pdf():
     if os.path.exists(logo_path):
         with open(logo_path, 'rb') as f:
             logo_b64 = base64.b64encode(f.read()).decode()
+
+    # Get selected columns (or use defaults)
+    selected_cols = request.args.getlist('cols')
+    if not selected_cols:
+        selected_cols = DEFAULT_PDF_COLS
+
+    # Build column headers for PDF
+    col_map = dict(PDF_COLUMNS)
+    pdf_cols = [(c, col_map.get(c, c)) for c in selected_cols if c in col_map]
 
     # Build filter description
     filter_desc = []
@@ -1114,7 +1196,7 @@ def records_list_pdf():
 
     html = render_template('pdf_list.html',
         records=records, logo_b64=logo_b64, filter_desc=filter_desc,
-        total=len(records))
+        total=len(records), pdf_cols=pdf_cols, selected_cols=selected_cols)
 
     from weasyprint import HTML
     pdf_bytes = HTML(string=html, base_url=BASE_DIR).write_pdf()

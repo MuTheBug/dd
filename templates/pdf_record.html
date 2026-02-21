@@ -313,6 +313,42 @@ body {
     </div>
 </div>
 
+<!-- Children Details -->
+{% set children = record.children_data|from_json %}
+{% if children %}
+<div class="section">
+    <div class="section-title">المسح الاجتماعي للأطفال ({{ children|length }} طفل)</div>
+    <table style="width:100%; border-collapse: collapse; font-size: 8pt; margin-top: 4px;">
+        <thead>
+            <tr style="background: #f0f7f7;">
+                <th style="border: 1px solid #ccc; padding: 3px; text-align: right;">#</th>
+                <th style="border: 1px solid #ccc; padding: 3px; text-align: right;">الاسم</th>
+                <th style="border: 1px solid #ccc; padding: 3px; text-align: right;">الجنس</th>
+                <th style="border: 1px solid #ccc; padding: 3px; text-align: right;">سنة الميلاد</th>
+                <th style="border: 1px solid #ccc; padding: 3px; text-align: right;">التحصيل العلمي</th>
+                <th style="border: 1px solid #ccc; padding: 3px; text-align: right;">المدرسة/الجامعة</th>
+                <th style="border: 1px solid #ccc; padding: 3px; text-align: right;">العمل</th>
+                <th style="border: 1px solid #ccc; padding: 3px; text-align: right;">ملاحظات صحية</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for child in children %}
+            <tr>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ loop.index }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px; font-weight: 600;">{{ child.name or '-' }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ 'ذكر' if child.gender == 'male' else 'أنثى' if child.gender == 'female' else '-' }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.birth_year or '-' }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.education or '-' }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.school or '-' }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.employment or '-' }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.health_notes or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 {% if record.notes %}
 <div class="section">
     <div class="section-title">ملاحظات</div>

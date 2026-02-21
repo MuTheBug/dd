@@ -400,38 +400,31 @@
             <input type="tel" name="spouse_phone" value="{{ record.spouse_phone or '' }}">
         </div>
         <div class="form-group">
-            <label>أطفال</label>
-            <select name="has_kids">
-                <option value="no" {{ 'selected' if record.has_kids!='yes' }}>لا</option>
-                <option value="yes" {{ 'selected' if record.has_kids=='yes' }}>نعم</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>عدد الأطفال</label>
-            <input type="number" name="kids_count" value="{{ record.kids_count or 0 }}">
-        </div>
-        <div class="form-group">
-            <label>أطفال تحت 18</label>
-            <input type="number" name="kids_under_18_count" value="{{ record.kids_under_18_count or 0 }}">
-        </div>
-        <div class="form-group">
             <label>زوج/ة سابق/ة</label>
             <input type="text" name="ex_spouse_name" value="{{ record.ex_spouse_name or '' }}">
         </div>
-        <div class="form-group">
-            <label>أطفال من زواج سابق</label>
-            <select name="has_kids_w">
-                <option value="no" {{ 'selected' if record.has_kids_w!='yes' }}>لا</option>
-                <option value="yes" {{ 'selected' if record.has_kids_w=='yes' }}>نعم</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>عدد أطفال الزواج السابق</label>
-            <input type="number" name="kids_count_w" value="{{ record.kids_count_w or 0 }}">
-        </div>
     </div>
-    <input type="hidden" name="children_data" value="{{ record.children_data or '[]' }}">
+
+    <!-- Dynamic Children Form -->
+    <div style="margin-top: 1rem; padding: 0.75rem; background: #f0f7f7; border-radius: 8px; border: 1px solid #d0e8e8;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+            <div style="font-weight: 600; color: #095355;">&#x1F476; المسح الاجتماعي للأطفال</div>
+            <button type="button" onclick="addChild()" class="btn btn-primary btn-sm">+ إضافة طفل</button>
+        </div>
+        <div style="font-size: 0.75rem; color: #666; margin-bottom: 0.5rem;">
+            عدد الأطفال: <span id="kidsCountDisplay">0</span> |
+            قاصرين (تحت 18): <span id="kidsUnder18Display">0</span>
+        </div>
+        <div id="childrenContainer"></div>
+    </div>
+
+    <input type="hidden" name="children_data" id="childrenDataInput" value="{{ record.children_data or '[]' }}">
     <input type="hidden" name="children_data_w" value="{{ record.children_data_w or '[]' }}">
+    <input type="hidden" name="has_kids" id="hasKidsInput" value="{{ record.has_kids or 'no' }}">
+    <input type="hidden" name="kids_count" id="kidsCountInput" value="{{ record.kids_count or 0 }}">
+    <input type="hidden" name="kids_under_18_count" id="kidsUnder18Input" value="{{ record.kids_under_18_count or 0 }}">
+    <input type="hidden" name="has_kids_w" value="{{ record.has_kids_w or 'no' }}">
+    <input type="hidden" name="kids_count_w" value="{{ record.kids_count_w or 0 }}">
 </div>
 
 <!-- Socioeconomic -->
@@ -626,8 +619,109 @@
 
 {% block scripts %}
 <script>
-function handleStatusChange() {
-    // Optional: could update case_type options dynamically like entry form
+function handleStatusChange() {}
+
+var eduLevels = ['أمّي','ابتدائية','إعدادية','ثانوية','معهد','بكالوريوس','ماجستير','دكتوراه'];
+var currentYear = new Date().getFullYear();
+
+function addChild(data) {
+    data = data || {};
+    var container = document.getElementById('childrenContainer');
+    var idx = container.children.length;
+    var div = document.createElement('div');
+    div.className = 'child-entry';
+    div.style.cssText = 'background: white; border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem; margin-bottom: 0.5rem; position: relative;';
+
+    var eduOpts = '<option value="">--</option>';
+    for (var i = 0; i < eduLevels.length; i++) {
+        var sel = (data.education === eduLevels[i]) ? ' selected' : '';
+        eduOpts += '<option value="' + eduLevels[i] + '"' + sel + '>' + eduLevels[i] + '</option>';
+    }
+
+    div.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">' +
+        '<strong style="font-size:0.8rem;color:#095355;">طفل #' + (idx + 1) + '</strong>' +
+        '<button type="button" onclick="removeChild(this)" style="background:#c0392b;color:white;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.75rem;">حذف</button>' +
+        '</div>' +
+        '<div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.4rem;">' +
+        '<div class="form-group"><label style="font-size:0.7rem;">الاسم</label>' +
+        '<input type="text" class="child-name" value="' + (data.name || '') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">الجنس</label>' +
+        '<select class="child-gender" style="font-size:0.8rem;padding:4px 6px;">' +
+        '<option value="">--</option><option value="male"' + (data.gender === 'male' ? ' selected' : '') + '>ذكر</option>' +
+        '<option value="female"' + (data.gender === 'female' ? ' selected' : '') + '>أنثى</option></select></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">سنة الميلاد</label>' +
+        '<input type="number" class="child-birth-year" value="' + (data.birth_year || '') + '" min="1990" max="2026" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">التحصيل العلمي</label>' +
+        '<select class="child-education" style="font-size:0.8rem;padding:4px 6px;">' + eduOpts + '</select></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">المدرسة/الجامعة</label>' +
+        '<input type="text" class="child-school" value="' + (data.school || '') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">العمل</label>' +
+        '<input type="text" class="child-employment" value="' + (data.employment || '') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">ملاحظات صحية</label>' +
+        '<input type="text" class="child-health" value="' + (data.health_notes || '') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">احتياجات خاصة</label>' +
+        '<input type="text" class="child-special" value="' + (data.special_needs || '') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '</div>';
+
+    container.appendChild(div);
+    updateChildrenData();
 }
+
+function removeChild(btn) {
+    btn.closest('.child-entry').remove();
+    renumberChildren();
+    updateChildrenData();
+}
+
+function renumberChildren() {
+    var entries = document.querySelectorAll('#childrenContainer .child-entry');
+    for (var i = 0; i < entries.length; i++) {
+        entries[i].querySelector('strong').textContent = 'طفل #' + (i + 1);
+    }
+}
+
+function updateChildrenData() {
+    var entries = document.querySelectorAll('#childrenContainer .child-entry');
+    var children = [];
+    var under18 = 0;
+    for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        var by = parseInt(e.querySelector('.child-birth-year').value) || 0;
+        var child = {
+            name: e.querySelector('.child-name').value,
+            gender: e.querySelector('.child-gender').value,
+            birth_year: by,
+            education: e.querySelector('.child-education').value,
+            school: e.querySelector('.child-school').value,
+            employment: e.querySelector('.child-employment').value,
+            health_notes: e.querySelector('.child-health').value,
+            special_needs: e.querySelector('.child-special').value
+        };
+        children.push(child);
+        if (by > 0 && (currentYear - by) < 18) under18++;
+    }
+    document.getElementById('childrenDataInput').value = JSON.stringify(children);
+    document.getElementById('kidsCountInput').value = children.length;
+    document.getElementById('kidsUnder18Input').value = under18;
+    document.getElementById('hasKidsInput').value = children.length > 0 ? 'yes' : 'no';
+    document.getElementById('kidsCountDisplay').textContent = children.length;
+    document.getElementById('kidsUnder18Display').textContent = under18;
+}
+
+// Load existing children data on page load
+(function() {
+    var raw = document.getElementById('childrenDataInput').value;
+    try {
+        var data = JSON.parse(raw);
+        if (Array.isArray(data)) {
+            for (var i = 0; i < data.length; i++) {
+                addChild(data[i]);
+            }
+        }
+    } catch(e) {}
+    // Attach change listeners
+    document.getElementById('childrenContainer').addEventListener('input', updateChildrenData);
+    document.getElementById('childrenContainer').addEventListener('change', updateChildrenData);
+})();
 </script>
 {% endblock %}

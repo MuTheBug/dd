@@ -7,7 +7,7 @@
         السجلات <span style="font-size: 0.85rem; color: var(--text-light);">({{ total_count }} سجل)</span>
     </h1>
     <div class="btn-group">
-        <a href="{{ url_for('records_list_pdf', **filter_params) }}" class="btn btn-outline btn-sm" target="_blank">&#x1F4C4; تصدير PDF</a>
+        <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('pdfColModal').style.display='flex'">&#x1F4C4; تصدير PDF</button>
         <a href="{{ url_for('entry_form') }}" class="btn btn-primary btn-sm">+ إضافة حالة</a>
     </div>
 </div>
@@ -280,6 +280,21 @@
                     </select>
                 </div>
 
+                <!-- Children Search -->
+                <div class="form-group">
+                    <label>&#x1F476; بحث باسم طفل</label>
+                    <input type="text" name="child_name_search" value="{{ filters.child_name_search }}" placeholder="اسم الطفل...">
+                </div>
+                <div class="form-group">
+                    <label>تحصيل أطفال</label>
+                    <select name="child_education">
+                        <option value="">الكل</option>
+                        {% for e in EDUCATION_LEVELS %}
+                        <option value="{{ e }}" {{ 'selected' if filters.child_education==e }}>{{ e }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
                 <!-- Case & Evidence -->
                 <div class="form-group">
                     <label>نوع الحالة التفصيلي</label>
@@ -410,6 +425,12 @@
         {% if filters.spouse_search %}
         <span class="filter-tag">زوج/ة: {{ filters.spouse_search }}</span>
         {% endif %}
+        {% if filters.child_name_search %}
+        <span class="filter-tag">طفل: {{ filters.child_name_search }}</span>
+        {% endif %}
+        {% if filters.child_education %}
+        <span class="filter-tag">تحصيل أطفال: {{ filters.child_education }}</span>
+        {% endif %}
         <a href="{{ url_for('admin_records') }}" style="font-size: 0.75rem; color: var(--deceased);">مسح الكل</a>
     </div>
     {% endif %}
@@ -514,10 +535,59 @@
     {% endif %}
 </div>
 {% endif %}
+<!-- PDF Column Selector Modal -->
+<div id="pdfColModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:white; border-radius:12px; max-width:600px; width:100%; max-height:80vh; overflow-y:auto; padding:1.5rem; position:relative;">
+        <button onclick="document.getElementById('pdfColModal').style.display='none'" style="position:absolute; top:10px; left:10px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#666;">&times;</button>
+        <h3 style="color:#095355; margin-bottom:0.5rem;">&#x1F4C4; اختر أعمدة التقرير</h3>
+        <p style="font-size:0.8rem; color:#666; margin-bottom:1rem;">حدد الأعمدة التي تريد إظهارها في ملف PDF</p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+            <button type="button" onclick="toggleAllCols(true)" class="btn btn-outline btn-sm" style="font-size:0.7rem;">تحديد الكل</button>
+            <button type="button" onclick="toggleAllCols(false)" class="btn btn-outline btn-sm" style="font-size:0.7rem;">إلغاء الكل</button>
+            <button type="button" onclick="resetDefaultCols()" class="btn btn-outline btn-sm" style="font-size:0.7rem;">الافتراضي</button>
+        </div>
+        <div id="pdfColGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:0.3rem; margin-bottom:1rem;">
+            {% for col_key, col_label in PDF_COLUMNS %}
+            <label style="display:flex; align-items:center; gap:4px; font-size:0.8rem; padding:4px 6px; border:1px solid #eee; border-radius:4px; cursor:pointer;">
+                <input type="checkbox" class="pdf-col-check" value="{{ col_key }}" {{ 'checked' if col_key in DEFAULT_PDF_COLS }}>
+                {{ col_label }}
+            </label>
+            {% endfor %}
+        </div>
+        <button type="button" onclick="exportPdf()" class="btn btn-primary" style="width:100%;">&#x1F4E5; تصدير PDF الآن</button>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+var defaultCols = {{ DEFAULT_PDF_COLS | tojson }};
+var filterParams = {{ filter_params | tojson }};
+
+function toggleAllCols(state) {
+    document.querySelectorAll('.pdf-col-check').forEach(function(cb) { cb.checked = state; });
+}
+function resetDefaultCols() {
+    document.querySelectorAll('.pdf-col-check').forEach(function(cb) {
+        cb.checked = defaultCols.indexOf(cb.value) >= 0;
+    });
+}
+function exportPdf() {
+    var cols = [];
+    document.querySelectorAll('.pdf-col-check:checked').forEach(function(cb) { cols.push(cb.value); });
+    if (cols.length === 0) { alert('يرجى تحديد عمود واحد على الأقل'); return; }
+    var url = '{{ url_for("records_list_pdf") }}?';
+    var params = [];
+    for (var key in filterParams) {
+        if (filterParams[key]) params.push(encodeURIComponent(key) + '=' + encodeURIComponent(filterParams[key]));
+    }
+    for (var i = 0; i < cols.length; i++) {
+        params.push('cols=' + encodeURIComponent(cols[i]));
+    }
+    window.open(url + params.join('&'), '_blank');
+    document.getElementById('pdfColModal').style.display = 'none';
+}
+
 function toggleFilters() {
     var fb = document.getElementById('filterBody');
     var arrow = document.getElementById('filterArrow');

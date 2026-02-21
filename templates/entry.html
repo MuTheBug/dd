@@ -440,22 +440,21 @@
                 <label>هاتف الزوج/ة</label>
                 <input type="tel" name="spouse_phone">
             </div>
-            <div class="form-group">
-                <label>هل لديه/ا أطفال؟</label>
-                <select name="has_kids" onchange="document.getElementById('kidsSection').style.display=this.value==='yes'?'block':'none'">
-                    <option value="no">لا</option>
-                    <option value="yes">نعم</option>
-                </select>
-            </div>
-            <div class="form-group" id="kidsSection" style="display:none">
-                <label>عدد الأطفال</label>
-                <input type="number" name="kids_count" min="0" value="0">
-            </div>
-            <div class="form-group">
-                <label>عدد الأطفال تحت 18 سنة</label>
-                <input type="number" name="kids_under_18_count" min="0" value="0">
-            </div>
         </div>
+    </div>
+
+    <!-- Dynamic Children Social Survey -->
+    <div class="form-section">
+        <div class="form-section-title">&#x1F476; المسح الاجتماعي للأطفال</div>
+        <div style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">
+            أضف بيانات كل طفل على حدة. عدد الأطفال: <strong id="entryKidsCount">0</strong> | قاصرين: <strong id="entryKidsUnder18">0</strong>
+        </div>
+        <div id="entryChildrenContainer"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addEntryChild()" style="margin-top: 0.5rem;">+ إضافة طفل</button>
+        <input type="hidden" name="children_data" id="entryChildrenData" value="[]">
+        <input type="hidden" name="has_kids" id="entryHasKids" value="no">
+        <input type="hidden" name="kids_count" id="entryKidsCountInput" value="0">
+        <input type="hidden" name="kids_under_18_count" id="entryKidsUnder18Input" value="0">
     </div>
 
     <div class="form-section conditional-section" id="exSpouseSection">
@@ -782,6 +781,67 @@ function addWitness() {
     `;
     container.appendChild(div);
 }
+
+// Children form
+var entryEduLevels = ['أمّي','ابتدائية','إعدادية','ثانوية','معهد','بكالوريوس','ماجستير','دكتوراه'];
+var entryCurrentYear = new Date().getFullYear();
+
+function addEntryChild(data) {
+    data = data || {};
+    var container = document.getElementById('entryChildrenContainer');
+    var idx = container.children.length;
+    var div = document.createElement('div');
+    div.className = 'child-entry';
+    div.style.cssText = 'background: #fafafa; border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem; margin-bottom: 0.5rem; position: relative;';
+
+    var eduOpts = '<option value="">--</option>';
+    for (var i = 0; i < entryEduLevels.length; i++) {
+        var sel = (data.education === entryEduLevels[i]) ? ' selected' : '';
+        eduOpts += '<option value="' + entryEduLevels[i] + '"' + sel + '>' + entryEduLevels[i] + '</option>';
+    }
+
+    div.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">' +
+        '<strong style="font-size:0.8rem;color:#095355;">طفل #' + (idx+1) + '</strong>' +
+        '<button type="button" onclick="removeEntryChild(this)" style="background:#c0392b;color:white;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.75rem;">حذف</button></div>' +
+        '<div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.4rem;">' +
+        '<div class="form-group"><label style="font-size:0.7rem;">الاسم</label><input type="text" class="ec-name" value="' + (data.name||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">الجنس</label><select class="ec-gender" style="font-size:0.8rem;padding:4px 6px;"><option value="">--</option><option value="male"' + (data.gender==='male'?' selected':'') + '>ذكر</option><option value="female"' + (data.gender==='female'?' selected':'') + '>أنثى</option></select></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">سنة الميلاد</label><input type="number" class="ec-birth" value="' + (data.birth_year||'') + '" min="1990" max="2026" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">التحصيل العلمي</label><select class="ec-edu" style="font-size:0.8rem;padding:4px 6px;">' + eduOpts + '</select></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">المدرسة/الجامعة</label><input type="text" class="ec-school" value="' + (data.school||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">العمل</label><input type="text" class="ec-work" value="' + (data.employment||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">ملاحظات صحية</label><input type="text" class="ec-health" value="' + (data.health_notes||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">احتياجات خاصة</label><input type="text" class="ec-special" value="' + (data.special_needs||'') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '</div>';
+    container.appendChild(div);
+    updateEntryChildren();
+}
+
+function removeEntryChild(btn) {
+    btn.closest('.child-entry').remove();
+    var entries = document.querySelectorAll('#entryChildrenContainer .child-entry');
+    for (var i = 0; i < entries.length; i++) entries[i].querySelector('strong').textContent = 'طفل #' + (i+1);
+    updateEntryChildren();
+}
+
+function updateEntryChildren() {
+    var entries = document.querySelectorAll('#entryChildrenContainer .child-entry');
+    var children = []; var u18 = 0;
+    for (var i = 0; i < entries.length; i++) {
+        var e = entries[i]; var by = parseInt(e.querySelector('.ec-birth').value) || 0;
+        children.push({name:e.querySelector('.ec-name').value, gender:e.querySelector('.ec-gender').value, birth_year:by, education:e.querySelector('.ec-edu').value, school:e.querySelector('.ec-school').value, employment:e.querySelector('.ec-work').value, health_notes:e.querySelector('.ec-health').value, special_needs:e.querySelector('.ec-special').value});
+        if (by > 0 && (entryCurrentYear - by) < 18) u18++;
+    }
+    document.getElementById('entryChildrenData').value = JSON.stringify(children);
+    document.getElementById('entryKidsCountInput').value = children.length;
+    document.getElementById('entryKidsUnder18Input').value = u18;
+    document.getElementById('entryHasKids').value = children.length > 0 ? 'yes' : 'no';
+    document.getElementById('entryKidsCount').textContent = children.length;
+    document.getElementById('entryKidsUnder18').textContent = u18;
+}
+
+document.getElementById('entryChildrenContainer').addEventListener('input', updateEntryChildren);
+document.getElementById('entryChildrenContainer').addEventListener('change', updateEntryChildren);
 
 // Collect witnesses before submit
 document.getElementById('entryForm').addEventListener('submit', function() {

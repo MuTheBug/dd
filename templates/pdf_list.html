@@ -143,44 +143,45 @@ tr:nth-child(even) { background: #fafafa; }
 <table>
     <thead>
         <tr>
-            <th>#</th>
-            <th>الاسم</th>
-            <th>الأب</th>
-            <th>الكنية</th>
-            <th>الحالة</th>
-            <th>المحافظة</th>
-            <th>الرقم الوطني</th>
-            <th>سنة الاعتقال</th>
-            <th>الجهة</th>
-            <th>مكان الاحتجاز</th>
-            <th>الزوج/ة</th>
-            <th>أطفال</th>
-            <th>قاصرين</th>
-            <th>التعليم</th>
+            {% for col_key, col_label in pdf_cols %}
+            <th>{{ col_label }}</th>
+            {% endfor %}
         </tr>
     </thead>
     <tbody>
         {% for r in records %}
         <tr>
-            <td>{{ r.id }}</td>
-            <td style="font-weight:600;">{{ r.first_name }}</td>
-            <td>{{ r.father_name }}</td>
-            <td>{{ r.last_name }}</td>
-            <td>
-                {% if r.status == 'survivor' %}<span class="badge badge-survivor">ناجٍ</span>
-                {% elif r.status == 'enforced' %}<span class="badge badge-enforced">مغيّب</span>
-                {% elif r.status == 'deceased' %}<span class="badge badge-deceased">متوفى</span>
-                {% else %}-{% endif %}
+            {% for col_key, col_label in pdf_cols %}
+            <td style="font-size:7pt;">
+                {% if col_key == 'status' %}
+                    {% if r.status == 'survivor' %}<span class="badge badge-survivor">ناجٍ</span>
+                    {% elif r.status == 'enforced' %}<span class="badge badge-enforced">مغيّب</span>
+                    {% elif r.status == 'deceased' %}<span class="badge badge-deceased">متوفى</span>
+                    {% else %}-{% endif %}
+                {% elif col_key == 'gender' %}
+                    {{ 'ذكر' if r.gender == 'male' else 'أنثى' if r.gender == 'female' else '-' }}
+                {% elif col_key == 'marital' %}
+                    {% for c,l in MARITAL_STATUSES %}{% if r.marital==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.marital }}
+                {% elif col_key == 'case_type' %}
+                    {% for c,l in CASE_TYPES %}{% if r.case_type==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.case_type }}
+                {% elif col_key == 'evidence_level' %}
+                    {% for c,l in EVIDENCE_LEVELS %}{% if r.evidence_level==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.evidence_level }}
+                {% elif col_key == 'has_special_needs' %}
+                    {{ 'نعم' if r.has_special_needs else '-' }}
+                {% elif col_key == 'kids_count' %}
+                    {{ r.kids_count if r.has_kids == 'yes' else '-' }}
+                {% elif col_key == 'kids_under_18_count' %}
+                    {{ r.kids_under_18_count if r.kids_under_18_count else '-' }}
+                {% elif col_key == 'children_summary' %}
+                    {% set ch = r.children_data|from_json %}
+                    {% if ch %}{% for c in ch %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                {% elif col_key == 'first_name' %}
+                    <span style="font-weight:600;">{{ r[col_key] or '-' }}</span>
+                {% else %}
+                    {{ r[col_key] or '-' }}
+                {% endif %}
             </td>
-            <td>{{ r.province }}</td>
-            <td style="font-size:7pt;">{{ r.national_id or '-' }}</td>
-            <td>{{ r.arrest_year if r.arrest_year else '-' }}</td>
-            <td style="font-size:7pt;">{{ r.arrest_authority or '-' }}</td>
-            <td style="font-size:7pt;">{{ r.arrest_place or '-' }}</td>
-            <td style="font-size:7pt;">{{ r.spouse_name or '-' }}</td>
-            <td>{{ r.kids_count if r.has_kids == 'yes' else '-' }}</td>
-            <td>{{ r.kids_under_18_count if r.kids_under_18_count else '-' }}</td>
-            <td>{{ r.education or '-' }}</td>
+            {% endfor %}
         </tr>
         {% endfor %}
     </tbody>

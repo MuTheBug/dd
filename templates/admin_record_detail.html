@@ -272,7 +272,7 @@
         {% endif %}
         <div class="detail-field">
             <div class="detail-field-label">أطفال</div>
-            <div class="detail-field-value">{{ record.has_kids or 'لا' }} {% if record.kids_count %}({{ record.kids_count }}){% endif %}</div>
+            <div class="detail-field-value">{{ record.has_kids or 'لا' }} {% if record.kids_count %}({{ record.kids_count }}){% endif %}{% if record.kids_under_18_count %} - قاصرين: {{ record.kids_under_18_count }}{% endif %}</div>
         </div>
         {% if record.guardian_name %}
         <div class="detail-field">
@@ -281,6 +281,49 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Children Social Survey -->
+    {% set children = record.children_data|from_json %}
+    {% if children %}
+    <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+            <div class="card-icon">&#x1F476;</div>
+            <h3>المسح الاجتماعي للأطفال ({{ children|length }} طفل)</h3>
+        </div>
+        <div class="table-wrapper">
+            <table style="font-size: 0.8rem;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>الاسم</th>
+                        <th>الجنس</th>
+                        <th>سنة الميلاد</th>
+                        <th>التحصيل العلمي</th>
+                        <th>المدرسة/الجامعة</th>
+                        <th>العمل</th>
+                        <th>ملاحظات صحية</th>
+                        <th>احتياجات خاصة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for child in children %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td style="font-weight: 600;">{{ child.name or '-' }}</td>
+                        <td>{{ 'ذكر' if child.gender == 'male' else 'أنثى' if child.gender == 'female' else '-' }}</td>
+                        <td>{{ child.birth_year or '-' }}</td>
+                        <td>{{ child.education or '-' }}</td>
+                        <td>{{ child.school or '-' }}</td>
+                        <td>{{ child.employment or '-' }}</td>
+                        <td>{{ child.health_notes or '-' }}</td>
+                        <td>{{ child.special_needs or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Socioeconomic -->
     <div class="card">

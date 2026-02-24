@@ -236,6 +236,12 @@ REPORTER_RELATIONS = [
     'صديق', 'جار', 'زميل', 'الشخص نفسه', 'أخرى'
 ]
 
+# Arrest authority normalization: map variant spellings to canonical form
+AUTHORITY_ALIASES = {
+    'أمن الدولة': ['أمن الدولة', 'امن الدولة', 'فرع امن الدولة', 'فرع أمن الدولة'],
+    'الأمن العسكري': ['الأمن العسكري', 'الامن العسكري', 'امن عسكري', 'أمن عسكري', 'فرع الامن العسكري', 'فرع الأمن العسكري'],
+}
+
 
 # ---------------------------------------------------------------------------
 # Database helpers
@@ -689,8 +695,20 @@ def admin_records():
     conditions = []
     params = []
 
+    # Status supports multi-select (via checkboxes or comma-separated)
+    status_list = request.args.getlist('status')
+    # Also handle comma-separated values (from pagination URLs)
+    expanded = []
+    for s in status_list:
+        if ',' in s:
+            expanded.extend(s.split(','))
+        elif s:
+            expanded.append(s)
+    status_list = expanded
+
     filters = {
-        'status': request.args.get('status', ''),
+        'status': ','.join(status_list),  # kept for backward compat
+        'status_list': status_list,
         'province': request.args.get('province', ''),
         'gender': request.args.get('gender', ''),
         'arrest_authority': request.args.get('arrest_authority', ''),
@@ -746,9 +764,14 @@ def admin_records():
         'digital_evidence_url_status': request.args.get('digital_evidence_url_status', ''),
     }
 
-    if filters['status']:
-        conditions.append("status = ?")
-        params.append(filters['status'])
+    if status_list:
+        if len(status_list) == 1:
+            conditions.append("status = ?")
+            params.append(status_list[0])
+        else:
+            placeholders = ','.join(['?'] * len(status_list))
+            conditions.append(f"status IN ({placeholders})")
+            params.extend(status_list)
     if filters['province']:
         conditions.append("province = ?")
         params.append(filters['province'])
@@ -756,8 +779,19 @@ def admin_records():
         conditions.append("gender = ?")
         params.append(filters['gender'])
     if filters['arrest_authority']:
-        conditions.append("arrest_authority LIKE ?")
-        params.append(f"%{filters['arrest_authority']}%")
+        # Check if this authority has known aliases
+        authority_variants = None
+        for canonical, aliases in AUTHORITY_ALIASES.items():
+            if filters['arrest_authority'] in aliases or filters['arrest_authority'] == canonical:
+                authority_variants = aliases
+                break
+        if authority_variants:
+            or_clauses = ' OR '.join(['arrest_authority LIKE ?' for _ in authority_variants])
+            conditions.append(f"({or_clauses})")
+            params.extend([f"%{v}%" for v in authority_variants])
+        else:
+            conditions.append("arrest_authority LIKE ?")
+            params.append(f"%{filters['arrest_authority']}%")
     if filters['arrest_place']:
         conditions.append("arrest_place LIKE ?")
         params.append(f"%{filters['arrest_place']}%")
@@ -840,7 +874,7 @@ def admin_records():
     if filters['has_special_needs'] == '1':
         conditions.append("has_special_needs = 1")
     if filters['chronic'] == 'yes':
-        conditions.append("chronic = 'نعم'")
+        conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
     if filters['breadwinner']:
         conditions.append("breadwinner LIKE ?")
         params.append(f"%{filters['breadwinner']}%")
@@ -962,7 +996,12 @@ def admin_records():
     total_pages = (count + per_page - 1) // per_page
 
     # Build filter_params for URL generation in templates
-    filter_params = {k: v for k, v in filters.items() if v}
+    filter_params = {k: v for k, v in filters.items() if v and k != 'status_list'}
+    # For multi-select status, use first value for URL compat (pagination uses &status=)
+    if status_list:
+        filter_params['status'] = status_list[0] if len(status_list) == 1 else ','.join(status_list)
+    else:
+        filter_params.pop('status', None)
 
     return render_template('admin_records.html',
         records=records, filters=filters, page=page,
@@ -1220,7 +1259,25 @@ def records_list_pdf():
     conditions = []
     params = []
 
-    for key in ['status', 'province', 'gender', 'marital', 'education', 'housing_type', 'blood_type',
+    # Handle multi-select status (checkboxes or comma-separated)
+    pdf_status_list = request.args.getlist('status')
+    expanded = []
+    for s in pdf_status_list:
+        if ',' in s:
+            expanded.extend(s.split(','))
+        elif s:
+            expanded.append(s)
+    pdf_status_list = expanded
+    if pdf_status_list:
+        if len(pdf_status_list) == 1:
+            conditions.append("status = ?")
+            params.append(pdf_status_list[0])
+        else:
+            placeholders = ','.join(['?'] * len(pdf_status_list))
+            conditions.append(f"status IN ({placeholders})")
+            params.extend(pdf_status_list)
+
+    for key in ['province', 'gender', 'marital', 'education', 'housing_type', 'blood_type',
                 'case_type', 'evidence_level', 'verification_status', 'civil_registry_status']:
         val = request.args.get(key, '')
         if val:
@@ -1228,8 +1285,19 @@ def records_list_pdf():
             params.append(val)
 
     if request.args.get('arrest_authority'):
-        conditions.append("arrest_authority LIKE ?")
-        params.append(f"%{request.args['arrest_authority']}%")
+        aa = request.args['arrest_authority']
+        authority_variants = None
+        for canonical, aliases in AUTHORITY_ALIASES.items():
+            if aa in aliases or aa == canonical:
+                authority_variants = aliases
+                break
+        if authority_variants:
+            or_clauses = ' OR '.join(['arrest_authority LIKE ?' for _ in authority_variants])
+            conditions.append(f"({or_clauses})")
+            params.extend([f"%{v}%" for v in authority_variants])
+        else:
+            conditions.append("arrest_authority LIKE ?")
+            params.append(f"%{aa}%")
     if request.args.get('arrest_place'):
         conditions.append("arrest_place LIKE ?")
         params.append(f"%{request.args['arrest_place']}%")
@@ -1256,7 +1324,7 @@ def records_list_pdf():
     if request.args.get('has_special_needs') == '1':
         conditions.append("has_special_needs = 1")
     if request.args.get('chronic') == 'yes':
-        conditions.append("chronic = 'نعم'")
+        conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
     if request.args.get('has_hypertension') == '1':
         conditions.append("has_hypertension = 1")
     if request.args.get('has_diabetes') == '1':
@@ -1371,8 +1439,9 @@ def records_list_pdf():
 
     # Build filter description
     filter_desc = []
-    if request.args.get('status'):
-        filter_desc.append(f"الحالة: {STATUS_MAP.get(request.args['status'], request.args['status'])}")
+    if pdf_status_list:
+        status_labels = [STATUS_MAP.get(s, s) for s in pdf_status_list]
+        filter_desc.append(f"الحالة: {' + '.join(status_labels)}")
     if request.args.get('province'):
         filter_desc.append(f"المحافظة: {request.args['province']}")
     if request.args.get('gender'):

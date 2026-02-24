@@ -791,7 +791,7 @@
 
     <div class="entry-section" id="healthSection">
         <div class="entry-section-title">&#x1F3E5; الحالة الصحية</div>
-        <div class="entry-section-desc status-deceased-hint" style="display:none; background: rgba(220,38,38,0.08); border-right-color: var(--deceased);">هذا القسم غير مطلوب للمتوفين.</div>
+        <div class="entry-section-desc status-deceased-hint" style="display:none; background: rgba(220,38,38,0.08); border-right-color: var(--deceased);">هذا القسم غير مطلوب للمتوفين والمغيّبين قسراً.</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>أمراض مزمنة؟</label>
@@ -1012,10 +1012,10 @@ function handleStatusChange() {
         bloodGroup.classList.remove('status-hidden');
     }
 
-    // Hide health section for deceased (irrelevant)
+    // Hide health section for deceased and enforced (irrelevant)
     var healthSection = document.getElementById('healthSection');
     var deceasedHint = healthSection.querySelector('.status-deceased-hint');
-    if (status === 'deceased') {
+    if (status === 'deceased' || status === 'enforced') {
         healthSection.querySelectorAll('.form-grid').forEach(function(g) { g.classList.add('status-hidden'); });
         deceasedHint.style.display = 'block';
     } else {

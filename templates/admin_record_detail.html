@@ -311,7 +311,7 @@
                         <td>{{ loop.index }}</td>
                         <td style="font-weight: 600;">{{ child.name or '-' }}</td>
                         <td>{{ 'ذكر' if child.gender == 'male' else 'أنثى' if child.gender == 'female' else '-' }}</td>
-                        <td>{{ child.birth_year or '-' }}</td>
+                        <td>{% if child.birth_year %}{{ child.birth_year }}{% elif child.age %}~{{ 2026 - child.age|int }}{% else %}-{% endif %}</td>
                         <td>{{ child.education or '-' }}</td>
                         <td>{{ child.school or '-' }}</td>
                         <td>{{ child.employment or '-' }}</td>
@@ -355,35 +355,41 @@
 </div>
 
     <!-- Documents & Files -->
-    {% if record.photo_path or record.document_path %}
+    {% if record.photo_path or record.document_path or record.digital_evidence_screenshot_path or record.civil_registry_document_path or record.survivor_cv_path or record.survivor_cv_photo_path %}
     <div class="card">
         <div class="card-header">
             <div class="card-icon">&#x1F4C1;</div>
             <h3>الملفات والوثائق</h3>
         </div>
-        {% if record.photo_path %}
+        {% macro doc_link(path, subfolder, label) %}
         <div class="detail-field">
-            <div class="detail-field-label">مسار الصورة الشخصية</div>
+            <div class="detail-field-label">{{ label }}</div>
             <div class="detail-field-value">
-                {% if record.photo_path.startswith('http://') or record.photo_path.startswith('https://') %}
-                <a href="{{ record.photo_path }}" target="_blank" style="word-break: break-all;">{{ record.photo_path }}</a>
+                {% if path.startswith('http://') or path.startswith('https://') %}
+                <a href="{{ path }}" target="_blank" style="word-break: break-all;">{{ path }}</a>
                 {% else %}
-                <a href="{{ url_for('uploaded_file', filename='photos/' + record.photo_path) }}" target="_blank">{{ record.photo_path }}</a>
+                <a href="{{ url_for('uploaded_file', filename=subfolder + '/' + path) }}" target="_blank">&#x1F4CE; {{ path }}</a>
                 {% endif %}
             </div>
         </div>
+        {% endmacro %}
+        {% if record.photo_path %}
+            {{ doc_link(record.photo_path, 'photos', 'الصورة الشخصية') }}
         {% endif %}
         {% if record.document_path %}
-        <div class="detail-field">
-            <div class="detail-field-label">مسار الوثيقة</div>
-            <div class="detail-field-value">
-                {% if record.document_path.startswith('http://') or record.document_path.startswith('https://') %}
-                <a href="{{ record.document_path }}" target="_blank" style="word-break: break-all;">{{ record.document_path }}</a>
-                {% else %}
-                <a href="{{ url_for('uploaded_file', filename='documents/' + record.document_path) }}" target="_blank">{{ record.document_path }}</a>
-                {% endif %}
-            </div>
-        </div>
+            {{ doc_link(record.document_path, 'documents', 'وثيقة الهوية') }}
+        {% endif %}
+        {% if record.digital_evidence_screenshot_path %}
+            {{ doc_link(record.digital_evidence_screenshot_path, 'screenshots', 'لقطة شاشة الدليل الرقمي') }}
+        {% endif %}
+        {% if record.civil_registry_document_path %}
+            {{ doc_link(record.civil_registry_document_path, 'documents', 'وثيقة السجل المدني (النفوس)') }}
+        {% endif %}
+        {% if record.survivor_cv_path %}
+            {{ doc_link(record.survivor_cv_path, 'documents', 'ملخص تجربة الناجي') }}
+        {% endif %}
+        {% if record.survivor_cv_photo_path %}
+            {{ doc_link(record.survivor_cv_photo_path, 'photos', 'صورة بعد الإفراج') }}
         {% endif %}
         {% if record.photo_hash %}
         <div class="detail-field">

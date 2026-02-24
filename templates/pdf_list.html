@@ -180,7 +180,7 @@ tr:nth-child(even) { background: #fafafa; }
                     {{ r.kids_under_18_count if r.kids_under_18_count else '-' }}
                 {% elif col_key == 'children_summary' %}
                     {% set ch = r.children_data|from_json %}
-                    {% if ch %}{% for c in ch %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                    {% if ch %}{% for c in ch %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ 2026 - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'first_name' %}
                     <span style="font-weight:600;">{{ r[col_key] or '-' }}</span>
                 {% else %}

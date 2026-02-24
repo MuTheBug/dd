@@ -143,6 +143,25 @@
 }
 .kids-counter strong { color: var(--primary); }
 
+/* Methodology tags */
+.methodology-tags {
+    display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem;
+}
+.method-tag {
+    display: inline-block; padding: 0.4rem 0.9rem;
+    border: 2px solid var(--border); border-radius: 20px;
+    background: var(--card); color: var(--text); font-size: 0.88rem;
+    cursor: pointer; transition: all 0.2s ease; font-family: inherit;
+}
+.method-tag:hover { border-color: var(--primary-light); background: var(--primary-bg); }
+.method-tag.selected {
+    border-color: var(--primary); background: var(--primary);
+    color: white; font-weight: 600;
+}
+
+/* Status-conditional fields */
+.status-hidden { display: none !important; }
+
 @media (max-width: 600px) {
     .step-label { display: none; }
     .step-circle { width: 34px; height: 34px; font-size: 0.8rem; }
@@ -294,7 +313,7 @@
                 <label>رقم الهاتف</label>
                 <input type="tel" name="phone" placeholder="رقم الهاتف">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="bloodTypeGroup">
                 <label>زمرة الدم</label>
                 <select name="blood_type">
                     <option value="">-- اختر --</option>
@@ -706,15 +725,15 @@
                 <label>مبلغ الإيجار (إن وُجد)</label>
                 <input type="text" name="rent_amount" placeholder="بالليرة السورية">
             </div>
-            <div class="form-group">
+            <div class="form-group status-alive-only">
                 <label>الوضع الوظيفي</label>
                 <input type="text" name="employment" placeholder="يعمل / لا يعمل">
             </div>
-            <div class="form-group">
+            <div class="form-group status-alive-only">
                 <label>المهنة</label>
                 <input type="text" name="profession">
             </div>
-            <div class="form-group">
+            <div class="form-group status-alive-only">
                 <label>جهة العمل</label>
                 <input type="text" name="employer">
             </div>
@@ -770,8 +789,9 @@
         </div>
     </div>
 
-    <div class="entry-section">
+    <div class="entry-section" id="healthSection">
         <div class="entry-section-title">&#x1F3E5; الحالة الصحية</div>
+        <div class="entry-section-desc status-deceased-hint" style="display:none; background: rgba(220,38,38,0.08); border-right-color: var(--deceased);">هذا القسم غير مطلوب للمتوفين.</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>أمراض مزمنة؟</label>
@@ -863,8 +883,27 @@
             <textarea name="notes" rows="4" placeholder="أي ملاحظات إضافية أو معلومات لم تُذكر أعلاه..."></textarea>
         </div>
         <div class="form-group full-width" style="margin-top: 0.8rem;">
-            <label>ملاحظات منهجية التوثيق</label>
-            <textarea name="methodology_notes" rows="3" placeholder="ملاحظات حول طريقة جمع البيانات وظروف المقابلة..."></textarea>
+            <label>منهجية التوثيق</label>
+            <div class="entry-section-desc">اختر الوسوم المناسبة لطريقة جمع وتوثيق هذه الحالة:</div>
+            <div class="methodology-tags" id="methodologyTags">
+                <button type="button" class="method-tag" data-tag="مقابلة مباشرة">مقابلة مباشرة</button>
+                <button type="button" class="method-tag" data-tag="مقابلة هاتفية">مقابلة هاتفية</button>
+                <button type="button" class="method-tag" data-tag="مقابلة عبر الإنترنت">مقابلة عبر الإنترنت</button>
+                <button type="button" class="method-tag" data-tag="شهادة شاهد عيان">شهادة شاهد عيان</button>
+                <button type="button" class="method-tag" data-tag="شهادة أحد الأقارب">شهادة أحد الأقارب</button>
+                <button type="button" class="method-tag" data-tag="تسريبات قيصر">تسريبات قيصر</button>
+                <button type="button" class="method-tag" data-tag="وثائق رسمية">وثائق رسمية</button>
+                <button type="button" class="method-tag" data-tag="بيانات السجل المدني">بيانات السجل المدني</button>
+                <button type="button" class="method-tag" data-tag="تقارير إعلامية">تقارير إعلامية</button>
+                <button type="button" class="method-tag" data-tag="منشورات وسائل التواصل">منشورات وسائل التواصل</button>
+                <button type="button" class="method-tag" data-tag="تقارير منظمات حقوقية">تقارير منظمات حقوقية</button>
+                <button type="button" class="method-tag" data-tag="أرشيف رقمي">أرشيف رقمي</button>
+                <button type="button" class="method-tag" data-tag="تحليل صور/فيديو">تحليل صور/فيديو</button>
+                <button type="button" class="method-tag" data-tag="تقاطع معلومات من مصادر متعددة">تقاطع معلومات من مصادر متعددة</button>
+                <button type="button" class="method-tag" data-tag="زيارة ميدانية">زيارة ميدانية</button>
+                <button type="button" class="method-tag" data-tag="بلاغ مجهول">بلاغ مجهول</button>
+            </div>
+            <textarea name="methodology_notes" id="methodologyNotes" rows="2" placeholder="ملاحظات إضافية حول المنهجية..." style="margin-top: 0.5rem;"></textarea>
         </div>
     </div>
 
@@ -964,6 +1003,34 @@ function handleStatusChange() {
         caseType.innerHTML += '<option value="enforced_disappearance_civil_registry_dead">متوفى بحسب النفوس فقط</option>';
         caseType.innerHTML += '<option value="deceased_caesar_files">متوفى - ملفات قيصر</option>';
     }
+
+    // Hide blood type for deceased and enforced (no blood sample available)
+    var bloodGroup = document.getElementById('bloodTypeGroup');
+    if (status === 'deceased' || status === 'enforced') {
+        bloodGroup.classList.add('status-hidden');
+    } else {
+        bloodGroup.classList.remove('status-hidden');
+    }
+
+    // Hide health section for deceased (irrelevant)
+    var healthSection = document.getElementById('healthSection');
+    var deceasedHint = healthSection.querySelector('.status-deceased-hint');
+    if (status === 'deceased') {
+        healthSection.querySelectorAll('.form-grid').forEach(function(g) { g.classList.add('status-hidden'); });
+        deceasedHint.style.display = 'block';
+    } else {
+        healthSection.querySelectorAll('.form-grid').forEach(function(g) { g.classList.remove('status-hidden'); });
+        deceasedHint.style.display = 'none';
+    }
+
+    // Hide employment fields for deceased and enforced
+    document.querySelectorAll('.status-alive-only').forEach(function(el) {
+        if (status === 'deceased' || status === 'enforced') {
+            el.classList.add('status-hidden');
+        } else {
+            el.classList.remove('status-hidden');
+        }
+    });
 }
 
 function handleDigitalEvidence() {
@@ -1222,7 +1289,55 @@ function clearDraft() {
 // Auto-save every 30 seconds
 setInterval(saveDraft, 30000);
 
+// === Methodology Tags ===
+document.getElementById('methodologyTags').addEventListener('click', function(e) {
+    var btn = e.target.closest('.method-tag');
+    if (!btn) return;
+    btn.classList.toggle('selected');
+    updateMethodologyNotes();
+});
+
+function updateMethodologyNotes() {
+    var selected = [];
+    document.querySelectorAll('.method-tag.selected').forEach(function(btn) {
+        selected.push(btn.dataset.tag);
+    });
+    var textarea = document.getElementById('methodologyNotes');
+    // Preserve any manually typed text after the tags
+    var currentVal = textarea.value;
+    var manualText = '';
+    var tagLine = selected.join(' | ');
+    // Check if there's existing tag line to separate from manual notes
+    var parts = currentVal.split('\n---\n');
+    if (parts.length > 1) {
+        manualText = parts.slice(1).join('\n---\n');
+    } else if (currentVal && !document.querySelectorAll('.method-tag.selected').length) {
+        manualText = currentVal;
+    }
+    if (selected.length > 0 && manualText) {
+        textarea.value = tagLine + '\n---\n' + manualText;
+    } else if (selected.length > 0) {
+        textarea.value = tagLine;
+    } else {
+        textarea.value = manualText;
+    }
+}
+
+// Restore tag selections from draft
+function restoreMethodologyTags() {
+    var textarea = document.getElementById('methodologyNotes');
+    if (!textarea.value) return;
+    var tagLine = textarea.value.split('\n---\n')[0];
+    var tags = tagLine.split(' | ');
+    document.querySelectorAll('.method-tag').forEach(function(btn) {
+        if (tags.indexOf(btn.dataset.tag) !== -1) {
+            btn.classList.add('selected');
+        }
+    });
+}
+
 // Load draft on page load
 loadDraft();
+restoreMethodologyTags();
 </script>
 {% endblock %}

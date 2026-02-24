@@ -31,12 +31,12 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    border-bottom: 3px solid #0d7377;
+    border-bottom: 3px solid #1e3a5f;
     padding-bottom: 10px;
     margin-bottom: 14px;
 }
 .logo { width: 50px; height: 50px; border-radius: 50%; }
-.header h1 { font-size: 14pt; color: #0d7377; }
+.header h1 { font-size: 14pt; color: #1e3a5f; }
 .header p { font-size: 8pt; color: #666; }
 .header-meta { margin-right: auto; text-align: left; font-size: 8pt; color: #999; }
 
@@ -62,13 +62,13 @@ body {
 }
 .summary-item .num { font-size: 14pt; font-weight: bold; }
 .summary-item .lbl { font-size: 7pt; color: #666; }
-.summary-item.s-total .num { color: #0d7377; }
+.summary-item.s-total .num { color: #1e3a5f; }
 .summary-item.s-surv .num { color: #27ae60; }
 .summary-item.s-enf .num { color: #e67e22; }
-.summary-item.s-dec .num { color: #c0392b; }
+.summary-item.s-dec .num { color: #dc2626; }
 
 table { width: 100%; border-collapse: collapse; font-size: 8pt; }
-thead { background: #0d7377; color: white; }
+thead { background: #1e3a5f; color: white; }
 th { padding: 5px 6px; text-align: right; font-weight: 600; font-size: 7.5pt; }
 td { padding: 4px 6px; border-bottom: 1px solid #eee; }
 tr:nth-child(even) { background: #fafafa; }
@@ -83,7 +83,7 @@ tr:nth-child(even) { background: #fafafa; }
 }
 .badge-survivor { background: #27ae60; }
 .badge-enforced { background: #e67e22; }
-.badge-deceased { background: #c0392b; }
+.badge-deceased { background: #dc2626; }
 
 .footer-note {
     margin-top: 14px;
@@ -166,8 +166,14 @@ tr:nth-child(even) { background: #fafafa; }
                     {% for c,l in CASE_TYPES %}{% if r.case_type==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.case_type }}
                 {% elif col_key == 'evidence_level' %}
                     {% for c,l in EVIDENCE_LEVELS %}{% if r.evidence_level==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.evidence_level }}
-                {% elif col_key == 'has_special_needs' %}
-                    {{ 'نعم' if r.has_special_needs else '-' }}
+                {% elif col_key == 'verification_status' %}
+                    {% for c,l in VERIFICATION_STATUSES %}{% if r.verification_status==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.verification_status }}
+                {% elif col_key == 'digital_evidence_type' %}
+                    {% for c,l in DIGITAL_EVIDENCE_TYPES %}{% if r.digital_evidence_type==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.digital_evidence_type }}
+                {% elif col_key == 'civil_registry_status' %}
+                    {% for c,l in CIVIL_REGISTRY_STATUSES %}{% if r.civil_registry_status==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.civil_registry_status }}
+                {% elif col_key in ('has_special_needs', 'has_hypertension', 'has_diabetes', 'has_conflicting_info', 'is_officially_registered') %}
+                    {{ 'نعم' if r[col_key] else '-' }}
                 {% elif col_key == 'kids_count' %}
                     {{ r.kids_count if r.has_kids == 'yes' else '-' }}
                 {% elif col_key == 'kids_under_18_count' %}

@@ -7,6 +7,7 @@ Fully offline system for documenting survivors, forcibly disappeared, and deceas
 
 import os
 import sys
+import socket
 import sqlite3
 import hashlib
 import json
@@ -60,30 +61,65 @@ PDF_COLUMNS = [
     ('gender', 'الجنس'),
     ('birth_year', 'سنة الميلاد'),
     ('arrest_year', 'سنة الاعتقال'),
+    ('arrest_month', 'شهر الاعتقال'),
+    ('arrest_day', 'يوم الاعتقال'),
     ('arrest_authority', 'الجهة'),
     ('arrest_place', 'مكان الاحتجاز'),
     ('arrest_reason', 'سبب الاعتقال'),
+    ('arrest_causer', 'المتسبب بالاعتقال'),
+    ('release_year', 'سنة الإفراج'),
+    ('death_year', 'سنة الوفاة'),
+    ('death_place', 'مكان الوفاة'),
     ('spouse_name', 'الزوج/ة'),
     ('spouse_phone', 'هاتف الزوج/ة'),
+    ('ex_spouse_name', 'الزوج/ة السابق/ة'),
     ('kids_count', 'عدد الأطفال'),
     ('kids_under_18_count', 'قاصرين'),
     ('education', 'التعليم'),
+    ('edu_type', 'نوع الدراسة'),
     ('edu_specialization', 'الاختصاص'),
+    ('edu_university', 'الجامعة/المعهد'),
     ('address', 'العنوان'),
     ('housing_type', 'السكن'),
     ('rent_amount', 'الإيجار'),
     ('employment', 'العمل'),
     ('profession', 'المهنة'),
+    ('employer', 'جهة العمل'),
     ('marital', 'الحالة الاجتماعية'),
     ('blood_type', 'زمرة الدم'),
     ('chronic', 'أمراض مزمنة'),
+    ('has_hypertension', 'ضغط دم'),
+    ('has_diabetes', 'سكري'),
+    ('other_diseases', 'أمراض أخرى'),
     ('has_special_needs', 'احتياجات خاصة'),
+    ('special_needs_details', 'تفاصيل الاحتياجات'),
     ('breadwinner', 'المعيل'),
+    ('breadwinner_job', 'مهنة المعيل'),
+    ('breadwinner_relation', 'صلة المعيل'),
+    ('guardian_name', 'ولي الأمر'),
+    ('guardian_relation', 'صلة ولي الأمر'),
+    ('guardian_phone', 'هاتف ولي الأمر'),
     ('case_type', 'نوع الحالة'),
     ('evidence_level', 'مستوى الأدلة'),
+    ('verification_status', 'حالة التحقق'),
+    ('evidence_sources_count', 'عدد مصادر الأدلة'),
+    ('digital_evidence_type', 'نوع الدليل الرقمي'),
+    ('digital_evidence_url_status', 'حالة رابط الدليل'),
+    ('digital_evidence_person_name', 'الاسم في الدليل'),
+    ('civil_registry_status', 'حالة السجل المدني'),
+    ('has_conflicting_info', 'معلومات متضاربة'),
+    ('last_known_location', 'آخر مكان معروف'),
+    ('last_known_alive_date', 'آخر تاريخ حياة'),
     ('reporter_name', 'المبلغ'),
     ('reporter_relation', 'صلة المبلغ'),
+    ('reporter_phone', 'هاتف المبلغ'),
+    ('collector_name', 'جامع البيانات'),
+    ('collection_date', 'تاريخ الجمع'),
+    ('legal', 'إجراء قانوني'),
     ('assoc_name', 'الجمعية'),
+    ('service_type', 'نوع الخدمة'),
+    ('is_officially_registered', 'مسجل رسمياً'),
+    ('notes', 'ملاحظات'),
     ('children_summary', 'تفاصيل الأطفال'),
 ]
 
@@ -1406,14 +1442,55 @@ def uploaded_file(filename):
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+def get_lan_ip():
+    """Detect the actual LAN IP address so other devices can connect."""
+    try:
+        # Create a UDP socket and connect to an external address
+        # This doesn't actually send data, just determines the local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(2)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        pass
+    # Fallback: try hostname resolution
+    try:
+        hostname = socket.gethostname()
+        ip = socket.gethostbyname(hostname)
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    # Last fallback: scan network interfaces
+    try:
+        import subprocess
+        result = subprocess.run(['hostname', '-I'], capture_output=True, text=True, timeout=5)
+        ips = result.stdout.strip().split()
+        for ip in ips:
+            if not ip.startswith("127."):
+                return ip
+    except Exception:
+        pass
+    return "0.0.0.0"
+
+
 if __name__ == '__main__':
     migrate_db()
+    lan_ip = get_lan_ip()
+    port = 5000
     print("\n" + "="*60)
     print("  HAQQUNA - نظام توثيق الضحايا")
     print("  Berkeley Protocol Documentation System")
     print("="*60)
-    print(f"  Admin:      http://0.0.0.0:5000/admin")
-    print(f"  Data Entry: http://0.0.0.0:5000/entry")
+    print(f"  Local:      http://localhost:{port}")
+    print(f"  Network:    http://{lan_ip}:{port}")
+    print(f"  Admin:      http://{lan_ip}:{port}/admin")
+    print(f"  Data Entry: http://{lan_ip}:{port}/entry")
     print(f"  Password:   {ADMIN_PASSWORD}")
+    print("="*60)
+    print(f"  * Other devices on your network can connect using:")
+    print(f"    http://{lan_ip}:{port}")
     print("="*60 + "\n")
-    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

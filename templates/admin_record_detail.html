@@ -432,8 +432,8 @@
         </div>
         {% endif %}
         {% if record.has_special_needs %}
-        <div class="detail-field" style="background: #e8f4fd; padding: 0.5rem; border-radius: 6px;">
-            <div class="detail-field-label" style="color: #0d7377;">&#x267F; احتياجات خاصة</div>
+        <div class="detail-field" style="background: var(--primary-bg); padding: 0.5rem; border-radius: 6px;">
+            <div class="detail-field-label" style="color: var(--primary);">&#x267F; احتياجات خاصة</div>
             <div class="detail-field-value">{{ record.special_needs_details or 'نعم' }}</div>
         </div>
         {% endif %}

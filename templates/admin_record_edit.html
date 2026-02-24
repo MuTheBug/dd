@@ -406,9 +406,9 @@
     </div>
 
     <!-- Dynamic Children Form -->
-    <div style="margin-top: 1rem; padding: 0.75rem; background: #f0f7f7; border-radius: 8px; border: 1px solid #d0e8e8;">
+    <div style="margin-top: 1rem; padding: 0.75rem; background: var(--primary-bg); border-radius: 8px; border: 1px solid var(--border);">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-            <div style="font-weight: 600; color: #095355;">&#x1F476; المسح الاجتماعي للأطفال</div>
+            <div style="font-weight: 600; color: var(--primary);">&#x1F476; المسح الاجتماعي للأطفال</div>
             <button type="button" onclick="addChild()" class="btn btn-primary btn-sm">+ إضافة طفل</button>
         </div>
         <div style="font-size: 0.75rem; color: #666; margin-bottom: 0.5rem;">
@@ -639,8 +639,8 @@ function addChild(data) {
     }
 
     div.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">' +
-        '<strong style="font-size:0.8rem;color:#095355;">طفل #' + (idx + 1) + '</strong>' +
-        '<button type="button" onclick="removeChild(this)" style="background:#c0392b;color:white;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.75rem;">حذف</button>' +
+        '<strong style="font-size:0.8rem;color:#1e3a5f;">طفل #' + (idx + 1) + '</strong>' +
+        '<button type="button" onclick="removeChild(this)" style="background:#dc2626;color:white;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.75rem;">حذف</button>' +
         '</div>' +
         '<div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.4rem;">' +
         '<div class="form-group"><label style="font-size:0.7rem;">الاسم</label>' +

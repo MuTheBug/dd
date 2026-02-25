@@ -117,6 +117,14 @@
                     <label>الحد الأقصى لعمر الأطفال</label>
                     <input type="number" name="kids_max_age" value="{{ filters.kids_max_age }}" placeholder="مثال: 15" min="1" max="18">
                 </div>
+                <div class="form-group">
+                    <label>&#x1F476; عمر الأطفال (من)</label>
+                    <input type="number" name="kids_age_from" value="{{ filters.kids_age_from }}" placeholder="مثال: 5" min="0" max="60">
+                </div>
+                <div class="form-group">
+                    <label>عمر الأطفال (إلى)</label>
+                    <input type="number" name="kids_age_to" value="{{ filters.kids_age_to }}" placeholder="مثال: 15" min="0" max="60">
+                </div>
 
                 <!-- Arrest Info -->
                 <div class="form-group">
@@ -507,6 +515,12 @@
         {% if filters.has_diabetes == '1' %}
         <span class="filter-tag">سكري</span>
         {% endif %}
+        {% if filters.kids_age_from %}
+        <span class="filter-tag">عمر أطفال من: {{ filters.kids_age_from }}</span>
+        {% endif %}
+        {% if filters.kids_age_to %}
+        <span class="filter-tag">عمر أطفال إلى: {{ filters.kids_age_to }}</span>
+        {% endif %}
         {% if filters.has_legal == 'yes' %}
         <span class="filter-tag">إجراء قانوني</span>
         {% endif %}
@@ -698,6 +712,12 @@
             </label>
             {% endfor %}
         </div>
+        <div style="margin-bottom: 0.8rem; padding: 0.6rem; background: var(--filter-preset-bg, #f0f4f8); border-radius: 8px; border: 1px solid var(--border);">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; font-weight: 600; cursor: pointer;">
+                <input type="checkbox" id="showSumCheck">
+                &#x2211; إظهار مجموع الأعمدة الرقمية في التقرير
+            </label>
+        </div>
         <button type="button" onclick="exportPdf()" class="btn btn-primary" style="width:100%;">&#x1F4E5; تصدير PDF الآن</button>
     </div>
 </div>
@@ -731,6 +751,9 @@ function exportPdf() {
     }
     for (var i = 0; i < cols.length; i++) {
         params.push('cols=' + encodeURIComponent(cols[i]));
+    }
+    if (document.getElementById('showSumCheck').checked) {
+        params.push('show_sum=1');
     }
     window.open(url + params.join('&'), '_blank');
     document.getElementById('pdfColModal').style.display = 'none';

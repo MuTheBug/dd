@@ -191,6 +191,18 @@ tr:nth-child(even) { background: #fafafa; }
         </tr>
         {% endfor %}
     </tbody>
+    {% if show_sum and col_sums %}
+    <tfoot>
+        <tr style="background: #e8edf3; font-weight: bold; border-top: 2px solid #1e3a5f;">
+            {% for col_key, col_label in pdf_cols %}
+            <td style="padding: 5px 6px; font-size: 8pt; text-align: center; color: #1e3a5f;">
+                {% if loop.first and col_key not in col_sums %}&#x2211;{% endif %}
+                {% if col_key in col_sums %}{{ col_sums[col_key] }}{% elif not loop.first %}-{% endif %}
+            </td>
+            {% endfor %}
+        </tr>
+    </tfoot>
+    {% endif %}
 </table>
 
 <div class="footer-note">

@@ -260,6 +260,36 @@ def normalize_authority(name):
     return name_clean
 
 
+def record_has_child_in_age_range(record, age_from=None, age_to=None):
+    """Check if a record has at least one child within the given age range."""
+    current_year = datetime.now().year
+    try:
+        children = json.loads(record['children_data']) if record['children_data'] else []
+    except (json.JSONDecodeError, TypeError):
+        return False
+    if not children:
+        return False
+    for child in children:
+        age = None
+        if child.get('birth_year'):
+            try:
+                age = current_year - int(child['birth_year'])
+            except (ValueError, TypeError):
+                pass
+        elif child.get('age'):
+            try:
+                age = int(child['age'])
+            except (ValueError, TypeError):
+                pass
+        if age is not None:
+            if age_from is not None and age < age_from:
+                continue
+            if age_to is not None and age > age_to:
+                continue
+            return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Database helpers
 # ---------------------------------------------------------------------------
@@ -788,6 +818,8 @@ def admin_records():
         'age_to': request.args.get('age_to', ''),
         'has_guardian': request.args.get('has_guardian', ''),
         'digital_evidence_url_status': request.args.get('digital_evidence_url_status', ''),
+        'kids_age_from': request.args.get('kids_age_from', ''),
+        'kids_age_to': request.args.get('kids_age_to', ''),
     }
 
     if status_list:
@@ -1007,8 +1039,16 @@ def admin_records():
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
-    # Count
-    count = db.execute(f"SELECT COUNT(*) FROM records{where}", params).fetchone()[0]
+    # For kids age filtering, we need post-filter since children_data is JSON
+    kids_age_from = int(filters['kids_age_from']) if filters['kids_age_from'] else None
+    kids_age_to = int(filters['kids_age_to']) if filters['kids_age_to'] else None
+    needs_kids_age_filter = kids_age_from is not None or kids_age_to is not None
+
+    if needs_kids_age_filter:
+        # Must ensure records have children
+        if "has_kids = 'yes'" not in ' '.join(conditions):
+            conditions_with_kids = conditions + ["(children_data IS NOT NULL AND children_data != '' AND children_data != '[]')"]
+            where = " WHERE " + " AND ".join(conditions_with_kids)
 
     # Sort
     sort_by = request.args.get('sort', 'id')
@@ -1019,11 +1059,22 @@ def admin_records():
     if sort_dir not in ('asc', 'desc'):
         sort_dir = 'desc'
 
-    offset = (page - 1) * per_page
-    records = db.execute(
-        f"SELECT * FROM records{where} ORDER BY {sort_by} {sort_dir} LIMIT ? OFFSET ?",
-        params + [per_page, offset]
-    ).fetchall()
+    if needs_kids_age_filter:
+        # Fetch all matching records, then filter by children age, then paginate
+        all_records = db.execute(
+            f"SELECT * FROM records{where} ORDER BY {sort_by} {sort_dir}", params
+        ).fetchall()
+        all_records = [r for r in all_records if record_has_child_in_age_range(r, kids_age_from, kids_age_to)]
+        count = len(all_records)
+        offset = (page - 1) * per_page
+        records = all_records[offset:offset + per_page]
+    else:
+        count = db.execute(f"SELECT COUNT(*) FROM records{where}", params).fetchone()[0]
+        offset = (page - 1) * per_page
+        records = db.execute(
+            f"SELECT * FROM records{where} ORDER BY {sort_by} {sort_dir} LIMIT ? OFFSET ?",
+            params + [per_page, offset]
+        ).fetchall()
 
     total_pages = (count + per_page - 1) // per_page
 
@@ -1460,6 +1511,12 @@ def records_list_pdf():
         f"SELECT * FROM records{where} ORDER BY id DESC LIMIT 500", params
     ).fetchall()
 
+    # Post-filter by kids age range if specified
+    pdf_kids_age_from = int(request.args['kids_age_from']) if request.args.get('kids_age_from') else None
+    pdf_kids_age_to = int(request.args['kids_age_to']) if request.args.get('kids_age_to') else None
+    if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
+        records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
+
     logo_path = os.path.join(BASE_DIR, 'logo.jpg')
     logo_b64 = ''
     if os.path.exists(logo_path):
@@ -1509,9 +1566,30 @@ def records_list_pdf():
     if request.args.get('chronic') == 'yes':
         filter_desc.append("أمراض مزمنة")
 
+    show_sum = request.args.get('show_sum') == '1'
+
+    # Pre-calculate sums for numeric columns if requested
+    col_sums = {}
+    if show_sum:
+        for col_key, col_label in pdf_cols:
+            total_val = 0
+            has_numeric = False
+            for r in records:
+                try:
+                    val = r[col_key]
+                    if val is not None and val != '' and str(val).strip():
+                        num = int(val) if isinstance(val, int) else float(str(val).strip())
+                        total_val += num
+                        has_numeric = True
+                except (ValueError, TypeError, KeyError):
+                    pass
+            if has_numeric:
+                col_sums[col_key] = int(total_val) if total_val == int(total_val) else round(total_val, 2)
+
     html = render_template('pdf_list.html',
         records=records, logo_b64=logo_b64, filter_desc=filter_desc,
-        total=len(records), pdf_cols=pdf_cols, selected_cols=selected_cols)
+        total=len(records), pdf_cols=pdf_cols, selected_cols=selected_cols,
+        show_sum=show_sum, col_sums=col_sums)
 
     from weasyprint import HTML
     pdf_bytes = HTML(string=html, base_url=BASE_DIR).write_pdf()

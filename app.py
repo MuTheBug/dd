@@ -1567,11 +1567,15 @@ def records_list_pdf():
         filter_desc.append("أمراض مزمنة")
 
     show_sum = request.args.get('show_sum') == '1'
+    sum_cols_requested = request.args.getlist('sum_cols')
 
-    # Pre-calculate sums for numeric columns if requested
+    # Pre-calculate sums for selected numeric columns if requested
     col_sums = {}
-    if show_sum:
+    if show_sum and sum_cols_requested:
+        sum_cols_set = set(sum_cols_requested)
         for col_key, col_label in pdf_cols:
+            if col_key not in sum_cols_set:
+                continue
             total_val = 0
             has_numeric = False
             for r in records:

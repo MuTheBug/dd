@@ -664,10 +664,34 @@ def admin_dashboard():
         "SELECT province, COUNT(*) as cnt FROM records GROUP BY province ORDER BY cnt DESC"
     ).fetchall()
 
-    # Authority distribution
-    authority_stats = db.execute(
-        "SELECT arrest_authority, COUNT(*) as cnt FROM records GROUP BY arrest_authority ORDER BY cnt DESC LIMIT 15"
+    # Authority distribution (with normalization of aliases)
+    raw_authority_stats = db.execute(
+        "SELECT arrest_authority, COUNT(*) as cnt FROM records WHERE arrest_authority IS NOT NULL AND arrest_authority != '' GROUP BY arrest_authority ORDER BY cnt DESC"
     ).fetchall()
+
+    # Build reverse lookup: variant -> canonical name
+    alias_to_canonical = {}
+    for canonical, aliases in AUTHORITY_ALIASES.items():
+        for alias in aliases:
+            alias_to_canonical[alias] = canonical
+
+    # Merge counts for aliased authorities
+    merged = {}
+    for row in raw_authority_stats:
+        name = row['arrest_authority']
+        # Check if this name (or a substring match) maps to a canonical name
+        canonical = alias_to_canonical.get(name)
+        if not canonical:
+            # Try partial match for entries like "فرع امن الدولة 123"
+            for alias, canon in alias_to_canonical.items():
+                if alias in name or name in alias:
+                    canonical = canon
+                    break
+        key = canonical or name
+        merged[key] = merged.get(key, 0) + row['cnt']
+
+    # Sort by count descending and limit to 15
+    authority_stats = sorted(merged.items(), key=lambda x: x[1], reverse=True)[:15]
 
     # Year distribution
     year_stats = db.execute(

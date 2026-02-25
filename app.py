@@ -1517,6 +1517,27 @@ def records_list_pdf():
     if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
         records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
 
+    # Exclude specific record IDs (user removed them in the picker)
+    exclude_ids = request.args.getlist('exclude_id')
+    if exclude_ids:
+        exclude_set = set(int(x) for x in exclude_ids if x.isdigit())
+        records = [r for r in records if r['id'] not in exclude_set]
+
+    # Add specific record IDs (user searched and added them)
+    add_ids = request.args.getlist('add_id')
+    if add_ids:
+        existing_ids = set(r['id'] for r in records)
+        new_ids = [int(x) for x in add_ids if x.isdigit() and int(x) not in existing_ids]
+        if new_ids:
+            placeholders = ','.join(['?'] * len(new_ids))
+            extra = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", new_ids).fetchall()
+            records.extend(extra)
+
+    # Apply record limit
+    pdf_limit = request.args.get('pdf_limit', '').strip()
+    if pdf_limit and pdf_limit.isdigit() and int(pdf_limit) > 0:
+        records = records[:int(pdf_limit)]
+
     logo_path = os.path.join(BASE_DIR, 'logo.jpg')
     logo_b64 = ''
     if os.path.exists(logo_path):
@@ -1618,6 +1639,73 @@ def api_stats():
         'total': total, 'survivors': survivors,
         'enforced': enforced, 'deceased': deceased
     })
+
+
+@app.route('/api/search_records')
+@admin_required
+def api_search_records():
+    """Search records by name for the PDF record picker."""
+    q = request.args.get('q', '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    db = get_db()
+    s = f"%{q}%"
+    rows = db.execute(
+        "SELECT id, first_name, father_name, last_name, status, province "
+        "FROM records WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? "
+        "ORDER BY id DESC LIMIT 20", (s, s, s)
+    ).fetchall()
+    results = []
+    for r in rows:
+        results.append({
+            'id': r['id'],
+            'first_name': r['first_name'] or '',
+            'father_name': r['father_name'] or '',
+            'last_name': r['last_name'] or '',
+            'status': r['status'] or '',
+            'province': r['province'] or '',
+        })
+    return jsonify(results)
+
+
+@app.route('/api/filtered_record_ids')
+@admin_required
+def api_filtered_record_ids():
+    """Return the list of record IDs matching current filters (for the PDF record picker)."""
+    db = get_db()
+    conditions = []
+    params = []
+    pdf_status_list = request.args.getlist('status')
+    expanded = []
+    for s in pdf_status_list:
+        if ',' in s:
+            expanded.extend(s.split(','))
+        elif s:
+            expanded.append(s)
+    pdf_status_list = expanded
+    if pdf_status_list:
+        if len(pdf_status_list) == 1:
+            conditions.append("status = ?")
+            params.append(pdf_status_list[0])
+        else:
+            placeholders = ','.join(['?'] * len(pdf_status_list))
+            conditions.append(f"status IN ({placeholders})")
+            params.extend(pdf_status_list)
+    for key in ['province', 'gender', 'marital', 'education', 'housing_type', 'blood_type',
+                'case_type', 'evidence_level', 'verification_status', 'civil_registry_status']:
+        val = request.args.get(key, '')
+        if val:
+            conditions.append(f"{key} = ?")
+            params.append(val)
+    if request.args.get('search'):
+        s = f"%{request.args['search']}%"
+        conditions.append("(first_name LIKE ? OR last_name LIKE ? OR national_id LIKE ?)")
+        params.extend([s, s, s])
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    rows = db.execute(
+        f"SELECT id, first_name, father_name, last_name FROM records{where} ORDER BY id DESC LIMIT 500", params
+    ).fetchall()
+    return jsonify([{'id': r['id'], 'first_name': r['first_name'] or '', 'father_name': r['father_name'] or '', 'last_name': r['last_name'] or ''} for r in rows])
 
 
 # ---------------------------------------------------------------------------

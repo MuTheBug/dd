@@ -768,10 +768,9 @@ var allColumns = {{ PDF_COLUMNS | tojson }};
 var statusMap = {{ STATUS_MAP | tojson }};
 
 // Record management state
-var excludedIds = {};   // IDs removed by user
-var addedRecords = {};  // {id: {id, first_name, father_name, last_name}} records added via search
-var filteredRecords = []; // records loaded from filter
+var orderedRecords = [];  // final ordered list [{id, first_name, father_name, last_name}, ...]
 var recordsLoaded = false;
+var dragSrcIndex = null;
 
 function toggleAllCols(state) {
     document.querySelectorAll('.pdf-col-check').forEach(function(cb) { cb.checked = state; });
@@ -838,52 +837,92 @@ function loadFilteredRecords() {
     }
     var url = '{{ url_for("api_filtered_record_ids") }}?' + params.join('&');
     fetch(url).then(function(r) { return r.json(); }).then(function(data) {
-        filteredRecords = data;
+        orderedRecords = data;
         recordsLoaded = true;
-        excludedIds = {};
         renderRecordsList();
     });
 }
 
 function renderRecordsList() {
     var list = document.getElementById('recordsList');
-    // Combine filtered + added, minus excluded
-    var allRecs = [];
-    for (var i = 0; i < filteredRecords.length; i++) {
-        if (!excludedIds[filteredRecords[i].id]) {
-            allRecs.push(filteredRecords[i]);
-        }
-    }
-    for (var id in addedRecords) {
-        var alreadyIn = false;
-        for (var j = 0; j < allRecs.length; j++) {
-            if (allRecs[j].id == id) { alreadyIn = true; break; }
-        }
-        if (!alreadyIn) allRecs.push(addedRecords[id]);
-    }
-    document.getElementById('recordCount').textContent = allRecs.length + ' سجل';
-    if (allRecs.length === 0) {
+    document.getElementById('recordCount').textContent = orderedRecords.length + ' سجل';
+    if (orderedRecords.length === 0) {
         list.innerHTML = '<p style="text-align:center; padding:0.8rem; color:var(--text-light); font-size:0.85rem;">لا توجد سجلات</p>';
         return;
     }
-    var html = '';
-    for (var i = 0; i < allRecs.length; i++) {
-        var r = allRecs[i];
-        var isAdded = !!addedRecords[r.id];
-        html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:4px 8px; border-bottom:1px solid var(--border); font-size:0.82rem;' + (isAdded ? ' background:#e8f5e9;' : '') + '">';
-        html += '<span><strong>#' + r.id + '</strong> ' + (r.first_name || '') + ' ' + (r.father_name || '') + ' ' + (r.last_name || '') + '</span>';
-        html += '<button type="button" onclick="removeRecord(' + r.id + ', ' + isAdded + ')" style="background:none; border:none; color:var(--deceased, #c0392b); cursor:pointer; font-size:1rem; padding:0 4px;" title="حذف من التقرير">&times;</button>';
-        html += '</div>';
+    list.innerHTML = '';
+    for (var i = 0; i < orderedRecords.length; i++) {
+        (function(idx, r) {
+            var row = document.createElement('div');
+            row.draggable = true;
+            row.dataset.idx = idx;
+            row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:4px 8px; border-bottom:1px solid var(--border); font-size:0.82rem; cursor:grab; transition:background 0.15s;';
+            if (r._added) row.style.background = '#e8f5e9';
+
+            // Drag handle + name
+            var left = document.createElement('span');
+            left.style.cssText = 'display:flex; align-items:center; gap:6px; pointer-events:none;';
+            left.innerHTML = '<span style="color:var(--text-light); font-size:0.9rem;">&#x2630;</span> <strong>#' + r.id + '</strong> ' + (r.first_name || '') + ' ' + (r.father_name || '') + ' ' + (r.last_name || '');
+            row.appendChild(left);
+
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.innerHTML = '&times;';
+            btn.title = 'حذف من التقرير';
+            btn.style.cssText = 'background:none; border:none; color:var(--deceased, #c0392b); cursor:pointer; font-size:1rem; padding:0 4px;';
+            btn.onclick = function(e) { e.stopPropagation(); removeRecord(idx); };
+            row.appendChild(btn);
+
+            // Drag events
+            row.addEventListener('dragstart', function(e) {
+                dragSrcIndex = idx;
+                row.style.opacity = '0.4';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            row.addEventListener('dragend', function() {
+                row.style.opacity = '1';
+                dragSrcIndex = null;
+                list.querySelectorAll('[data-idx]').forEach(function(el) { el.style.borderTop = ''; el.style.borderBottom = ''; });
+            });
+            row.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                var rect = row.getBoundingClientRect();
+                var mid = rect.top + rect.height / 2;
+                list.querySelectorAll('[data-idx]').forEach(function(el) { el.style.borderTop = ''; el.style.borderBottom = ''; });
+                if (e.clientY < mid) {
+                    row.style.borderTop = '2px solid var(--primary, #2980b9)';
+                } else {
+                    row.style.borderBottom = '2px solid var(--primary, #2980b9)';
+                }
+            });
+            row.addEventListener('dragleave', function() {
+                row.style.borderTop = '';
+                row.style.borderBottom = '';
+            });
+            row.addEventListener('drop', function(e) {
+                e.preventDefault();
+                row.style.borderTop = '';
+                row.style.borderBottom = '';
+                if (dragSrcIndex === null || dragSrcIndex === idx) return;
+                var rect = row.getBoundingClientRect();
+                var mid = rect.top + rect.height / 2;
+                var targetIdx = e.clientY < mid ? idx : idx + 1;
+                // Move the item
+                var item = orderedRecords.splice(dragSrcIndex, 1)[0];
+                if (targetIdx > dragSrcIndex) targetIdx--;
+                orderedRecords.splice(targetIdx, 0, item);
+                dragSrcIndex = null;
+                renderRecordsList();
+            });
+
+            list.appendChild(row);
+        })(i, orderedRecords[i]);
     }
-    list.innerHTML = html;
 }
 
-function removeRecord(id, isAdded) {
-    if (isAdded) {
-        delete addedRecords[id];
-    } else {
-        excludedIds[id] = true;
-    }
+function removeRecord(idx) {
+    orderedRecords.splice(idx, 1);
     renderRecordsList();
 }
 
@@ -924,12 +963,19 @@ function searchRecords() {
 }
 
 function addRecord(r) {
-    addedRecords[r.id] = {id: r.id, first_name: r.first_name, father_name: r.father_name, last_name: r.last_name};
-    // Also un-exclude if it was excluded
-    delete excludedIds[r.id];
+    // Don't add duplicates
+    for (var i = 0; i < orderedRecords.length; i++) {
+        if (orderedRecords[i].id == r.id) {
+            document.getElementById('addRecordSearch').value = '';
+            document.getElementById('searchResults').style.display = 'none';
+            return;
+        }
+    }
+    orderedRecords.push({id: r.id, first_name: r.first_name, father_name: r.father_name, last_name: r.last_name, _added: true});
+    recordsLoaded = true;
     document.getElementById('addRecordSearch').value = '';
     document.getElementById('searchResults').style.display = 'none';
-    if (recordsLoaded) renderRecordsList();
+    renderRecordsList();
 }
 
 function exportPdf() {
@@ -953,13 +999,11 @@ function exportPdf() {
     if (limitVal && parseInt(limitVal) > 0) {
         params.push('pdf_limit=' + encodeURIComponent(limitVal));
     }
-    // Excluded record IDs
-    for (var id in excludedIds) {
-        params.push('exclude_id=' + encodeURIComponent(id));
-    }
-    // Added record IDs
-    for (var id in addedRecords) {
-        params.push('add_id=' + encodeURIComponent(id));
+    // Send ordered record IDs if user loaded/modified the records list
+    if (recordsLoaded && orderedRecords.length > 0) {
+        for (var i = 0; i < orderedRecords.length; i++) {
+            params.push('record_order=' + encodeURIComponent(orderedRecords[i].id));
+        }
     }
     // Sum columns
     if (document.getElementById('showSumCheck').checked) {

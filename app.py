@@ -1517,21 +1517,22 @@ def records_list_pdf():
     if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
         records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
 
-    # Exclude specific record IDs (user removed them in the picker)
-    exclude_ids = request.args.getlist('exclude_id')
-    if exclude_ids:
-        exclude_set = set(int(x) for x in exclude_ids if x.isdigit())
-        records = [r for r in records if r['id'] not in exclude_set]
-
-    # Add specific record IDs (user searched and added them)
-    add_ids = request.args.getlist('add_id')
-    if add_ids:
-        existing_ids = set(r['id'] for r in records)
-        new_ids = [int(x) for x in add_ids if x.isdigit() and int(x) not in existing_ids]
-        if new_ids:
-            placeholders = ','.join(['?'] * len(new_ids))
-            extra = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", new_ids).fetchall()
-            records.extend(extra)
+    # If user provided an explicit ordered list of record IDs (from the picker),
+    # use that order, fetching any extra IDs the user added via search.
+    record_order = request.args.getlist('record_order')
+    if record_order:
+        ordered_ids = [int(x) for x in record_order if x.isdigit()]
+        # Build lookup from already-fetched records
+        rec_map = {r['id']: r for r in records}
+        # Find IDs we don't have yet (added via search)
+        missing_ids = [rid for rid in ordered_ids if rid not in rec_map]
+        if missing_ids:
+            placeholders = ','.join(['?'] * len(missing_ids))
+            extra = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", missing_ids).fetchall()
+            for r in extra:
+                rec_map[r['id']] = r
+        # Rebuild records in the user's custom order
+        records = [rec_map[rid] for rid in ordered_ids if rid in rec_map]
 
     # Apply record limit
     pdf_limit = request.args.get('pdf_limit', '').strip()

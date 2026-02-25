@@ -236,11 +236,28 @@ REPORTER_RELATIONS = [
     'صديق', 'جار', 'زميل', 'الشخص نفسه', 'أخرى'
 ]
 
-# Arrest authority normalization: map variant spellings to canonical form
-AUTHORITY_ALIASES = {
-    'أمن الدولة': ['أمن الدولة', 'امن الدولة', 'فرع امن الدولة', 'فرع أمن الدولة'],
-    'الأمن العسكري': ['الأمن العسكري', 'الامن العسكري', 'امن عسكري', 'أمن عسكري', 'فرع الامن العسكري', 'فرع الأمن العسكري'],
+# Arrest authority normalization: keyword-based grouping
+# Maps a canonical name to keywords that identify it
+AUTHORITY_GROUPS = {
+    'أمن الدولة': ['دول'],           # covers الدولة, الدوله, دولة, لادوله, الادوله
+    'الأمن العسكري': ['عسكر', 'العسمري'],  # covers العسكري, عسكري, العسمري (typo), عسكر
+    'الأمن السياسي': ['سياس'],       # covers السياسي, سياسي
+    'المخابرات الجوية': ['جوي', 'جويه', 'الجوية', 'مخابرات جو'],  # covers الجوية, الجويه, جويه, الجوي
+    'الدفاع الوطني': ['دفاع'],       # covers الدفاع الوطني, دفاع لوطني
+    'غير معروف': ['مجهول', 'لا نعلم', 'غير معروف', 'لاتعلم', 'مجهولة', 'غير معروفة'],
 }
+
+
+def normalize_authority(name):
+    """Normalize arrest authority name to canonical form."""
+    if not name:
+        return name
+    name_clean = name.strip()
+    for canonical, keywords in AUTHORITY_GROUPS.items():
+        for kw in keywords:
+            if kw in name_clean:
+                return canonical
+    return name_clean
 
 
 # ---------------------------------------------------------------------------
@@ -669,25 +686,10 @@ def admin_dashboard():
         "SELECT arrest_authority, COUNT(*) as cnt FROM records WHERE arrest_authority IS NOT NULL AND arrest_authority != '' GROUP BY arrest_authority ORDER BY cnt DESC"
     ).fetchall()
 
-    # Build reverse lookup: variant -> canonical name
-    alias_to_canonical = {}
-    for canonical, aliases in AUTHORITY_ALIASES.items():
-        for alias in aliases:
-            alias_to_canonical[alias] = canonical
-
-    # Merge counts for aliased authorities
+    # Merge counts using keyword-based normalization
     merged = {}
     for row in raw_authority_stats:
-        name = row['arrest_authority']
-        # Check if this name (or a substring match) maps to a canonical name
-        canonical = alias_to_canonical.get(name)
-        if not canonical:
-            # Try partial match for entries like "فرع امن الدولة 123"
-            for alias, canon in alias_to_canonical.items():
-                if alias in name or name in alias:
-                    canonical = canon
-                    break
-        key = canonical or name
+        key = normalize_authority(row['arrest_authority'])
         merged[key] = merged.get(key, 0) + row['cnt']
 
     # Sort by count descending and limit to 15
@@ -803,16 +805,22 @@ def admin_records():
         conditions.append("gender = ?")
         params.append(filters['gender'])
     if filters['arrest_authority']:
-        # Check if this authority has known aliases
-        authority_variants = None
-        for canonical, aliases in AUTHORITY_ALIASES.items():
-            if filters['arrest_authority'] in aliases or filters['arrest_authority'] == canonical:
-                authority_variants = aliases
+        # Find which keyword group this authority belongs to
+        matching_keywords = None
+        for canonical, keywords in AUTHORITY_GROUPS.items():
+            if filters['arrest_authority'] == canonical:
+                matching_keywords = keywords
                 break
-        if authority_variants:
-            or_clauses = ' OR '.join(['arrest_authority LIKE ?' for _ in authority_variants])
+            for kw in keywords:
+                if kw in filters['arrest_authority']:
+                    matching_keywords = keywords
+                    break
+            if matching_keywords:
+                break
+        if matching_keywords:
+            or_clauses = ' OR '.join(['arrest_authority LIKE ?' for _ in matching_keywords])
             conditions.append(f"({or_clauses})")
-            params.extend([f"%{v}%" for v in authority_variants])
+            params.extend([f"%{kw}%" for kw in matching_keywords])
         else:
             conditions.append("arrest_authority LIKE ?")
             params.append(f"%{filters['arrest_authority']}%")
@@ -1310,15 +1318,21 @@ def records_list_pdf():
 
     if request.args.get('arrest_authority'):
         aa = request.args['arrest_authority']
-        authority_variants = None
-        for canonical, aliases in AUTHORITY_ALIASES.items():
-            if aa in aliases or aa == canonical:
-                authority_variants = aliases
+        matching_keywords = None
+        for canonical, keywords in AUTHORITY_GROUPS.items():
+            if aa == canonical:
+                matching_keywords = keywords
                 break
-        if authority_variants:
-            or_clauses = ' OR '.join(['arrest_authority LIKE ?' for _ in authority_variants])
+            for kw in keywords:
+                if kw in aa:
+                    matching_keywords = keywords
+                    break
+            if matching_keywords:
+                break
+        if matching_keywords:
+            or_clauses = ' OR '.join(['arrest_authority LIKE ?' for _ in matching_keywords])
             conditions.append(f"({or_clauses})")
-            params.extend([f"%{v}%" for v in authority_variants])
+            params.extend([f"%{kw}%" for kw in matching_keywords])
         else:
             conditions.append("arrest_authority LIKE ?")
             params.append(f"%{aa}%")

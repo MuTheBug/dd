@@ -982,27 +982,36 @@ function exportPdf() {
     var cols = [];
     document.querySelectorAll('.pdf-col-check:checked').forEach(function(cb) { cols.push(cb.value); });
     if (cols.length === 0) { alert('يرجى تحديد عمود واحد على الأقل'); return; }
-    var url = '{{ url_for("records_list_pdf") }}?';
-    var params = [];
-    // Add status checkboxes
+
+    // Build a POST form to avoid URL length limits
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{{ url_for("records_list_pdf") }}';
+    form.target = '_blank';
+    form.style.display = 'none';
+
+    function addField(name, value) {
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = name; inp.value = value;
+        form.appendChild(inp);
+    }
+
+    // Filter params
     document.querySelectorAll('input[name="status"]:checked').forEach(function(cb) {
-        params.push('status=' + encodeURIComponent(cb.value));
+        addField('status', cb.value);
     });
     for (var key in filterParams) {
-        if (filterParams[key]) params.push(encodeURIComponent(key) + '=' + encodeURIComponent(filterParams[key]));
+        if (filterParams[key]) addField(key, filterParams[key]);
     }
-    for (var i = 0; i < cols.length; i++) {
-        params.push('cols=' + encodeURIComponent(cols[i]));
-    }
+    // Columns
+    for (var i = 0; i < cols.length; i++) addField('cols', cols[i]);
     // Record limit
     var limitVal = document.getElementById('pdfLimitInput').value.trim();
-    if (limitVal && parseInt(limitVal) > 0) {
-        params.push('pdf_limit=' + encodeURIComponent(limitVal));
-    }
-    // Send ordered record IDs if user loaded/modified the records list
+    if (limitVal && parseInt(limitVal) > 0) addField('pdf_limit', limitVal);
+    // Ordered record IDs
     if (recordsLoaded && orderedRecords.length > 0) {
         for (var i = 0; i < orderedRecords.length; i++) {
-            params.push('record_order=' + encodeURIComponent(orderedRecords[i].id));
+            addField('record_order', orderedRecords[i].id);
         }
     }
     // Sum columns
@@ -1010,12 +1019,13 @@ function exportPdf() {
         var sumCols = [];
         document.querySelectorAll('.sum-col-check:checked').forEach(function(cb) { sumCols.push(cb.value); });
         if (sumCols.length === 0) { alert('يرجى تحديد عمود واحد على الأقل لحساب المجموع'); return; }
-        params.push('show_sum=1');
-        for (var i = 0; i < sumCols.length; i++) {
-            params.push('sum_cols=' + encodeURIComponent(sumCols[i]));
-        }
+        addField('show_sum', '1');
+        for (var i = 0; i < sumCols.length; i++) addField('sum_cols', sumCols[i]);
     }
-    window.open(url + params.join('&'), '_blank');
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
     document.getElementById('pdfColModal').style.display = 'none';
 }
 

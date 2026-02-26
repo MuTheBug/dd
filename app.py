@@ -1334,17 +1334,12 @@ def record_pdf(record_id):
     return response
 
 
-@app.route('/admin/records/pdf')
-@admin_required
-def records_list_pdf():
-    db = get_db()
-
-    # Apply same filters as records page
+def build_pdf_filter_conditions(args):
+    """Build SQL filter conditions from request args. Shared by PDF route and filtered IDs API."""
     conditions = []
     params = []
 
-    # Handle multi-select status (checkboxes or comma-separated)
-    pdf_status_list = request.args.getlist('status')
+    pdf_status_list = args.getlist('status')
     expanded = []
     for s in pdf_status_list:
         if ',' in s:
@@ -1363,13 +1358,13 @@ def records_list_pdf():
 
     for key in ['province', 'gender', 'marital', 'education', 'housing_type', 'blood_type',
                 'case_type', 'evidence_level', 'verification_status', 'civil_registry_status']:
-        val = request.args.get(key, '')
+        val = args.get(key, '')
         if val:
             conditions.append(f"{key} = ?")
             params.append(val)
 
-    if request.args.get('arrest_authority'):
-        aa = request.args['arrest_authority']
+    if args.get('arrest_authority'):
+        aa = args['arrest_authority']
         matching_keywords = None
         for canonical, keywords in AUTHORITY_GROUPS.items():
             if aa == canonical:
@@ -1388,59 +1383,59 @@ def records_list_pdf():
         else:
             conditions.append("arrest_authority LIKE ?")
             params.append(f"%{aa}%")
-    if request.args.get('arrest_place'):
+    if args.get('arrest_place'):
         conditions.append("arrest_place LIKE ?")
-        params.append(f"%{request.args['arrest_place']}%")
-    if request.args.get('search'):
-        s = f"%{request.args['search']}%"
+        params.append(f"%{args['arrest_place']}%")
+    if args.get('search'):
+        s = f"%{args['search']}%"
         conditions.append("(first_name LIKE ? OR last_name LIKE ? OR national_id LIKE ?)")
         params.extend([s, s, s])
-    if request.args.get('arrest_year_from'):
+    if args.get('arrest_year_from'):
         conditions.append("arrest_year >= ?")
-        params.append(int(request.args['arrest_year_from']))
-    if request.args.get('arrest_year_to'):
+        params.append(int(args['arrest_year_from']))
+    if args.get('arrest_year_to'):
         conditions.append("arrest_year <= ?")
-        params.append(int(request.args['arrest_year_to']))
-    if request.args.get('birth_year_from'):
+        params.append(int(args['arrest_year_to']))
+    if args.get('birth_year_from'):
         conditions.append("birth_year >= ?")
-        params.append(int(request.args['birth_year_from']))
-    if request.args.get('birth_year_to'):
+        params.append(int(args['birth_year_from']))
+    if args.get('birth_year_to'):
         conditions.append("birth_year <= ?")
-        params.append(int(request.args['birth_year_to']))
-    if request.args.get('has_kids') == 'yes':
+        params.append(int(args['birth_year_to']))
+    if args.get('has_kids') == 'yes':
         conditions.append("has_kids = 'yes'")
-    if request.args.get('has_kids_under_18') == 'yes':
+    if args.get('has_kids_under_18') == 'yes':
         conditions.append("kids_under_18_count > 0")
-    if request.args.get('has_special_needs') == '1':
+    if args.get('has_special_needs') == '1':
         conditions.append("has_special_needs = 1")
-    if request.args.get('chronic') == 'yes':
+    if args.get('chronic') == 'yes':
         conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
-    if request.args.get('has_hypertension') == '1':
+    if args.get('has_hypertension') == '1':
         conditions.append("has_hypertension = 1")
-    if request.args.get('has_diabetes') == '1':
+    if args.get('has_diabetes') == '1':
         conditions.append("has_diabetes = 1")
-    if request.args.get('has_conflicting_info') == '1':
+    if args.get('has_conflicting_info') == '1':
         conditions.append("has_conflicting_info = 1")
-    if request.args.get('is_registered') == '1':
+    if args.get('is_registered') == '1':
         conditions.append("is_officially_registered = 1")
-    if request.args.get('has_legal') == 'yes':
+    if args.get('has_legal') == 'yes':
         conditions.append("legal = 'نعم'")
-    if request.args.get('has_assoc') == 'yes':
+    if args.get('has_assoc') == 'yes':
         conditions.append("assoc = 'نعم'")
-    if request.args.get('reporter_relation'):
+    if args.get('reporter_relation'):
         conditions.append("reporter_relation = ?")
-        params.append(request.args['reporter_relation'])
-    if request.args.get('education_max'):
+        params.append(args['reporter_relation'])
+    if args.get('education_max'):
         edu_order = ['أمّي', 'ابتدائية', 'إعدادية', 'ثانوية', 'معهد', 'بكالوريوس', 'ماجستير', 'دكتوراه']
         try:
-            max_idx = edu_order.index(request.args['education_max'])
+            max_idx = edu_order.index(args['education_max'])
             included = edu_order[:max_idx + 1]
             placeholders = ','.join(['?'] * len(included))
             conditions.append(f"education IN ({placeholders})")
             params.extend(included)
         except ValueError:
             pass
-    widows_f = request.args.get('widows_filter', '')
+    widows_f = args.get('widows_filter', '')
     if widows_f == 'widows_deceased':
         conditions.append("status IN ('deceased') AND gender = 'male' AND marital = 'married'")
     elif widows_f == 'widows_enforced':
@@ -1449,63 +1444,76 @@ def records_list_pdf():
         conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married'")
     elif widows_f == 'widows_with_minors':
         conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married' AND kids_under_18_count > 0")
-    if request.args.get('spouse_search'):
+    if args.get('spouse_search'):
         conditions.append("spouse_name LIKE ?")
-        params.append(f"%{request.args['spouse_search']}%")
-    if request.args.get('child_name_search'):
+        params.append(f"%{args['spouse_search']}%")
+    if args.get('child_name_search'):
         conditions.append("children_data LIKE ?")
-        params.append(f"%{request.args['child_name_search']}%")
-    if request.args.get('child_education'):
+        params.append(f"%{args['child_name_search']}%")
+    if args.get('child_education'):
         conditions.append("children_data LIKE ?")
-        params.append(f"%{request.args['child_education']}%")
-    if request.args.get('employment'):
+        params.append(f"%{args['child_education']}%")
+    if args.get('employment'):
         conditions.append("employment LIKE ?")
-        params.append(f"%{request.args['employment']}%")
-    if request.args.get('profession'):
+        params.append(f"%{args['employment']}%")
+    if args.get('profession'):
         conditions.append("profession LIKE ?")
-        params.append(f"%{request.args['profession']}%")
-    if request.args.get('address_search'):
+        params.append(f"%{args['profession']}%")
+    if args.get('address_search'):
         conditions.append("address LIKE ?")
-        params.append(f"%{request.args['address_search']}%")
-    if request.args.get('arrest_reason'):
+        params.append(f"%{args['address_search']}%")
+    if args.get('arrest_reason'):
         conditions.append("arrest_reason LIKE ?")
-        params.append(f"%{request.args['arrest_reason']}%")
-    if request.args.get('death_year_from'):
+        params.append(f"%{args['arrest_reason']}%")
+    if args.get('death_year_from'):
         conditions.append("death_year >= ?")
-        params.append(int(request.args['death_year_from']))
-    if request.args.get('death_year_to'):
+        params.append(int(args['death_year_from']))
+    if args.get('death_year_to'):
         conditions.append("death_year <= ?")
-        params.append(int(request.args['death_year_to']))
-    if request.args.get('release_year_from'):
+        params.append(int(args['death_year_to']))
+    if args.get('release_year_from'):
         conditions.append("release_year >= ?")
-        params.append(int(request.args['release_year_from']))
-    if request.args.get('release_year_to'):
+        params.append(int(args['release_year_from']))
+    if args.get('release_year_to'):
         conditions.append("release_year <= ?")
-        params.append(int(request.args['release_year_to']))
-    if request.args.get('notes_search'):
+        params.append(int(args['release_year_to']))
+    if args.get('notes_search'):
         conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
-        params.extend([f"%{request.args['notes_search']}%"] * 2)
-    if request.args.get('employer'):
+        params.extend([f"%{args['notes_search']}%"] * 2)
+    if args.get('employer'):
         conditions.append("employer LIKE ?")
-        params.append(f"%{request.args['employer']}%")
-    if request.args.get('breadwinner_relation'):
+        params.append(f"%{args['employer']}%")
+    if args.get('breadwinner_relation'):
         conditions.append("breadwinner_relation = ?")
-        params.append(request.args['breadwinner_relation'])
-    if request.args.get('age_from'):
+        params.append(args['breadwinner_relation'])
+    if args.get('age_from'):
         current_year = datetime.now().year
-        max_birth_year = current_year - int(request.args['age_from'])
+        max_birth_year = current_year - int(args['age_from'])
         conditions.append("birth_year <= ? AND birth_year > 0")
         params.append(max_birth_year)
-    if request.args.get('age_to'):
+    if args.get('age_to'):
         current_year = datetime.now().year
-        min_birth_year = current_year - int(request.args['age_to'])
+        min_birth_year = current_year - int(args['age_to'])
         conditions.append("birth_year >= ?")
         params.append(min_birth_year)
-    if request.args.get('has_guardian') == 'yes':
+    if args.get('has_guardian') == 'yes':
         conditions.append("guardian_name IS NOT NULL AND guardian_name != ''")
-    if request.args.get('digital_evidence_url_status'):
+    if args.get('digital_evidence_url_status'):
         conditions.append("digital_evidence_url_status = ?")
-        params.append(request.args['digital_evidence_url_status'])
+        params.append(args['digital_evidence_url_status'])
+
+    return conditions, params, pdf_status_list
+
+
+@app.route('/admin/records/pdf', methods=['GET', 'POST'])
+@admin_required
+def records_list_pdf():
+    db = get_db()
+
+    # Use POST data if available, otherwise GET
+    args = request.form if request.method == 'POST' else request.args
+
+    conditions, params, pdf_status_list = build_pdf_filter_conditions(args)
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
     records = db.execute(
@@ -1513,14 +1521,14 @@ def records_list_pdf():
     ).fetchall()
 
     # Post-filter by kids age range if specified
-    pdf_kids_age_from = int(request.args['kids_age_from']) if request.args.get('kids_age_from') else None
-    pdf_kids_age_to = int(request.args['kids_age_to']) if request.args.get('kids_age_to') else None
+    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
+    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
     if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
         records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
 
     # If user provided an explicit ordered list of record IDs (from the picker),
     # use that order, fetching any extra IDs the user added via search.
-    record_order = request.args.getlist('record_order')
+    record_order = args.getlist('record_order')
     if record_order:
         ordered_ids = [int(x) for x in record_order if x.isdigit()]
         # Build lookup from already-fetched records
@@ -1536,7 +1544,7 @@ def records_list_pdf():
         records = [rec_map[rid] for rid in ordered_ids if rid in rec_map]
 
     # Apply record limit
-    pdf_limit = request.args.get('pdf_limit', '').strip()
+    pdf_limit = args.get('pdf_limit', '').strip()
     if pdf_limit and pdf_limit.isdigit() and int(pdf_limit) > 0:
         records = records[:int(pdf_limit)]
 
@@ -1547,7 +1555,7 @@ def records_list_pdf():
             logo_b64 = base64.b64encode(f.read()).decode()
 
     # Get selected columns (or use defaults)
-    selected_cols = request.args.getlist('cols')
+    selected_cols = args.getlist('cols')
     if not selected_cols:
         selected_cols = DEFAULT_PDF_COLS
 
@@ -1560,20 +1568,21 @@ def records_list_pdf():
     if pdf_status_list:
         status_labels = [STATUS_MAP.get(s, s) for s in pdf_status_list]
         filter_desc.append(f"الحالة: {' + '.join(status_labels)}")
-    if request.args.get('province'):
-        filter_desc.append(f"المحافظة: {request.args['province']}")
-    if request.args.get('gender'):
-        filter_desc.append(f"الجنس: {'ذكر' if request.args['gender']=='male' else 'أنثى'}")
-    if request.args.get('marital'):
+    if args.get('province'):
+        filter_desc.append(f"المحافظة: {args['province']}")
+    if args.get('gender'):
+        filter_desc.append(f"الجنس: {'ذكر' if args['gender']=='male' else 'أنثى'}")
+    if args.get('marital'):
         marital_map = dict(MARITAL_STATUSES)
-        filter_desc.append(f"الحالة الاجتماعية: {marital_map.get(request.args['marital'], request.args['marital'])}")
-    if request.args.get('education') or request.args.get('education_max'):
-        edu_val = request.args.get('education') or f"حتى {request.args.get('education_max')}"
+        filter_desc.append(f"الحالة الاجتماعية: {marital_map.get(args['marital'], args['marital'])}")
+    if args.get('education') or args.get('education_max'):
+        edu_val = args.get('education') or f"حتى {args.get('education_max')}"
         filter_desc.append(f"التحصيل العلمي: {edu_val}")
-    if request.args.get('has_kids_under_18') == 'yes':
+    if args.get('has_kids_under_18') == 'yes':
         filter_desc.append("لديه أطفال قاصرين")
-    if request.args.get('has_special_needs') == '1':
+    if args.get('has_special_needs') == '1':
         filter_desc.append("ذوي احتياجات خاصة")
+    widows_f = args.get('widows_filter', '')
     if widows_f:
         widows_labels = {
             'widows_deceased': 'أرامل الشهداء',
@@ -1582,15 +1591,15 @@ def records_list_pdf():
             'widows_with_minors': 'أرامل لديهم قاصرين',
         }
         filter_desc.append(widows_labels.get(widows_f, widows_f))
-    if request.args.get('has_hypertension') == '1':
+    if args.get('has_hypertension') == '1':
         filter_desc.append("ضغط دم")
-    if request.args.get('has_diabetes') == '1':
+    if args.get('has_diabetes') == '1':
         filter_desc.append("سكري")
-    if request.args.get('chronic') == 'yes':
+    if args.get('chronic') == 'yes':
         filter_desc.append("أمراض مزمنة")
 
-    show_sum = request.args.get('show_sum') == '1'
-    sum_cols_requested = request.args.getlist('sum_cols')
+    show_sum = args.get('show_sum') == '1'
+    sum_cols_requested = args.getlist('sum_cols')
 
     # Virtual columns that don't exist in the database
     VIRTUAL_COLS = {'children_summary', 'minors_summary'}
@@ -1679,38 +1688,25 @@ def api_search_records():
 def api_filtered_record_ids():
     """Return the list of record IDs matching current filters (for the PDF record picker)."""
     db = get_db()
-    conditions = []
-    params = []
-    pdf_status_list = request.args.getlist('status')
-    expanded = []
-    for s in pdf_status_list:
-        if ',' in s:
-            expanded.extend(s.split(','))
-        elif s:
-            expanded.append(s)
-    pdf_status_list = expanded
-    if pdf_status_list:
-        if len(pdf_status_list) == 1:
-            conditions.append("status = ?")
-            params.append(pdf_status_list[0])
-        else:
-            placeholders = ','.join(['?'] * len(pdf_status_list))
-            conditions.append(f"status IN ({placeholders})")
-            params.extend(pdf_status_list)
-    for key in ['province', 'gender', 'marital', 'education', 'housing_type', 'blood_type',
-                'case_type', 'evidence_level', 'verification_status', 'civil_registry_status']:
-        val = request.args.get(key, '')
-        if val:
-            conditions.append(f"{key} = ?")
-            params.append(val)
-    if request.args.get('search'):
-        s = f"%{request.args['search']}%"
-        conditions.append("(first_name LIKE ? OR last_name LIKE ? OR national_id LIKE ?)")
-        params.extend([s, s, s])
+    conditions, params, _ = build_pdf_filter_conditions(request.args)
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
     rows = db.execute(
         f"SELECT id, first_name, father_name, last_name FROM records{where} ORDER BY id DESC LIMIT 500", params
     ).fetchall()
+
+    # Post-filter by kids age range if specified
+    if request.args.get('kids_age_from') or request.args.get('kids_age_to'):
+        age_from = int(request.args['kids_age_from']) if request.args.get('kids_age_from') else None
+        age_to = int(request.args['kids_age_to']) if request.args.get('kids_age_to') else None
+        # Need full records for age check
+        ids = [r['id'] for r in rows]
+        if ids:
+            placeholders = ','.join(['?'] * len(ids))
+            full = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", ids).fetchall()
+            full = [r for r in full if record_has_child_in_age_range(r, age_from, age_to)]
+            id_set = set(r['id'] for r in full)
+            rows = [r for r in rows if r['id'] in id_set]
+
     return jsonify([{'id': r['id'], 'first_name': r['first_name'] or '', 'father_name': r['father_name'] or '', 'last_name': r['last_name'] or ''} for r in rows])
 
 

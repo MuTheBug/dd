@@ -783,6 +783,7 @@ def admin_records():
         'blood_type': request.args.get('blood_type', ''),
         'has_kids': request.args.get('has_kids', ''),
         'has_kids_under_18': request.args.get('has_kids_under_18', ''),
+        'minor_age_threshold': request.args.get('minor_age_threshold', ''),
         'kids_max_age': request.args.get('kids_max_age', ''),
         'has_photo': request.args.get('has_photo', ''),
         'has_document': request.args.get('has_document', ''),
@@ -901,10 +902,18 @@ def admin_records():
         conditions.append("has_kids = 'yes'")
     elif filters['has_kids'] == 'no':
         conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
+    minor_threshold = int(filters['minor_age_threshold']) if filters.get('minor_age_threshold') else 18
     if filters['has_kids_under_18'] == 'yes':
-        conditions.append("kids_under_18_count > 0")
+        if minor_threshold == 18:
+            conditions.append("kids_under_18_count > 0")
+        else:
+            # Custom threshold - need post-filter via children_data
+            conditions.append("(children_data IS NOT NULL AND children_data != '' AND children_data != '[]')")
     elif filters['has_kids_under_18'] == 'no':
-        conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
+        if minor_threshold == 18:
+            conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
+        else:
+            pass  # post-filter will handle this
     if filters['kids_max_age']:
         # Children born after (current_year - max_age) are under that age
         current_year = datetime.now().year
@@ -957,6 +966,8 @@ def admin_records():
         conditions.append("legal = 'نعم'")
     if filters['has_assoc'] == 'yes':
         conditions.append("assoc = 'نعم'")
+    elif filters['has_assoc'] == 'no':
+        conditions.append("(assoc != 'نعم' OR assoc IS NULL OR assoc = '')")
     if filters['reporter_relation']:
         conditions.append("reporter_relation = ?")
         params.append(filters['reporter_relation'])
@@ -1046,6 +1057,8 @@ def admin_records():
     kids_age_from = int(filters['kids_age_from']) if filters['kids_age_from'] else None
     kids_age_to = int(filters['kids_age_to']) if filters['kids_age_to'] else None
     needs_kids_age_filter = kids_age_from is not None or kids_age_to is not None
+    # Custom minor age threshold also needs post-filter
+    needs_minor_threshold_filter = filters['has_kids_under_18'] in ('yes', 'no') and minor_threshold != 18
 
     if needs_kids_age_filter:
         # Must ensure records have children
@@ -1062,12 +1075,19 @@ def admin_records():
     if sort_dir not in ('asc', 'desc'):
         sort_dir = 'desc'
 
-    if needs_kids_age_filter:
+    needs_post_filter = needs_kids_age_filter or needs_minor_threshold_filter
+    if needs_post_filter:
         # Fetch all matching records, then filter by children age, then paginate
         all_records = db.execute(
             f"SELECT * FROM records{where} ORDER BY {sort_by} {sort_dir}", params
         ).fetchall()
-        all_records = [r for r in all_records if record_has_child_in_age_range(r, kids_age_from, kids_age_to)]
+        if needs_kids_age_filter:
+            all_records = [r for r in all_records if record_has_child_in_age_range(r, kids_age_from, kids_age_to)]
+        if needs_minor_threshold_filter:
+            if filters['has_kids_under_18'] == 'yes':
+                all_records = [r for r in all_records if record_has_child_in_age_range(r, 0, minor_threshold - 1)]
+            elif filters['has_kids_under_18'] == 'no':
+                all_records = [r for r in all_records if not record_has_child_in_age_range(r, 0, minor_threshold - 1)]
         count = len(all_records)
         offset = (page - 1) * per_page
         records = all_records[offset:offset + per_page]
@@ -1406,8 +1426,17 @@ def build_pdf_filter_conditions(args):
         params.append(int(args['birth_year_to']))
     if args.get('has_kids') == 'yes':
         conditions.append("has_kids = 'yes'")
+    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
     if args.get('has_kids_under_18') == 'yes':
-        conditions.append("kids_under_18_count > 0")
+        if pdf_minor_threshold == 18:
+            conditions.append("kids_under_18_count > 0")
+        else:
+            conditions.append("(children_data IS NOT NULL AND children_data != '' AND children_data != '[]')")
+    elif args.get('has_kids_under_18') == 'no':
+        if pdf_minor_threshold == 18:
+            conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
+        else:
+            pass  # post-filter
     if args.get('has_special_needs') == '1':
         conditions.append("has_special_needs = 1")
     if args.get('chronic') == 'yes':
@@ -1424,6 +1453,8 @@ def build_pdf_filter_conditions(args):
         conditions.append("legal = 'نعم'")
     if args.get('has_assoc') == 'yes':
         conditions.append("assoc = 'نعم'")
+    elif args.get('has_assoc') == 'no':
+        conditions.append("(assoc != 'نعم' OR assoc IS NULL OR assoc = '')")
     if args.get('reporter_relation'):
         conditions.append("reporter_relation = ?")
         params.append(args['reporter_relation'])
@@ -1527,6 +1558,12 @@ def records_list_pdf():
     pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
     if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
         records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
+    # Post-filter for custom minor age threshold
+    if args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18:
+        if args['has_kids_under_18'] == 'yes':
+            records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]
+        else:
+            records = [r for r in records if not record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]
 
     # If user provided an explicit ordered list of record IDs (from the picker),
     # use that order, fetching any extra IDs the user added via search.
@@ -1581,7 +1618,11 @@ def records_list_pdf():
         edu_val = args.get('education') or f"حتى {args.get('education_max')}"
         filter_desc.append(f"التحصيل العلمي: {edu_val}")
     if args.get('has_kids_under_18') == 'yes':
-        filter_desc.append("لديه أطفال قاصرين")
+        _mt = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+        filter_desc.append(f"لديه أطفال قاصرين (تحت {_mt})")
+    elif args.get('has_kids_under_18') == 'no':
+        _mt = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+        filter_desc.append(f"بدون أطفال قاصرين (تحت {_mt})")
     if args.get('has_special_needs') == '1':
         filter_desc.append("ذوي احتياجات خاصة")
     widows_f = args.get('widows_filter', '')

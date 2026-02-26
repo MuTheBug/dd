@@ -107,12 +107,15 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>أطفال قاصرين (تحت 18)</label>
-                    <select name="has_kids_under_18">
-                        <option value="">الكل</option>
-                        <option value="yes" {{ 'selected' if filters.has_kids_under_18=='yes' }}>لديه قاصرين</option>
-                        <option value="no" {{ 'selected' if filters.has_kids_under_18=='no' }}>بدون قاصرين</option>
-                    </select>
+                    <label>أطفال قاصرين (تحت عمر)</label>
+                    <div style="display:flex;gap:0.3rem;align-items:center;">
+                        <select name="has_kids_under_18" style="flex:1;">
+                            <option value="">الكل</option>
+                            <option value="yes" {{ 'selected' if filters.has_kids_under_18=='yes' }}>لديه قاصرين</option>
+                            <option value="no" {{ 'selected' if filters.has_kids_under_18=='no' }}>بدون قاصرين</option>
+                        </select>
+                        <input type="number" name="minor_age_threshold" value="{{ filters.minor_age_threshold }}" placeholder="18" min="1" max="25" style="width:60px;" title="عمر القاصر">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>الحد الأقصى لعمر الأطفال</label>
@@ -283,6 +286,7 @@
                     <select name="has_assoc">
                         <option value="">الكل</option>
                         <option value="yes" {{ 'selected' if filters.has_assoc=='yes' }}>نعم</option>
+                        <option value="no" {{ 'selected' if filters.has_assoc=='no' }}>لا</option>
                     </select>
                 </div>
 
@@ -499,7 +503,9 @@
         </span>
         {% endif %}
         {% if filters.has_kids_under_18 == 'yes' %}
-        <span class="filter-tag">أطفال قاصرين</span>
+        <span class="filter-tag">أطفال قاصرين (تحت {{ filters.minor_age_threshold or '18' }})</span>
+        {% elif filters.has_kids_under_18 == 'no' %}
+        <span class="filter-tag">بدون قاصرين (تحت {{ filters.minor_age_threshold or '18' }})</span>
         {% endif %}
         {% if filters.kids_max_age %}
         <span class="filter-tag">عمر أقصى: {{ filters.kids_max_age }}</span>
@@ -527,6 +533,8 @@
         {% endif %}
         {% if filters.has_assoc == 'yes' %}
         <span class="filter-tag">مسجل بجمعية</span>
+        {% elif filters.has_assoc == 'no' %}
+        <span class="filter-tag">غير مسجل بجمعية</span>
         {% endif %}
         {% if filters.is_registered == '1' %}
         <span class="filter-tag">مسجل رسمياً</span>

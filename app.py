@@ -1656,6 +1656,78 @@ def api_stats():
     })
 
 
+def serialize_record_for_picker(r):
+    """Serialize a database row to a dict with all PDF column values."""
+    col_keys = [k for k, _ in PDF_COLUMNS]
+    current_year = datetime.now().year
+
+    # Helper to safely get a value from sqlite3.Row
+    def _get(key, default=''):
+        try:
+            v = r[key]
+            return v if v is not None else default
+        except (IndexError, KeyError):
+            return default
+
+    rec = {}
+    for k in col_keys:
+        if k == 'children_summary':
+            try:
+                cd = _get('children_data', '')
+                ch = json.loads(cd) if cd else []
+                parts = []
+                for c in ch:
+                    name = c.get('name', '')
+                    if c.get('birth_year'):
+                        parts.append(f"{name}({c['birth_year']})")
+                    elif c.get('age'):
+                        parts.append(f"{name}(~{current_year - int(c['age'])})")
+                    else:
+                        parts.append(name)
+                rec[k] = ', '.join(parts) if parts else '-'
+            except Exception:
+                rec[k] = '-'
+        elif k == 'minors_summary':
+            try:
+                cd = _get('children_data', '')
+                ch = json.loads(cd) if cd else []
+                parts = []
+                for c in ch:
+                    age = None
+                    if c.get('birth_year'):
+                        try: age = current_year - int(c['birth_year'])
+                        except: pass
+                    elif c.get('age'):
+                        try: age = int(c['age'])
+                        except: pass
+                    if age is not None and age < 18:
+                        name = c.get('name', '')
+                        if c.get('birth_year'):
+                            parts.append(f"{name}({c['birth_year']})")
+                        elif c.get('age'):
+                            parts.append(f"{name}(~{current_year - int(c['age'])})")
+                        else:
+                            parts.append(name)
+                rec[k] = ', '.join(parts) if parts else '-'
+            except Exception:
+                rec[k] = '-'
+        elif k == 'status':
+            rec[k] = STATUS_MAP.get(_get('status'), _get('status') or '-')
+        elif k == 'gender':
+            gmap = {'male': 'ذكر', 'female': 'أنثى'}
+            rec[k] = gmap.get(_get('gender'), _get('gender') or '-')
+        elif k == 'marital':
+            mmap = dict(MARITAL_STATUSES)
+            rec[k] = mmap.get(_get('marital'), _get('marital') or '-')
+        elif k == 'case_type':
+            cmap = dict(CASE_TYPES)
+            rec[k] = cmap.get(_get('case_type'), _get('case_type') or '-')
+        else:
+            val = _get(k, '')
+            rec[k] = str(val) if val is not None and val != '' else '-'
+    return rec
+
+
 @app.route('/api/search_records')
 @admin_required
 def api_search_records():
@@ -1666,48 +1738,30 @@ def api_search_records():
     db = get_db()
     s = f"%{q}%"
     rows = db.execute(
-        "SELECT id, first_name, father_name, last_name, status, province "
-        "FROM records WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? "
+        "SELECT * FROM records WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? "
         "ORDER BY id DESC LIMIT 20", (s, s, s)
     ).fetchall()
-    results = []
-    for r in rows:
-        results.append({
-            'id': r['id'],
-            'first_name': r['first_name'] or '',
-            'father_name': r['father_name'] or '',
-            'last_name': r['last_name'] or '',
-            'status': r['status'] or '',
-            'province': r['province'] or '',
-        })
-    return jsonify(results)
+    return jsonify([serialize_record_for_picker(r) for r in rows])
 
 
 @app.route('/api/filtered_record_ids')
 @admin_required
 def api_filtered_record_ids():
-    """Return the list of record IDs matching current filters (for the PDF record picker)."""
+    """Return filtered records with all fields for the PDF record picker."""
     db = get_db()
     conditions, params, _ = build_pdf_filter_conditions(request.args)
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
     rows = db.execute(
-        f"SELECT id, first_name, father_name, last_name FROM records{where} ORDER BY id DESC LIMIT 500", params
+        f"SELECT * FROM records{where} ORDER BY id DESC LIMIT 500", params
     ).fetchall()
 
     # Post-filter by kids age range if specified
     if request.args.get('kids_age_from') or request.args.get('kids_age_to'):
         age_from = int(request.args['kids_age_from']) if request.args.get('kids_age_from') else None
         age_to = int(request.args['kids_age_to']) if request.args.get('kids_age_to') else None
-        # Need full records for age check
-        ids = [r['id'] for r in rows]
-        if ids:
-            placeholders = ','.join(['?'] * len(ids))
-            full = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", ids).fetchall()
-            full = [r for r in full if record_has_child_in_age_range(r, age_from, age_to)]
-            id_set = set(r['id'] for r in full)
-            rows = [r for r in rows if r['id'] in id_set]
+        rows = [r for r in rows if record_has_child_in_age_range(r, age_from, age_to)]
 
-    return jsonify([{'id': r['id'], 'first_name': r['first_name'] or '', 'father_name': r['father_name'] or '', 'last_name': r['last_name'] or ''} for r in rows])
+    return jsonify([serialize_record_for_picker(r) for r in rows])
 
 
 # ---------------------------------------------------------------------------

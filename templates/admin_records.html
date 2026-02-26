@@ -733,8 +733,8 @@
                 <input type="text" id="addRecordSearch" placeholder="ابحث باسم لإضافة سجل..." style="flex:1; padding:5px 10px; border:1px solid var(--border); border-radius:4px; font-size:0.85rem;" oninput="searchRecordDebounced()">
             </div>
             <div id="searchResults" style="display:none; max-height:120px; overflow-y:auto; border:1px solid var(--border); border-radius:4px; background:var(--card); margin-bottom:0.5rem;"></div>
-            <!-- Records list -->
-            <div id="recordsList" style="max-height:180px; overflow-y:auto; border:1px solid var(--border); border-radius:4px; background:var(--card);">
+            <!-- Records table -->
+            <div id="recordsTableWrap" style="max-height:250px; overflow:auto; border:1px solid var(--border); border-radius:4px; background:var(--card);">
                 <p style="text-align:center; padding:1rem; color:var(--text-light); font-size:0.85rem;">اضغط "تحميل السجلات" لعرض قائمة السجلات</p>
             </div>
             <button type="button" onclick="loadFilteredRecords()" class="btn btn-outline btn-sm" style="margin-top:0.4rem; font-size:0.82rem;">&#x1F504; تحميل السجلات</button>
@@ -827,6 +827,18 @@ document.addEventListener('change', function(e) {
 });
 
 // --- Record management ---
+function getSelectedPdfCols() {
+    var cols = [];
+    document.querySelectorAll('.pdf-col-check:checked').forEach(function(cb) { cols.push(cb.value); });
+    return cols;
+}
+function getColLabel(key) {
+    for (var i = 0; i < allColumns.length; i++) {
+        if (allColumns[i][0] === key) return allColumns[i][1];
+    }
+    return key;
+}
+
 function loadFilteredRecords() {
     var params = [];
     document.querySelectorAll('input[name="status"]:checked').forEach(function(cb) {
@@ -836,6 +848,7 @@ function loadFilteredRecords() {
         if (filterParams[key]) params.push(encodeURIComponent(key) + '=' + encodeURIComponent(filterParams[key]));
     }
     var url = '{{ url_for("api_filtered_record_ids") }}?' + params.join('&');
+    document.getElementById('recordsTableWrap').innerHTML = '<p style="text-align:center; padding:1rem; color:var(--text-light);">جاري التحميل...</p>';
     fetch(url).then(function(r) { return r.json(); }).then(function(data) {
         orderedRecords = data;
         recordsLoaded = true;
@@ -844,71 +857,108 @@ function loadFilteredRecords() {
 }
 
 function renderRecordsList() {
-    var list = document.getElementById('recordsList');
+    var wrap = document.getElementById('recordsTableWrap');
+    var cols = getSelectedPdfCols();
     document.getElementById('recordCount').textContent = orderedRecords.length + ' سجل';
     if (orderedRecords.length === 0) {
-        list.innerHTML = '<p style="text-align:center; padding:0.8rem; color:var(--text-light); font-size:0.85rem;">لا توجد سجلات</p>';
+        wrap.innerHTML = '<p style="text-align:center; padding:0.8rem; color:var(--text-light); font-size:0.85rem;">لا توجد سجلات</p>';
         return;
     }
-    list.innerHTML = '';
+    if (cols.length === 0) cols = ['id', 'first_name', 'father_name', 'last_name'];
+
+    var table = document.createElement('table');
+    table.style.cssText = 'width:100%; border-collapse:collapse; font-size:0.78rem; direction:rtl;';
+
+    // Header
+    var thead = document.createElement('thead');
+    var hrow = document.createElement('tr');
+    hrow.style.cssText = 'background:var(--primary-dark, #1e3a5f); color:#fff; position:sticky; top:0; z-index:1;';
+    var thDrag = document.createElement('th');
+    thDrag.style.cssText = 'padding:4px; width:24px;';
+    hrow.appendChild(thDrag);
+    for (var c = 0; c < cols.length; c++) {
+        var th = document.createElement('th');
+        th.style.cssText = 'padding:4px 6px; white-space:nowrap; font-weight:600;';
+        th.textContent = getColLabel(cols[c]);
+        hrow.appendChild(th);
+    }
+    var thAct = document.createElement('th');
+    thAct.style.cssText = 'padding:4px; width:28px;';
+    hrow.appendChild(thAct);
+    thead.appendChild(hrow);
+    table.appendChild(thead);
+
+    // Body
+    var tbody = document.createElement('tbody');
     for (var i = 0; i < orderedRecords.length; i++) {
         (function(idx, r) {
-            var row = document.createElement('div');
-            row.draggable = true;
-            row.dataset.idx = idx;
-            row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:4px 8px; border-bottom:1px solid var(--border); font-size:0.82rem; cursor:grab; transition:background 0.15s;';
-            if (r._added) row.style.background = '#e8f5e9';
+            var tr = document.createElement('tr');
+            tr.draggable = true;
+            tr.dataset.idx = idx;
+            tr.style.cssText = 'border-bottom:1px solid var(--border); cursor:grab; transition:background 0.1s;' + (r._added ? ' background:#e8f5e9;' : '');
 
-            // Drag handle + name
-            var left = document.createElement('span');
-            left.style.cssText = 'display:flex; align-items:center; gap:6px; pointer-events:none;';
-            left.innerHTML = '<span style="color:var(--text-light); font-size:0.9rem;">&#x2630;</span> <strong>#' + r.id + '</strong> ' + (r.first_name || '') + ' ' + (r.father_name || '') + ' ' + (r.last_name || '');
-            row.appendChild(left);
+            // Drag handle cell
+            var tdDrag = document.createElement('td');
+            tdDrag.style.cssText = 'text-align:center; color:var(--text-light); padding:3px; user-select:none;';
+            tdDrag.innerHTML = '&#x2630;';
+            tr.appendChild(tdDrag);
 
+            // Data cells
+            for (var c = 0; c < cols.length; c++) {
+                var td = document.createElement('td');
+                td.style.cssText = 'padding:3px 5px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+                td.textContent = r[cols[c]] || '-';
+                td.title = r[cols[c]] || '-';
+                tr.appendChild(td);
+            }
+
+            // Remove button cell
+            var tdAct = document.createElement('td');
+            tdAct.style.cssText = 'text-align:center; padding:2px;';
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.innerHTML = '&times;';
             btn.title = 'حذف من التقرير';
-            btn.style.cssText = 'background:none; border:none; color:var(--deceased, #c0392b); cursor:pointer; font-size:1rem; padding:0 4px;';
+            btn.style.cssText = 'background:none; border:none; color:var(--deceased, #c0392b); cursor:pointer; font-size:1.1rem; padding:0 3px; line-height:1;';
             btn.onclick = function(e) { e.stopPropagation(); removeRecord(idx); };
-            row.appendChild(btn);
+            tdAct.appendChild(btn);
+            tr.appendChild(tdAct);
 
             // Drag events
-            row.addEventListener('dragstart', function(e) {
+            tr.addEventListener('dragstart', function(e) {
                 dragSrcIndex = idx;
-                row.style.opacity = '0.4';
+                tr.style.opacity = '0.4';
                 e.dataTransfer.effectAllowed = 'move';
             });
-            row.addEventListener('dragend', function() {
-                row.style.opacity = '1';
+            tr.addEventListener('dragend', function() {
+                tr.style.opacity = '1';
                 dragSrcIndex = null;
-                list.querySelectorAll('[data-idx]').forEach(function(el) { el.style.borderTop = ''; el.style.borderBottom = ''; });
+                tbody.querySelectorAll('tr').forEach(function(el) { el.style.borderTop = ''; el.style.borderBottom = ''; });
             });
-            row.addEventListener('dragover', function(e) {
+            tr.addEventListener('dragover', function(e) {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
-                var rect = row.getBoundingClientRect();
+                var rect = tr.getBoundingClientRect();
                 var mid = rect.top + rect.height / 2;
-                list.querySelectorAll('[data-idx]').forEach(function(el) { el.style.borderTop = ''; el.style.borderBottom = ''; });
+                tbody.querySelectorAll('tr').forEach(function(el) { el.style.borderTop = ''; el.style.borderBottom = ''; });
                 if (e.clientY < mid) {
-                    row.style.borderTop = '2px solid var(--primary, #2980b9)';
+                    tr.style.borderTop = '2px solid var(--primary, #2980b9)';
                 } else {
-                    row.style.borderBottom = '2px solid var(--primary, #2980b9)';
+                    tr.style.borderBottom = '2px solid var(--primary, #2980b9)';
                 }
             });
-            row.addEventListener('dragleave', function() {
-                row.style.borderTop = '';
-                row.style.borderBottom = '';
+            tr.addEventListener('dragleave', function() {
+                tr.style.borderTop = '';
+                tr.style.borderBottom = '';
             });
-            row.addEventListener('drop', function(e) {
+            tr.addEventListener('drop', function(e) {
                 e.preventDefault();
-                row.style.borderTop = '';
-                row.style.borderBottom = '';
+                tr.style.borderTop = '';
+                tr.style.borderBottom = '';
                 if (dragSrcIndex === null || dragSrcIndex === idx) return;
-                var rect = row.getBoundingClientRect();
+                var rect = tr.getBoundingClientRect();
                 var mid = rect.top + rect.height / 2;
                 var targetIdx = e.clientY < mid ? idx : idx + 1;
-                // Move the item
                 var item = orderedRecords.splice(dragSrcIndex, 1)[0];
                 if (targetIdx > dragSrcIndex) targetIdx--;
                 orderedRecords.splice(targetIdx, 0, item);
@@ -916,9 +966,13 @@ function renderRecordsList() {
                 renderRecordsList();
             });
 
-            list.appendChild(row);
+            tbody.appendChild(tr);
         })(i, orderedRecords[i]);
     }
+    table.appendChild(tbody);
+
+    wrap.innerHTML = '';
+    wrap.appendChild(table);
 }
 
 function removeRecord(idx) {
@@ -950,10 +1004,9 @@ function searchRecords() {
             resultsDiv.innerHTML = '';
             for (var i = 0; i < data.length; i++) {
                 (function(r) {
-                    var st = statusMap[r.status] || r.status;
                     var row = document.createElement('div');
                     row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:4px 8px; border-bottom:1px solid var(--border); font-size:0.82rem; cursor:pointer;';
-                    row.innerHTML = '<span><strong>#' + r.id + '</strong> ' + r.first_name + ' ' + r.father_name + ' ' + r.last_name + ' <span style="color:var(--text-light);">(' + st + ' - ' + r.province + ')</span></span><span style="color:var(--primary); font-weight:bold;">+</span>';
+                    row.innerHTML = '<span><strong>#' + r.id + '</strong> ' + (r.first_name||'') + ' ' + (r.father_name||'') + ' ' + (r.last_name||'') + ' <span style="color:var(--text-light);">(' + (r.status||'') + ' - ' + (r.province||'') + ')</span></span><span style="color:var(--primary); font-weight:bold;">+</span>';
                     row.onclick = function() { addRecord(r); };
                     resultsDiv.appendChild(row);
                 })(data[i]);
@@ -971,7 +1024,8 @@ function addRecord(r) {
             return;
         }
     }
-    orderedRecords.push({id: r.id, first_name: r.first_name, father_name: r.father_name, last_name: r.last_name, _added: true});
+    r._added = true;
+    orderedRecords.push(r);
     recordsLoaded = true;
     document.getElementById('addRecordSearch').value = '';
     document.getElementById('searchResults').style.display = 'none';

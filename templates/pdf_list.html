@@ -181,6 +181,11 @@ tr:nth-child(even) { background: #fafafa; }
                 {% elif col_key == 'children_summary' %}
                     {% set ch = r.children_data|from_json %}
                     {% if ch %}{% for c in ch %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ 2026 - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                {% elif col_key == 'minors_summary' %}
+                    {% set ch = r.children_data|from_json %}
+                    {% set minors = [] %}
+                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < 18 %}{% if minors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if minors %}{% for c in minors %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ 2026 - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'first_name' %}
                     <span style="font-weight:600;">{{ r[col_key] or '-' }}</span>
                 {% else %}

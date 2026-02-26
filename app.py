@@ -121,6 +121,7 @@ PDF_COLUMNS = [
     ('is_officially_registered', 'مسجل رسمياً'),
     ('notes', 'ملاحظات'),
     ('children_summary', 'تفاصيل الأطفال'),
+    ('minors_summary', 'أسماء القاصرين'),
 ]
 
 # Default columns for PDF
@@ -1615,7 +1616,8 @@ def records_list_pdf():
     html = render_template('pdf_list.html',
         records=records, logo_b64=logo_b64, filter_desc=filter_desc,
         total=len(records), pdf_cols=pdf_cols, selected_cols=selected_cols,
-        show_sum=show_sum, col_sums=col_sums)
+        show_sum=show_sum, col_sums=col_sums,
+        current_year=datetime.now().year)
 
     from weasyprint import HTML
     pdf_bytes = HTML(string=html, base_url=BASE_DIR).write_pdf()

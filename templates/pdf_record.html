@@ -339,9 +339,9 @@ body {
                 <td style="border: 1px solid #ccc; padding: 2px;">{{ 'ذكر' if child.gender == 'male' else 'أنثى' if child.gender == 'female' else '-' }}</td>
                 <td style="border: 1px solid #ccc; padding: 2px;">{% if child.birth_year %}{{ child.birth_year }}{% elif child.age %}~{{ 2026 - child.age|int }}{% else %}-{% endif %}</td>
                 <td style="border: 1px solid #ccc; padding: 2px;">{{ child.education or '-' }}</td>
-                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.school or '-' }}</td>
-                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.employment or '-' }}</td>
-                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.health_notes or '-' }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.school or child.university or '-' }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.employment or child.job or '-' }}</td>
+                <td style="border: 1px solid #ccc; padding: 2px;">{{ child.health_notes or child.healthDetails or '-' }}</td>
             </tr>
             {% endfor %}
         </tbody>

@@ -1667,8 +1667,8 @@ def export_kids_no_birthdate():
             children = json.loads(r['children_data']) if r['children_data'] else []
         except (json.JSONDecodeError, TypeError):
             continue
-        # Find children with no birth_year
-        kids_no_bd = [c for c in children if not c.get('birth_year')]
+        # Find children with no birth_year and no age
+        kids_no_bd = [c for c in children if not c.get('birth_year') and not c.get('age')]
         if not kids_no_bd:
             continue
         count += 1

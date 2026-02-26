@@ -313,9 +313,9 @@
                         <td>{{ 'ذكر' if child.gender == 'male' else 'أنثى' if child.gender == 'female' else '-' }}</td>
                         <td>{% if child.birth_year %}{{ child.birth_year }}{% elif child.age %}~{{ 2026 - child.age|int }}{% else %}-{% endif %}</td>
                         <td>{{ child.education or '-' }}</td>
-                        <td>{{ child.school or '-' }}</td>
-                        <td>{{ child.employment or '-' }}</td>
-                        <td>{{ child.health_notes or '-' }}</td>
+                        <td>{{ child.school or child.university or '-' }}</td>
+                        <td>{{ child.employment or child.job or '-' }}</td>
+                        <td>{{ child.health_notes or child.healthDetails or '-' }}</td>
                         <td>{{ child.special_needs or '-' }}</td>
                     </tr>
                     {% endfor %}

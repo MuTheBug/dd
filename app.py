@@ -1592,12 +1592,15 @@ def records_list_pdf():
     show_sum = request.args.get('show_sum') == '1'
     sum_cols_requested = request.args.getlist('sum_cols')
 
+    # Virtual columns that don't exist in the database
+    VIRTUAL_COLS = {'children_summary', 'minors_summary'}
+
     # Pre-calculate sums for selected numeric columns if requested
     col_sums = {}
     if show_sum and sum_cols_requested:
         sum_cols_set = set(sum_cols_requested)
         for col_key, col_label in pdf_cols:
-            if col_key not in sum_cols_set:
+            if col_key not in sum_cols_set or col_key in VIRTUAL_COLS:
                 continue
             total_val = 0
             has_numeric = False
@@ -1608,7 +1611,7 @@ def records_list_pdf():
                         num = int(val) if isinstance(val, int) else float(str(val).strip())
                         total_val += num
                         has_numeric = True
-                except (ValueError, TypeError, KeyError):
+                except (ValueError, TypeError, KeyError, IndexError):
                     pass
             if has_numeric:
                 col_sums[col_key] = int(total_val) if total_val == int(total_val) else round(total_val, 2)

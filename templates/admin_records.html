@@ -1024,8 +1024,10 @@ function renderRecordsList() {
 }
 
 function removeRecord(idx) {
-    orderedRecords.splice(idx, 1);
-    renderRecordsList();
+    setTimeout(function() {
+        orderedRecords.splice(idx, 1);
+        renderRecordsList();
+    }, 0);
 }
 
 // --- Deceased kids < 13 preset ---

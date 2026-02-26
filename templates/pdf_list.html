@@ -186,6 +186,16 @@ tr:nth-child(even) { background: #fafafa; }
                     {% set minors = [] %}
                     {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < 18 %}{% if minors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
                     {% if minors %}{% for c in minors %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ 2026 - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                {% elif col_key == 'kids_u13_names' %}
+                    {% set ch = r.children_data|from_json %}
+                    {% set u13 = [] %}
+                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < 13 %}{% if u13.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if u13 %}{% for c in u13 %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                {% elif col_key == 'kids_u13_ages' %}
+                    {% set ch = r.children_data|from_json %}
+                    {% set ages = [] %}
+                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < 13 %}{% if ages.append(age) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if ages %}{% for a in ages %}{{ a }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'first_name' %}
                     <span style="font-weight:600;">{{ r[col_key] or '-' }}</span>
                 {% else %}

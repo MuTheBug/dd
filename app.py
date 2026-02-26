@@ -122,6 +122,8 @@ PDF_COLUMNS = [
     ('notes', 'ملاحظات'),
     ('children_summary', 'تفاصيل الأطفال'),
     ('minors_summary', 'أسماء القاصرين'),
+    ('kids_u13_names', 'أسماء أطفال تحت 13'),
+    ('kids_u13_ages', 'أعمار أطفال تحت 13'),
 ]
 
 # Default columns for PDF
@@ -1602,7 +1604,7 @@ def records_list_pdf():
     sum_cols_requested = args.getlist('sum_cols')
 
     # Virtual columns that don't exist in the database
-    VIRTUAL_COLS = {'children_summary', 'minors_summary'}
+    VIRTUAL_COLS = {'children_summary', 'minors_summary', 'kids_u13_names', 'kids_u13_ages'}
 
     # Pre-calculate sums for selected numeric columns if requested
     col_sums = {}
@@ -1709,6 +1711,42 @@ def serialize_record_for_picker(r):
                         else:
                             parts.append(name)
                 rec[k] = ', '.join(parts) if parts else '-'
+            except Exception:
+                rec[k] = '-'
+        elif k == 'kids_u13_names':
+            try:
+                cd = _get('children_data', '')
+                ch = json.loads(cd) if cd else []
+                names = []
+                for c in ch:
+                    age = None
+                    if c.get('birth_year'):
+                        try: age = current_year - int(c['birth_year'])
+                        except: pass
+                    elif c.get('age'):
+                        try: age = int(c['age'])
+                        except: pass
+                    if age is not None and age < 13:
+                        names.append(c.get('name', ''))
+                rec[k] = ', '.join(names) if names else '-'
+            except Exception:
+                rec[k] = '-'
+        elif k == 'kids_u13_ages':
+            try:
+                cd = _get('children_data', '')
+                ch = json.loads(cd) if cd else []
+                ages = []
+                for c in ch:
+                    age = None
+                    if c.get('birth_year'):
+                        try: age = current_year - int(c['birth_year'])
+                        except: pass
+                    elif c.get('age'):
+                        try: age = int(c['age'])
+                        except: pass
+                    if age is not None and age < 13:
+                        ages.append(str(age))
+                rec[k] = ', '.join(ages) if ages else '-'
             except Exception:
                 rec[k] = '-'
         elif k == 'status':

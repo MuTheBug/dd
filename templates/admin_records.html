@@ -7,6 +7,7 @@
         السجلات <span style="font-size: 0.95rem; color: var(--text-light);">({{ total_count }} سجل)</span>
     </h1>
     <div class="btn-group">
+        <a href="{{ url_for('export_kids_no_birthdate') }}" class="btn btn-outline btn-sm" style="color:#856404; border-color:#ffc107;">&#x1F4CB; أطفال بدون تاريخ ميلاد</a>
         <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('pdfColModal').style.display='flex'">&#x1F4C4; تصدير PDF</button>
         <a href="{{ url_for('entry_form') }}" class="btn btn-primary btn-sm">+ إضافة حالة</a>
     </div>

@@ -1643,6 +1643,54 @@ def records_list_pdf():
 
 
 # ---------------------------------------------------------------------------
+# Export: kids missing birth dates
+# ---------------------------------------------------------------------------
+@app.route('/admin/export/kids_no_birthdate')
+@admin_required
+def export_kids_no_birthdate():
+    """Export a text file listing people who have kids with no birth date, showing
+    full name, phone, and kids' names."""
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, first_name, father_name, last_name, phone, children_data "
+        "FROM records WHERE has_kids = 'yes' AND children_data IS NOT NULL AND children_data != '' AND children_data != '[]' "
+        "ORDER BY id DESC"
+    ).fetchall()
+
+    lines = []
+    lines.append("سجلات أطفال بدون تاريخ ميلاد")
+    lines.append("=" * 50)
+    lines.append("")
+    count = 0
+    for r in rows:
+        try:
+            children = json.loads(r['children_data']) if r['children_data'] else []
+        except (json.JSONDecodeError, TypeError):
+            continue
+        # Find children with no birth_year
+        kids_no_bd = [c for c in children if not c.get('birth_year')]
+        if not kids_no_bd:
+            continue
+        count += 1
+        full_name = ' '.join(filter(None, [r['first_name'], r['father_name'], r['last_name']]))
+        phone = r['phone'] or '-'
+        kid_names = ', '.join(c.get('name', '؟') for c in kids_no_bd)
+        lines.append(f"#{r['id']}  {full_name}")
+        lines.append(f"    الهاتف: {phone}")
+        lines.append(f"    أطفال بدون تاريخ ميلاد: {kid_names}")
+        lines.append("")
+
+    lines.insert(3, f"العدد: {count}")
+    lines.insert(4, "")
+
+    content = '\n'.join(lines)
+    response = make_response(content)
+    response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=kids_no_birthdate_{int(time.time())}.txt'
+    return response
+
+
+# ---------------------------------------------------------------------------
 # API endpoints for dynamic data
 # ---------------------------------------------------------------------------
 @app.route('/api/stats')

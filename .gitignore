@@ -7,5 +7,6 @@ uploads/screenshots/*
 !uploads/photos/.gitkeep
 !uploads/documents/.gitkeep
 !uploads/screenshots/.gitkeep
+*.db
 *.db-shm
 *.db-wal

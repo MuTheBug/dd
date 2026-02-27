@@ -965,9 +965,9 @@ def admin_records():
     if filters['has_legal'] == 'yes':
         conditions.append("legal = 'نعم'")
     if filters['has_assoc'] == 'yes':
-        conditions.append("assoc = 'نعم'")
+        conditions.append("assoc = 'yes'")
     elif filters['has_assoc'] == 'no':
-        conditions.append("(assoc != 'نعم' OR assoc IS NULL OR assoc = '')")
+        conditions.append("(assoc != 'yes' OR assoc IS NULL OR assoc = '')")
     if filters['reporter_relation']:
         conditions.append("reporter_relation = ?")
         params.append(filters['reporter_relation'])
@@ -1452,9 +1452,9 @@ def build_pdf_filter_conditions(args):
     if args.get('has_legal') == 'yes':
         conditions.append("legal = 'نعم'")
     if args.get('has_assoc') == 'yes':
-        conditions.append("assoc = 'نعم'")
+        conditions.append("assoc = 'yes'")
     elif args.get('has_assoc') == 'no':
-        conditions.append("(assoc != 'نعم' OR assoc IS NULL OR assoc = '')")
+        conditions.append("(assoc != 'yes' OR assoc IS NULL OR assoc = '')")
     if args.get('reporter_relation'):
         conditions.append("reporter_relation = ?")
         params.append(args['reporter_relation'])

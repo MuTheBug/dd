@@ -1559,6 +1559,7 @@ def records_list_pdf():
     if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
         records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
     # Post-filter for custom minor age threshold
+    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
     if args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18:
         if args['has_kids_under_18'] == 'yes':
             records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]

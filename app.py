@@ -1410,8 +1410,12 @@ def build_pdf_filter_conditions(args):
         params.append(f"%{args['arrest_place']}%")
     if args.get('search'):
         s = f"%{args['search']}%"
-        conditions.append("(first_name LIKE ? OR last_name LIKE ? OR national_id LIKE ?)")
-        params.extend([s, s, s])
+        conditions.append("""(
+            first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
+            OR mother_name LIKE ? OR national_id LIKE ? OR phone LIKE ?
+            OR address LIKE ? OR notes LIKE ? OR reporter_name LIKE ?
+        )""")
+        params.extend([s] * 9)
     if args.get('arrest_year_from'):
         conditions.append("arrest_year >= ?")
         params.append(int(args['arrest_year_from']))
@@ -1426,6 +1430,8 @@ def build_pdf_filter_conditions(args):
         params.append(int(args['birth_year_to']))
     if args.get('has_kids') == 'yes':
         conditions.append("has_kids = 'yes'")
+    elif args.get('has_kids') == 'no':
+        conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
     pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
     if args.get('has_kids_under_18') == 'yes':
         if pdf_minor_threshold == 18:
@@ -1437,6 +1443,19 @@ def build_pdf_filter_conditions(args):
             conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
         else:
             pass  # post-filter
+    if args.get('kids_max_age'):
+        conditions.append("kids_under_18_count > 0")
+    if args.get('has_photo') == 'yes':
+        conditions.append("photo_path IS NOT NULL AND photo_path != ''")
+    elif args.get('has_photo') == 'no':
+        conditions.append("(photo_path IS NULL OR photo_path = '')")
+    if args.get('has_document') == 'yes':
+        conditions.append("document_path IS NOT NULL AND document_path != ''")
+    elif args.get('has_document') == 'no':
+        conditions.append("(document_path IS NULL OR document_path = '')")
+    if args.get('digital_evidence_type'):
+        conditions.append("digital_evidence_type = ?")
+        params.append(args['digital_evidence_type'])
     if args.get('has_special_needs') == '1':
         conditions.append("has_special_needs = 1")
     if args.get('chronic') == 'yes':
@@ -1447,8 +1466,13 @@ def build_pdf_filter_conditions(args):
         conditions.append("has_diabetes = 1")
     if args.get('has_conflicting_info') == '1':
         conditions.append("has_conflicting_info = 1")
+    if args.get('breadwinner'):
+        conditions.append("breadwinner LIKE ?")
+        params.append(f"%{args['breadwinner']}%")
     if args.get('is_registered') == '1':
         conditions.append("is_officially_registered = 1")
+    elif args.get('is_registered') == '0':
+        conditions.append("(is_officially_registered = 0 OR is_officially_registered IS NULL)")
     if args.get('has_legal') == 'yes':
         conditions.append("legal = 'نعم'")
     if args.get('has_assoc') == 'yes':
@@ -1531,6 +1555,8 @@ def build_pdf_filter_conditions(args):
         params.append(min_birth_year)
     if args.get('has_guardian') == 'yes':
         conditions.append("guardian_name IS NOT NULL AND guardian_name != ''")
+    elif args.get('has_guardian') == 'no':
+        conditions.append("(guardian_name IS NULL OR guardian_name = '')")
     if args.get('digital_evidence_url_status'):
         conditions.append("digital_evidence_url_status = ?")
         params.append(args['digital_evidence_url_status'])

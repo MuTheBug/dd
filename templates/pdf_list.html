@@ -5,93 +5,226 @@
 <style>
 @page {
     size: A4 landscape;
-    margin: 1.2cm;
+    margin: 1cm 1.2cm;
     @top-center {
-        content: "حقنا - تقرير السجلات";
-        font-size: 10pt;
-        color: #999;
+        content: "حقنا — تقرير السجلات";
+        font-size: 11pt;
+        color: #8a9bb5;
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     }
     @bottom-center {
         content: "صفحة " counter(page) " من " counter(pages);
-        font-size: 10pt;
-        color: #999;
+        font-size: 11pt;
+        color: #8a9bb5;
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
     font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-    font-size: 12pt;
-    line-height: 1.5;
+    font-size: 13pt;
+    line-height: 1.6;
     color: #1a1a2e;
     direction: rtl;
 }
 
+/* ── Header ───────────────────────────────────── */
 .header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    border-bottom: 3px solid #1e3a5f;
-    padding-bottom: 10px;
-    margin-bottom: 14px;
+    gap: 16px;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+    border-bottom: 4px solid #1e3a5f;
+    position: relative;
 }
-.logo { width: 50px; height: 50px; border-radius: 50%; }
-.header h1 { font-size: 16pt; color: #1e3a5f; }
-.header p { font-size: 10pt; color: #666; }
-.header-meta { margin-right: auto; text-align: left; font-size: 10pt; color: #999; }
+.header::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    right: 0;
+    width: 120px;
+    height: 4px;
+    background: linear-gradient(90deg, #e67e22, #f39c12);
+    border-radius: 0 0 2px 2px;
+}
+.logo {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 3px solid #1e3a5f;
+    box-shadow: 0 2px 8px rgba(30,58,95,0.2);
+}
+.header-title h1 {
+    font-size: 22pt;
+    color: #1e3a5f;
+    letter-spacing: -0.5px;
+    margin-bottom: 2px;
+}
+.header-title p {
+    font-size: 11pt;
+    color: #7a8ba3;
+}
+.header-meta {
+    margin-right: auto;
+    text-align: left;
+    font-size: 12pt;
+    color: #7a8ba3;
+    line-height: 1.8;
+}
 
+/* ── Filters ──────────────────────────────────── */
 .filters-line {
-    background: #f0f2f5;
-    padding: 6px 10px;
-    border-radius: 4px;
-    margin-bottom: 10px;
-    font-size: 10pt;
-    color: #666;
+    background: linear-gradient(135deg, #eef2f7, #e4eaf3);
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    font-size: 12pt;
+    color: #3d5170;
+    border-right: 4px solid #e67e22;
+    font-weight: 500;
 }
 
+/* ── Summary cards ────────────────────────────── */
 .summary-bar {
     display: flex;
-    gap: 20px;
-    margin-bottom: 12px;
+    gap: 14px;
+    margin-bottom: 16px;
 }
 .summary-item {
     text-align: center;
-    padding: 6px 16px;
-    border-radius: 6px;
-    background: #f0f2f5;
-}
-.summary-item .num { font-size: 16pt; font-weight: bold; }
-.summary-item .lbl { font-size: 9pt; color: #666; }
-.summary-item.s-total .num { color: #1e3a5f; }
-.summary-item.s-surv .num { color: #27ae60; }
-.summary-item.s-enf .num { color: #e67e22; }
-.summary-item.s-dec .num { color: #dc2626; }
-
-table { width: 100%; border-collapse: collapse; font-size: 11pt; }
-thead { background: #1e3a5f; color: white; }
-th { padding: 6px 8px; text-align: right; font-weight: 600; font-size: 10pt; }
-td { padding: 5px 8px; border-bottom: 1px solid #eee; }
-tr:nth-child(even) { background: #fafafa; }
-
-.badge {
-    display: inline-block;
-    padding: 2px 8px;
+    padding: 10px 24px;
     border-radius: 10px;
-    font-size: 9pt;
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+.summary-item::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+}
+.summary-item .num {
+    font-size: 22pt;
+    font-weight: 800;
+    display: block;
+    margin-bottom: 2px;
+}
+.summary-item .lbl {
+    font-size: 11pt;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.s-total {
+    background: linear-gradient(135deg, #eef2f7, #dce4ef);
+}
+.s-total::before { background: #1e3a5f; }
+.s-total .num { color: #1e3a5f; }
+.s-total .lbl { color: #4a6a8a; }
+
+.s-surv {
+    background: linear-gradient(135deg, #e8f8f0, #d0f0df);
+}
+.s-surv::before { background: #27ae60; }
+.s-surv .num { color: #1e8449; }
+.s-surv .lbl { color: #27ae60; }
+
+.s-enf {
+    background: linear-gradient(135deg, #fef5e7, #fdebd0);
+}
+.s-enf::before { background: #e67e22; }
+.s-enf .num { color: #ca6f1e; }
+.s-enf .lbl { color: #e67e22; }
+
+.s-dec {
+    background: linear-gradient(135deg, #fdedee, #fadbd8);
+}
+.s-dec::before { background: #dc2626; }
+.s-dec .num { color: #b71c1c; }
+.s-dec .lbl { color: #dc2626; }
+
+/* ── Table ────────────────────────────────────── */
+table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12pt;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 6px rgba(30,58,95,0.08);
+}
+thead {
+    background: linear-gradient(135deg, #1e3a5f, #2c5282);
     color: white;
 }
-.badge-survivor { background: #27ae60; }
-.badge-enforced { background: #e67e22; }
-.badge-deceased { background: #dc2626; }
+th {
+    padding: 10px 10px;
+    text-align: right;
+    font-weight: 700;
+    font-size: 12pt;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e8ecf1;
+    font-size: 12pt;
+    vertical-align: top;
+}
+tr:nth-child(even) {
+    background: #f7f9fc;
+}
+tr:nth-child(odd) {
+    background: #ffffff;
+}
+tr:hover {
+    background: #eef3fa;
+}
+tbody tr:last-child td {
+    border-bottom: none;
+}
 
-.footer-note {
-    margin-top: 14px;
-    padding-top: 8px;
-    border-top: 1px solid #ddd;
-    font-size: 9pt;
-    color: #999;
+/* ── Badges ───────────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 12px;
+    font-size: 11pt;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 0.3px;
+}
+.badge-survivor { background: linear-gradient(135deg, #27ae60, #2ecc71); }
+.badge-enforced { background: linear-gradient(135deg, #d35400, #e67e22); }
+.badge-deceased { background: linear-gradient(135deg, #b71c1c, #dc2626); }
+
+/* ── Footer sum row ───────────────────────────── */
+tfoot tr {
+    background: linear-gradient(135deg, #dce4ef, #c8d6e8) !important;
+    font-weight: 800;
+    border-top: 3px solid #1e3a5f;
+}
+tfoot td {
+    padding: 10px 10px;
+    font-size: 13pt;
     text-align: center;
+    color: #1e3a5f;
+    border-bottom: none;
+}
+
+/* ── Footer note ──────────────────────────────── */
+.footer-note {
+    margin-top: 18px;
+    padding: 12px 16px;
+    border-top: 2px solid #1e3a5f;
+    font-size: 11pt;
+    color: #7a8ba3;
+    text-align: center;
+    background: linear-gradient(135deg, #f7f9fc, #eef2f7);
+    border-radius: 0 0 8px 8px;
 }
 </style>
 </head>
@@ -101,12 +234,12 @@ tr:nth-child(even) { background: #fafafa; }
     {% if logo_b64 %}
     <img src="data:image/jpeg;base64,{{ logo_b64 }}" class="logo" alt="حقنا">
     {% endif %}
-    <div>
-        <h1>حقنا - تقرير السجلات</h1>
+    <div class="header-title">
+        <h1>حقنا — تقرير السجلات</h1>
         <p>نظام التوثيق وفق بروتوكول بيركلي للتحقيقات الرقمية مفتوحة المصدر</p>
     </div>
     <div class="header-meta">
-        عدد السجلات: {{ total }}<br>
+        عدد السجلات: <strong>{{ total }}</strong><br>
         تاريخ التقرير: {{ now() if now is defined else '' }}
     </div>
 </div>
@@ -123,28 +256,30 @@ tr:nth-child(even) { background: #fafafa; }
 
 <div class="summary-bar">
     <div class="summary-item s-total">
-        <div class="num">{{ total }}</div>
-        <div class="lbl">إجمالي</div>
+        <span class="num">{{ total }}</span>
+        <span class="lbl">إجمالي</span>
     </div>
     <div class="summary-item s-surv">
-        <div class="num">{{ survivors }}</div>
-        <div class="lbl">ناجٍ</div>
+        <span class="num">{{ survivors }}</span>
+        <span class="lbl">ناجٍ</span>
     </div>
     <div class="summary-item s-enf">
-        <div class="num">{{ enforced }}</div>
-        <div class="lbl">مغيّب</div>
+        <span class="num">{{ enforced }}</span>
+        <span class="lbl">مغيّب</span>
     </div>
     <div class="summary-item s-dec">
-        <div class="num">{{ deceased }}</div>
-        <div class="lbl">متوفى</div>
+        <span class="num">{{ deceased }}</span>
+        <span class="lbl">متوفى</span>
     </div>
 </div>
+
+{% set mt = minor_age_threshold|default(18) %}
 
 <table>
     <thead>
         <tr>
             {% for col_key, col_label in pdf_cols %}
-            <th>{{ col_label }}</th>
+            <th>{% if col_key == 'minors_summary' %}قاصرين (تحت {{ mt }}){% elif col_key == 'kids_u13_names' %}أطفال تحت {{ mt }}{% elif col_key == 'kids_u13_ages' %}أعمار تحت {{ mt }}{% else %}{{ col_label }}{% endif %}</th>
             {% endfor %}
         </tr>
     </thead>
@@ -152,7 +287,7 @@ tr:nth-child(even) { background: #fafafa; }
         {% for r in records %}
         <tr>
             {% for col_key, col_label in pdf_cols %}
-            <td style="font-size:10pt;">
+            <td>
                 {% if col_key == 'status' %}
                     {% if r.status == 'survivor' %}<span class="badge badge-survivor">ناجٍ</span>
                     {% elif r.status == 'enforced' %}<span class="badge badge-enforced">مغيّب</span>
@@ -180,25 +315,24 @@ tr:nth-child(even) { background: #fafafa; }
                     {{ r.kids_under_18_count if r.kids_under_18_count else '-' }}
                 {% elif col_key == 'children_summary' %}
                     {% set ch = r.children_data|from_json %}
-                    {% if ch %}{% for c in ch %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ 2026 - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                    {% if ch %}{% for c in ch %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ current_year - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'minors_summary' %}
                     {% set ch = r.children_data|from_json %}
                     {% set minors = [] %}
-                    {% set mt = minor_age_threshold|default(18) %}
                     {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < mt %}{% if minors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
-                    {% if minors %}{% for c in minors %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ 2026 - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                    {% if minors %}{% for c in minors %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ current_year - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'kids_u13_names' %}
                     {% set ch = r.children_data|from_json %}
-                    {% set u13 = [] %}
-                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < 13 %}{% if u13.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
-                    {% if u13 %}{% for c in u13 %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                    {% set uminors = [] %}
+                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < mt %}{% if uminors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if uminors %}{% for c in uminors %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'kids_u13_ages' %}
                     {% set ch = r.children_data|from_json %}
                     {% set ages = [] %}
-                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < 13 %}{% if ages.append(age) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < mt %}{% if ages.append(age) %}{% endif %}{% endif %}{% endfor %}{% endif %}
                     {% if ages %}{% for a in ages %}{{ a }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'first_name' %}
-                    <span style="font-weight:600;">{{ r[col_key] or '-' }}</span>
+                    <strong>{{ r[col_key] or '-' }}</strong>
                 {% else %}
                     {{ r[col_key] or '-' }}
                 {% endif %}
@@ -209,11 +343,11 @@ tr:nth-child(even) { background: #fafafa; }
     </tbody>
     {% if show_sum and col_sums %}
     <tfoot>
-        <tr style="background: #e8edf3; font-weight: bold; border-top: 2px solid #1e3a5f;">
+        <tr>
             {% for col_key, col_label in pdf_cols %}
-            <td style="padding: 5px 8px; font-size: 10pt; text-align: center; color: #1e3a5f;">
-                {% if loop.first and col_key not in col_sums %}&#x2211;{% endif %}
-                {% if col_key in col_sums %}{{ col_sums[col_key] }}{% elif not loop.first %}-{% endif %}
+            <td>
+                {% if loop.first and col_key not in col_sums %}<strong>&#x2211;</strong>{% endif %}
+                {% if col_key in col_sums %}<strong>{{ col_sums[col_key] }}</strong>{% elif not loop.first %}-{% endif %}
             </td>
             {% endfor %}
         </tr>

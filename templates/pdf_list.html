@@ -264,17 +264,17 @@ tfoot td {
                 {% elif col_key == 'minors_summary' %}
                     {% set ch = r.children_data|from_json %}
                     {% set minors = [] %}
-                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < mt %}{% if minors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if ch %}{% for c in ch %}{% if c.birth_year and (current_year - c.birth_year|int) < mt %}{% if minors.append(c) %}{% endif %}{% elif c.age and c.age|int < mt %}{% if minors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
                     {% if minors %}{% for c in minors %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ current_year - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'kids_u13_names' %}
                     {% set ch = r.children_data|from_json %}
                     {% set uminors = [] %}
-                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < mt %}{% if uminors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if ch %}{% for c in ch %}{% if c.birth_year and (current_year - c.birth_year|int) < mt %}{% if uminors.append(c) %}{% endif %}{% elif c.age and c.age|int < mt %}{% if uminors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
                     {% if uminors %}{% for c in uminors %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'kids_u13_ages' %}
                     {% set ch = r.children_data|from_json %}
                     {% set ages = [] %}
-                    {% if ch %}{% for c in ch %}{% set age = none %}{% if c.birth_year %}{% set age = current_year - c.birth_year|int %}{% elif c.age %}{% set age = c.age|int %}{% endif %}{% if age is not none and age < mt %}{% if ages.append(age) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if ch %}{% for c in ch %}{% if c.birth_year and (current_year - c.birth_year|int) < mt %}{% if ages.append(current_year - c.birth_year|int) %}{% endif %}{% elif c.age and c.age|int < mt %}{% if ages.append(c.age|int) %}{% endif %}{% endif %}{% endfor %}{% endif %}
                     {% if ages %}{% for a in ages %}{{ a }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
                 {% elif col_key == 'first_name' %}
                     <strong>{{ r[col_key] or '-' }}</strong>

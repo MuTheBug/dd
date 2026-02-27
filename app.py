@@ -1699,7 +1699,8 @@ def records_list_pdf():
         records=records, logo_b64=logo_b64, filter_desc=filter_desc,
         total=len(records), pdf_cols=pdf_cols, selected_cols=selected_cols,
         show_sum=show_sum, col_sums=col_sums,
-        current_year=datetime.now().year)
+        current_year=datetime.now().year,
+        minor_age_threshold=pdf_minor_threshold)
 
     from weasyprint import HTML
     pdf_bytes = HTML(string=html, base_url=BASE_DIR).write_pdf()
@@ -1774,7 +1775,7 @@ def api_stats():
     })
 
 
-def serialize_record_for_picker(r):
+def serialize_record_for_picker(r, minor_threshold=18):
     """Serialize a database row to a dict with all PDF column values."""
     col_keys = [k for k, _ in PDF_COLUMNS]
     current_year = datetime.now().year
@@ -1818,7 +1819,7 @@ def serialize_record_for_picker(r):
                     elif c.get('age'):
                         try: age = int(c['age'])
                         except: pass
-                    if age is not None and age < 18:
+                    if age is not None and age < minor_threshold:
                         name = c.get('name', '')
                         if c.get('birth_year'):
                             parts.append(f"{name}({c['birth_year']})")
@@ -1915,7 +1916,15 @@ def api_filtered_record_ids():
         age_to = int(request.args['kids_age_to']) if request.args.get('kids_age_to') else None
         rows = [r for r in rows if record_has_child_in_age_range(r, age_from, age_to)]
 
-    return jsonify([serialize_record_for_picker(r) for r in rows])
+    # Post-filter for custom minor age threshold
+    api_minor_threshold = int(request.args['minor_age_threshold']) if request.args.get('minor_age_threshold') else 18
+    if request.args.get('has_kids_under_18') in ('yes', 'no') and api_minor_threshold != 18:
+        if request.args['has_kids_under_18'] == 'yes':
+            rows = [r for r in rows if record_has_child_in_age_range(r, 0, api_minor_threshold - 1)]
+        else:
+            rows = [r for r in rows if not record_has_child_in_age_range(r, 0, api_minor_threshold - 1)]
+
+    return jsonify([serialize_record_for_picker(r, minor_threshold=api_minor_threshold) for r in rows])
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}المتطوعون - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+        المتطوعون والمنتسبون
+        <span style="font-size: 0.95rem; color: var(--text-light);">({{ total }} متطوع — {{ active_count }} نشط)</span>
+    </h1>
+    <a href="{{ url_for('admin_volunteer_add') }}" class="btn btn-primary btn-sm">+ إضافة متطوع</a>
+</div>
+
+<!-- Filter Bar -->
+<div class="card" style="padding: 0.75rem 1rem; margin-bottom: 1rem;">
+    <form method="GET" action="{{ url_for('admin_volunteers') }}" style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: end;">
+        <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 180px;">
+            <label style="font-size: 0.82rem;">بحث</label>
+            <input type="text" name="search" value="{{ filters.search }}" placeholder="اسم، هاتف، رقم وطني..." style="font-size: 0.9rem;">
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width: 130px;">
+            <label style="font-size: 0.82rem;">الحالة</label>
+            <select name="status" style="font-size: 0.9rem;">
+                <option value="">الكل</option>
+                {% for code, label in VOLUNTEER_STATUSES %}
+                <option value="{{ code }}" {{ 'selected' if filters.status==code }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width: 130px;">
+            <label style="font-size: 0.82rem;">الدور</label>
+            <select name="role" style="font-size: 0.9rem;">
+                <option value="">الكل</option>
+                {% for r in VOLUNTEER_ROLES %}
+                <option value="{{ r }}" {{ 'selected' if filters.role==r }}>{{ r }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display: flex; gap: 0.4rem;">
+            <button type="submit" class="btn btn-primary btn-sm">تصفية</button>
+            <a href="{{ url_for('admin_volunteers') }}" class="btn btn-outline btn-sm">مسح</a>
+        </div>
+    </form>
+</div>
+
+<!-- Volunteers Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>الاسم الكامل</th>
+                    <th>الهاتف</th>
+                    <th>المحافظة</th>
+                    <th>الدور</th>
+                    <th>التخصص</th>
+                    <th>تاريخ الانضمام</th>
+                    <th>الحالة</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in volunteers %}
+                <tr>
+                    <td>{{ v.id }}</td>
+                    <td style="font-weight: 600;">{{ v.full_name }}</td>
+                    <td dir="ltr" style="text-align: right;">{{ v.phone or '-' }}</td>
+                    <td>{{ v.province or '-' }}</td>
+                    <td>{{ v.role or '-' }}</td>
+                    <td>{{ v.specialization or '-' }}</td>
+                    <td>{{ v.join_date or '-' }}</td>
+                    <td>
+                        {% if v.status == 'active' %}
+                        <span class="status-badge status-survivor">نشط</span>
+                        {% elif v.status == 'inactive' %}
+                        <span class="status-badge" style="background: #eee; color: #666;">غير نشط</span>
+                        {% elif v.status == 'suspended' %}
+                        <span class="status-badge status-enforced">معلّق</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group" style="flex-wrap: nowrap;">
+                            <a href="{{ url_for('admin_volunteer_edit', vid=v.id) }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
+                            <form method="POST" action="{{ url_for('admin_volunteer_delete', vid=v.id) }}" style="display:inline;" onsubmit="return confirm('هل تريد حذف هذا المتطوع؟')">
+                                <button type="submit" class="btn btn-danger btn-sm" title="حذف">&#x1F5D1;</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                        لا يوجد متطوعون مسجلون
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

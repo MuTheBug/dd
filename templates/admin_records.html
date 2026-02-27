@@ -301,6 +301,16 @@
                     </select>
                 </div>
 
+                <div class="form-group">
+                    <label>جامع البيانات</label>
+                    <select name="collector_name">
+                        <option value="">الكل</option>
+                        {% for vname in volunteer_names %}
+                        <option value="{{ vname }}" {{ 'selected' if filters.collector_name==vname }}>{{ vname }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
                 <!-- Children Search -->
                 <div class="form-group">
                     <label>&#x1F476; بحث باسم طفل</label>
@@ -541,6 +551,9 @@
         {% endif %}
         {% if filters.reporter_relation %}
         <span class="filter-tag">صلة المبلغ: {{ filters.reporter_relation }}</span>
+        {% endif %}
+        {% if filters.collector_name %}
+        <span class="filter-tag">جامع البيانات: {{ filters.collector_name }}</span>
         {% endif %}
         {% if filters.spouse_search %}
         <span class="filter-tag">زوج/ة: {{ filters.spouse_search }}</span>

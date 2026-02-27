@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}{{ 'تعديل متطوع' if volunteer else 'إضافة متطوع' }} - حقنا{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark); margin-bottom: 1rem;">
+        {{ 'تعديل بيانات المتطوع' if volunteer else 'إضافة متطوع جديد' }}
+    </h1>
+
+    <form method="POST" class="card" style="padding: 1.5rem;">
+        <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+
+            <div class="form-group">
+                <label>الاسم الكامل <span style="color: var(--deceased);">*</span></label>
+                <input type="text" name="full_name" value="{{ volunteer.full_name if volunteer else '' }}" required placeholder="الاسم الثلاثي">
+            </div>
+
+            <div class="form-group">
+                <label>رقم الهاتف</label>
+                <input type="text" name="phone" value="{{ volunteer.phone if volunteer else '' }}" placeholder="رقم الهاتف" dir="ltr">
+            </div>
+
+            <div class="form-group">
+                <label>البريد الإلكتروني</label>
+                <input type="email" name="email" value="{{ volunteer.email if volunteer else '' }}" placeholder="email@example.com" dir="ltr">
+            </div>
+
+            <div class="form-group">
+                <label>الرقم الوطني</label>
+                <input type="text" name="national_id" value="{{ volunteer.national_id if volunteer else '' }}" placeholder="الرقم الوطني" dir="ltr">
+            </div>
+
+            <div class="form-group">
+                <label>المحافظة</label>
+                <select name="province">
+                    <option value="">-- اختر --</option>
+                    {% for p in PROVINCES %}
+                    <option value="{{ p }}" {{ 'selected' if volunteer and volunteer.province==p }}>{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>العنوان</label>
+                <input type="text" name="address" value="{{ volunteer.address if volunteer else '' }}" placeholder="العنوان التفصيلي">
+            </div>
+
+            <div class="form-group">
+                <label>الدور / الوظيفة</label>
+                <select name="role">
+                    <option value="">-- اختر --</option>
+                    {% for r in VOLUNTEER_ROLES %}
+                    <option value="{{ r }}" {{ 'selected' if volunteer and volunteer.role==r }}>{{ r }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>التخصص</label>
+                <input type="text" name="specialization" value="{{ volunteer.specialization if volunteer else '' }}" placeholder="مثال: حقوق، طب، إعلام...">
+            </div>
+
+            <div class="form-group">
+                <label>تاريخ الانضمام</label>
+                <input type="date" name="join_date" value="{{ volunteer.join_date if volunteer else '' }}">
+            </div>
+
+            <div class="form-group">
+                <label>الحالة</label>
+                <select name="status">
+                    {% for code, label in VOLUNTEER_STATUSES %}
+                    <option value="{{ code }}" {{ 'selected' if volunteer and volunteer.status==code }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 1rem;">
+            <label>ملاحظات</label>
+            <textarea name="notes" rows="3" placeholder="أي ملاحظات إضافية...">{{ volunteer.notes if volunteer else '' }}</textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">{{ 'حفظ التعديلات' if volunteer else 'إضافة المتطوع' }}</button>
+            <a href="{{ url_for('admin_volunteers') }}" class="btn btn-outline">إلغاء</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

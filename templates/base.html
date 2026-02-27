@@ -27,6 +27,7 @@
                 {% if session.get('is_admin') %}
                 <a href="{{ url_for('admin_dashboard') }}">لوحة التحكم</a>
                 <a href="{{ url_for('admin_records') }}">السجلات</a>
+                <a href="{{ url_for('admin_volunteers') }}">المتطوعون</a>
                 <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
                 {% else %}
                 <a href="{{ url_for('admin_login') }}">دخول الإدارة</a>

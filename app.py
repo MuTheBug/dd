@@ -406,8 +406,41 @@ def migrate_db():
             except sqlite3.OperationalError:
                 pass
 
+    # -- Volunteers table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS volunteers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            phone TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            national_id TEXT DEFAULT '',
+            province TEXT DEFAULT '',
+            address TEXT DEFAULT '',
+            role TEXT DEFAULT '',
+            specialization TEXT DEFAULT '',
+            join_date TEXT DEFAULT '',
+            status TEXT DEFAULT 'active',
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
+
     conn.commit()
     conn.close()
+
+
+# Volunteer statuses
+VOLUNTEER_STATUSES = [
+    ('active', 'نشط'),
+    ('inactive', 'غير نشط'),
+    ('suspended', 'معلّق'),
+]
+
+VOLUNTEER_ROLES = [
+    'جامع بيانات', 'محقق ميداني', 'مدقق معلومات', 'مترجم',
+    'دعم نفسي', 'مستشار قانوني', 'إداري', 'متطوع عام', 'أخرى'
+]
 
 
 # ---------------------------------------------------------------------------
@@ -472,6 +505,8 @@ def inject_constants():
         'REPORTER_RELATIONS': REPORTER_RELATIONS,
         'PDF_COLUMNS': PDF_COLUMNS,
         'DEFAULT_PDF_COLS': DEFAULT_PDF_COLS,
+        'VOLUNTEER_STATUSES': VOLUNTEER_STATUSES,
+        'VOLUNTEER_ROLES': VOLUNTEER_ROLES,
     }
 
 
@@ -512,7 +547,11 @@ def index():
 
 @app.route('/entry', methods=['GET'])
 def entry_form():
-    return render_template('entry.html')
+    db = get_db()
+    volunteer_names = db.execute(
+        "SELECT DISTINCT full_name FROM volunteers WHERE status='active' ORDER BY full_name"
+    ).fetchall()
+    return render_template('entry.html', volunteer_names=[v['full_name'] for v in volunteer_names])
 
 
 @app.route('/entry', methods=['POST'])
@@ -844,6 +883,7 @@ def admin_records():
         'digital_evidence_url_status': request.args.get('digital_evidence_url_status', ''),
         'kids_age_from': request.args.get('kids_age_from', ''),
         'kids_age_to': request.args.get('kids_age_to', ''),
+        'collector_name': request.args.get('collector_name', ''),
     }
 
     if status_list:
@@ -1062,6 +1102,9 @@ def admin_records():
     if filters['digital_evidence_url_status']:
         conditions.append("digital_evidence_url_status = ?")
         params.append(filters['digital_evidence_url_status'])
+    if filters['collector_name']:
+        conditions.append("collector_name = ?")
+        params.append(filters['collector_name'])
     if filters['search']:
         search_term = f"%{filters['search']}%"
         conditions.append("""(
@@ -1129,10 +1172,16 @@ def admin_records():
     else:
         filter_params.pop('status', None)
 
+    # Fetch active volunteers for collector_name filter dropdown
+    volunteer_names = db.execute(
+        "SELECT DISTINCT full_name FROM volunteers WHERE status='active' ORDER BY full_name"
+    ).fetchall()
+
     return render_template('admin_records.html',
         records=records, filters=filters, page=page,
         per_page=per_page, total_pages=total_pages, total_count=count,
-        sort_by=sort_by, sort_dir=sort_dir, filter_params=filter_params
+        sort_by=sort_by, sort_dir=sort_dir, filter_params=filter_params,
+        volunteer_names=[v['full_name'] for v in volunteer_names]
     )
 
 
@@ -1317,7 +1366,11 @@ def admin_record_edit(record_id):
         flash('تم تحديث السجل بنجاح', 'success')
         return redirect(url_for('admin_record_detail', record_id=record_id))
 
-    return render_template('admin_record_edit.html', record=record)
+    volunteer_names = db.execute(
+        "SELECT DISTINCT full_name FROM volunteers WHERE status='active' ORDER BY full_name"
+    ).fetchall()
+    return render_template('admin_record_edit.html', record=record,
+                           volunteer_names=[v['full_name'] for v in volunteer_names])
 
 
 @app.route('/admin/record/<int:record_id>/delete', methods=['POST'])
@@ -1580,6 +1633,9 @@ def build_pdf_filter_conditions(args):
     if args.get('digital_evidence_url_status'):
         conditions.append("digital_evidence_url_status = ?")
         params.append(args['digital_evidence_url_status'])
+    if args.get('collector_name'):
+        conditions.append("collector_name = ?")
+        params.append(args['collector_name'])
 
     return conditions, params, pdf_status_list
 
@@ -1950,6 +2006,128 @@ def api_filtered_record_ids():
             rows = [r for r in rows if not record_has_child_in_age_range(r, 0, api_minor_threshold - 1)]
 
     return jsonify([serialize_record_for_picker(r, minor_threshold=api_minor_threshold) for r in rows])
+
+
+# ---------------------------------------------------------------------------
+# Volunteers management
+# ---------------------------------------------------------------------------
+@app.route('/admin/volunteers')
+@admin_required
+def admin_volunteers():
+    db = get_db()
+    search = request.args.get('search', '').strip()
+    status_filter = request.args.get('status', '')
+    role_filter = request.args.get('role', '')
+
+    where = []
+    params = []
+    if search:
+        where.append("(full_name LIKE ? OR phone LIKE ? OR national_id LIKE ? OR specialization LIKE ?)")
+        params.extend([f'%{search}%'] * 4)
+    if status_filter:
+        where.append("status = ?")
+        params.append(status_filter)
+    if role_filter:
+        where.append("role = ?")
+        params.append(role_filter)
+
+    where_clause = " AND ".join(where) if where else "1=1"
+    volunteers = db.execute(
+        f"SELECT * FROM volunteers WHERE {where_clause} ORDER BY created_at DESC", params
+    ).fetchall()
+
+    total = db.execute("SELECT COUNT(*) FROM volunteers").fetchone()[0]
+    active = db.execute("SELECT COUNT(*) FROM volunteers WHERE status='active'").fetchone()[0]
+
+    return render_template('admin_volunteers.html',
+                           volunteers=volunteers,
+                           total=total,
+                           active_count=active,
+                           filters={'search': search, 'status': status_filter, 'role': role_filter})
+
+
+@app.route('/admin/volunteer/add', methods=['GET', 'POST'])
+@admin_required
+def admin_volunteer_add():
+    if request.method == 'POST':
+        db = get_db()
+        db.execute("""
+            INSERT INTO volunteers (full_name, phone, email, national_id, province,
+                                    address, role, specialization, join_date, status, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            request.form.get('full_name', '').strip(),
+            request.form.get('phone', '').strip(),
+            request.form.get('email', '').strip(),
+            request.form.get('national_id', '').strip(),
+            request.form.get('province', ''),
+            request.form.get('address', '').strip(),
+            request.form.get('role', ''),
+            request.form.get('specialization', '').strip(),
+            request.form.get('join_date', ''),
+            request.form.get('status', 'active'),
+            request.form.get('notes', '').strip(),
+        ))
+        db.commit()
+        flash('تم إضافة المتطوع بنجاح', 'success')
+        return redirect(url_for('admin_volunteers'))
+    return render_template('admin_volunteer_form.html', volunteer=None)
+
+
+@app.route('/admin/volunteer/<int:vid>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_volunteer_edit(vid):
+    db = get_db()
+    volunteer = db.execute("SELECT * FROM volunteers WHERE id=?", (vid,)).fetchone()
+    if not volunteer:
+        flash('المتطوع غير موجود', 'error')
+        return redirect(url_for('admin_volunteers'))
+
+    if request.method == 'POST':
+        db.execute("""
+            UPDATE volunteers SET full_name=?, phone=?, email=?, national_id=?, province=?,
+                                  address=?, role=?, specialization=?, join_date=?, status=?,
+                                  notes=?, updated_at=datetime('now','localtime')
+            WHERE id=?
+        """, (
+            request.form.get('full_name', '').strip(),
+            request.form.get('phone', '').strip(),
+            request.form.get('email', '').strip(),
+            request.form.get('national_id', '').strip(),
+            request.form.get('province', ''),
+            request.form.get('address', '').strip(),
+            request.form.get('role', ''),
+            request.form.get('specialization', '').strip(),
+            request.form.get('join_date', ''),
+            request.form.get('status', 'active'),
+            request.form.get('notes', '').strip(),
+            vid,
+        ))
+        db.commit()
+        flash('تم تعديل بيانات المتطوع بنجاح', 'success')
+        return redirect(url_for('admin_volunteers'))
+    return render_template('admin_volunteer_form.html', volunteer=volunteer)
+
+
+@app.route('/admin/volunteer/<int:vid>/delete', methods=['POST'])
+@admin_required
+def admin_volunteer_delete(vid):
+    db = get_db()
+    db.execute("DELETE FROM volunteers WHERE id=?", (vid,))
+    db.commit()
+    flash('تم حذف المتطوع', 'success')
+    return redirect(url_for('admin_volunteers'))
+
+
+@app.route('/api/volunteers')
+@admin_required
+def api_volunteers_list():
+    """API endpoint returning active volunteer names for filter dropdowns."""
+    db = get_db()
+    vols = db.execute(
+        "SELECT id, full_name, role FROM volunteers WHERE status='active' ORDER BY full_name"
+    ).fetchall()
+    return jsonify([{'id': v['id'], 'name': v['full_name'], 'role': v['role']} for v in vols])
 
 
 # ---------------------------------------------------------------------------

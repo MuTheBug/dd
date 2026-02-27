@@ -238,7 +238,12 @@
             </div>
             <div class="form-group">
                 <label>اسم جامع البيانات</label>
-                <input type="text" name="collector_name" placeholder="اسم الموظف/المتطوع">
+                <input type="text" name="collector_name" placeholder="اسم الموظف/المتطوع" list="volunteer_list">
+                <datalist id="volunteer_list">
+                    {% for vname in volunteer_names %}
+                    <option value="{{ vname }}">
+                    {% endfor %}
+                </datalist>
             </div>
             <div class="form-group">
                 <label>تاريخ جمع البيانات</label>

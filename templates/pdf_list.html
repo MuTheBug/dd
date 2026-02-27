@@ -5,17 +5,23 @@
 <style>
 @page {
     size: A4 landscape;
-    margin: 1cm 1.2cm;
+    margin: 0.9cm 1cm;
     @top-center {
         content: "حقنا — تقرير السجلات";
-        font-size: 11pt;
-        color: #8a9bb5;
+        font-size: 9pt;
+        color: #a0aec0;
         font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     }
-    @bottom-center {
+    @bottom-left {
         content: "صفحة " counter(page) " من " counter(pages);
-        font-size: 11pt;
-        color: #8a9bb5;
+        font-size: 9pt;
+        color: #a0aec0;
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    }
+    @bottom-right {
+        content: "سري — لا يُنشر بدون إذن";
+        font-size: 8pt;
+        color: #cbd5e0;
         font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     }
 }
@@ -24,257 +30,196 @@
 body {
     font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     font-size: 13pt;
-    line-height: 1.6;
-    color: #1a1a2e;
+    line-height: 1.5;
+    color: #2d3748;
     direction: rtl;
 }
 
 /* ── Header ───────────────────────────────────── */
-.header {
+.header-band {
+    background: #1a365d;
+    color: white;
+    padding: 14px 20px;
+    margin: -0.9cm -1cm 0 -1cm;
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding-bottom: 14px;
-    margin-bottom: 16px;
-    border-bottom: 4px solid #1e3a5f;
-    position: relative;
-}
-.header::after {
-    content: '';
-    position: absolute;
-    bottom: -4px;
-    right: 0;
-    width: 120px;
-    height: 4px;
-    background: linear-gradient(90deg, #e67e22, #f39c12);
-    border-radius: 0 0 2px 2px;
+    gap: 14px;
 }
 .logo {
-    width: 60px;
-    height: 60px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    border: 3px solid #1e3a5f;
-    box-shadow: 0 2px 8px rgba(30,58,95,0.2);
+    border: 2px solid rgba(255,255,255,0.5);
 }
-.header-title h1 {
-    font-size: 22pt;
-    color: #1e3a5f;
-    letter-spacing: -0.5px;
-    margin-bottom: 2px;
+.header-band h1 {
+    font-size: 20pt;
+    font-weight: 800;
+    letter-spacing: -0.3px;
 }
-.header-title p {
-    font-size: 11pt;
-    color: #7a8ba3;
+.header-band .subtitle {
+    font-size: 9pt;
+    color: rgba(255,255,255,0.7);
+    margin-top: 1px;
 }
-.header-meta {
+.header-band .meta {
     margin-right: auto;
     text-align: left;
-    font-size: 12pt;
-    color: #7a8ba3;
-    line-height: 1.8;
+    font-size: 10pt;
+    color: rgba(255,255,255,0.8);
+    line-height: 1.6;
 }
+
+/* ── Compact summary strip ────────────────────── */
+.summary-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 10pt;
+}
+.stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 10pt;
+}
+.stat .n { font-size: 12pt; font-weight: 800; }
+.stat-total { background: #edf2f7; color: #1a365d; }
+.stat-surv  { background: #c6f6d5; color: #22543d; }
+.stat-enf   { background: #feebc8; color: #7b341e; }
+.stat-dec   { background: #fed7d7; color: #822727; }
+.stat-sep   { color: #cbd5e0; font-size: 8pt; }
 
 /* ── Filters ──────────────────────────────────── */
 .filters-line {
-    background: linear-gradient(135deg, #eef2f7, #e4eaf3);
-    padding: 10px 16px;
-    border-radius: 8px;
-    margin-bottom: 14px;
-    font-size: 12pt;
-    color: #3d5170;
-    border-right: 4px solid #e67e22;
-    font-weight: 500;
+    background: #fffbeb;
+    padding: 6px 12px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    font-size: 10pt;
+    color: #744210;
+    border: 1px solid #fbd38d;
 }
-
-/* ── Summary cards ────────────────────────────── */
-.summary-bar {
-    display: flex;
-    gap: 14px;
-    margin-bottom: 16px;
-}
-.summary-item {
-    text-align: center;
-    padding: 10px 24px;
-    border-radius: 10px;
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-}
-.summary-item::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 4px;
-}
-.summary-item .num {
-    font-size: 22pt;
-    font-weight: 800;
-    display: block;
-    margin-bottom: 2px;
-}
-.summary-item .lbl {
-    font-size: 11pt;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-.s-total {
-    background: linear-gradient(135deg, #eef2f7, #dce4ef);
-}
-.s-total::before { background: #1e3a5f; }
-.s-total .num { color: #1e3a5f; }
-.s-total .lbl { color: #4a6a8a; }
-
-.s-surv {
-    background: linear-gradient(135deg, #e8f8f0, #d0f0df);
-}
-.s-surv::before { background: #27ae60; }
-.s-surv .num { color: #1e8449; }
-.s-surv .lbl { color: #27ae60; }
-
-.s-enf {
-    background: linear-gradient(135deg, #fef5e7, #fdebd0);
-}
-.s-enf::before { background: #e67e22; }
-.s-enf .num { color: #ca6f1e; }
-.s-enf .lbl { color: #e67e22; }
-
-.s-dec {
-    background: linear-gradient(135deg, #fdedee, #fadbd8);
-}
-.s-dec::before { background: #dc2626; }
-.s-dec .num { color: #b71c1c; }
-.s-dec .lbl { color: #dc2626; }
 
 /* ── Table ────────────────────────────────────── */
 table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
+    border-collapse: collapse;
     font-size: 12pt;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 1px 6px rgba(30,58,95,0.08);
 }
-thead {
-    background: linear-gradient(135deg, #1e3a5f, #2c5282);
-    color: white;
+thead tr {
+    background: #1a365d;
 }
 th {
-    padding: 10px 10px;
+    padding: 8px 8px;
     text-align: right;
     font-weight: 700;
-    font-size: 12pt;
-    letter-spacing: 0.3px;
+    font-size: 11pt;
+    color: #ffffff;
+    border-bottom: 3px solid #e67e22;
     white-space: nowrap;
 }
 td {
-    padding: 8px 10px;
-    border-bottom: 1px solid #e8ecf1;
+    padding: 6px 8px;
+    border-bottom: 1px solid #e2e8f0;
     font-size: 12pt;
     vertical-align: top;
+    color: #2d3748;
 }
-tr:nth-child(even) {
-    background: #f7f9fc;
-}
-tr:nth-child(odd) {
-    background: #ffffff;
-}
-tr:hover {
-    background: #eef3fa;
-}
-tbody tr:last-child td {
-    border-bottom: none;
+/* Zebra stripes */
+tbody tr:nth-child(even) { background: #f7fafc; }
+tbody tr:nth-child(odd)  { background: #ffffff; }
+/* Highlight row number & name */
+td:first-child {
+    font-weight: 700;
+    color: #4a5568;
+    text-align: center;
 }
 
-/* ── Badges ───────────────────────────────────── */
+/* ── Status badges ────────────────────────────── */
 .badge {
     display: inline-block;
-    padding: 3px 12px;
-    border-radius: 12px;
-    font-size: 11pt;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 10pt;
     font-weight: 700;
     color: white;
-    letter-spacing: 0.3px;
+    white-space: nowrap;
 }
-.badge-survivor { background: linear-gradient(135deg, #27ae60, #2ecc71); }
-.badge-enforced { background: linear-gradient(135deg, #d35400, #e67e22); }
-.badge-deceased { background: linear-gradient(135deg, #b71c1c, #dc2626); }
+.badge-survivor { background: #38a169; }
+.badge-enforced { background: #dd6b20; }
+.badge-deceased { background: #e53e3e; }
 
-/* ── Footer sum row ───────────────────────────── */
+/* ── Sum footer ───────────────────────────────── */
 tfoot tr {
-    background: linear-gradient(135deg, #dce4ef, #c8d6e8) !important;
-    font-weight: 800;
-    border-top: 3px solid #1e3a5f;
+    background: #edf2f7 !important;
 }
 tfoot td {
-    padding: 10px 10px;
-    font-size: 13pt;
+    padding: 7px 8px;
+    font-size: 12pt;
+    font-weight: 800;
     text-align: center;
-    color: #1e3a5f;
+    color: #1a365d;
+    border-top: 2px solid #1a365d;
     border-bottom: none;
 }
 
-/* ── Footer note ──────────────────────────────── */
+/* ── Footer ───────────────────────────────────── */
 .footer-note {
-    margin-top: 18px;
-    padding: 12px 16px;
-    border-top: 2px solid #1e3a5f;
-    font-size: 11pt;
-    color: #7a8ba3;
+    margin-top: 12px;
+    padding: 6px 0;
+    border-top: 1px solid #e2e8f0;
+    font-size: 9pt;
+    color: #a0aec0;
     text-align: center;
-    background: linear-gradient(135deg, #f7f9fc, #eef2f7);
-    border-radius: 0 0 8px 8px;
 }
 </style>
 </head>
 <body>
 
-<div class="header">
+<!-- ██ HEADER BAND ██ -->
+<div class="header-band">
     {% if logo_b64 %}
-    <img src="data:image/jpeg;base64,{{ logo_b64 }}" class="logo" alt="حقنا">
+    <img src="data:image/jpeg;base64,{{ logo_b64 }}" class="logo" alt="">
     {% endif %}
-    <div class="header-title">
-        <h1>حقنا — تقرير السجلات</h1>
-        <p>نظام التوثيق وفق بروتوكول بيركلي للتحقيقات الرقمية مفتوحة المصدر</p>
+    <div>
+        <h1>حقنا</h1>
+        <div class="subtitle">نظام التوثيق — بروتوكول بيركلي</div>
     </div>
-    <div class="header-meta">
-        عدد السجلات: <strong>{{ total }}</strong><br>
-        تاريخ التقرير: {{ now() if now is defined else '' }}
+    <div class="meta">
+        {{ total }} سجل<br>
+        {{ now() if now is defined else '' }}
     </div>
+</div>
+
+<!-- ██ COMPACT SUMMARY ██ -->
+{% set survivors = records | selectattr('status', 'equalto', 'survivor') | list | length %}
+{% set enforced_cnt = records | selectattr('status', 'equalto', 'enforced') | list | length %}
+{% set deceased_cnt = records | selectattr('status', 'equalto', 'deceased') | list | length %}
+
+<div class="summary-strip">
+    <span class="stat stat-total"><span class="n">{{ total }}</span> إجمالي</span>
+    <span class="stat-sep">|</span>
+    <span class="stat stat-surv"><span class="n">{{ survivors }}</span> ناجٍ</span>
+    <span class="stat-sep">|</span>
+    <span class="stat stat-enf"><span class="n">{{ enforced_cnt }}</span> مغيّب</span>
+    <span class="stat-sep">|</span>
+    <span class="stat stat-dec"><span class="n">{{ deceased_cnt }}</span> متوفى</span>
 </div>
 
 {% if filter_desc %}
 <div class="filters-line">
-    الفلاتر المطبقة: {{ filter_desc | join(' | ') }}
+    <strong>الفلاتر:</strong> {{ filter_desc | join(' | ') }}
 </div>
 {% endif %}
 
-{% set survivors = records | selectattr('status', 'equalto', 'survivor') | list | length %}
-{% set enforced = records | selectattr('status', 'equalto', 'enforced') | list | length %}
-{% set deceased = records | selectattr('status', 'equalto', 'deceased') | list | length %}
-
-<div class="summary-bar">
-    <div class="summary-item s-total">
-        <span class="num">{{ total }}</span>
-        <span class="lbl">إجمالي</span>
-    </div>
-    <div class="summary-item s-surv">
-        <span class="num">{{ survivors }}</span>
-        <span class="lbl">ناجٍ</span>
-    </div>
-    <div class="summary-item s-enf">
-        <span class="num">{{ enforced }}</span>
-        <span class="lbl">مغيّب</span>
-    </div>
-    <div class="summary-item s-dec">
-        <span class="num">{{ deceased }}</span>
-        <span class="lbl">متوفى</span>
-    </div>
-</div>
-
 {% set mt = minor_age_threshold|default(18) %}
 
+<!-- ██ DATA TABLE ██ -->
 <table>
     <thead>
         <tr>
@@ -356,7 +301,7 @@ tfoot td {
 </table>
 
 <div class="footer-note">
-    هذا التقرير صادر عن نظام توثيق حقنا. جميع المعلومات سرية ولا يجوز مشاركتها دون إذن مسبق.
+    هذا التقرير صادر عن نظام توثيق حقنا — جميع المعلومات سرية ولا يجوز مشاركتها دون إذن مسبق.
 </div>
 
 </body>

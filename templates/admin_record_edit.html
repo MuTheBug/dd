@@ -650,7 +650,7 @@ function addChild(data) {
         '<option value="">--</option><option value="male"' + (data.gender === 'male' ? ' selected' : '') + '>ذكر</option>' +
         '<option value="female"' + (data.gender === 'female' ? ' selected' : '') + '>أنثى</option></select></div>' +
         '<div class="form-group"><label style="font-size:0.7rem;">سنة الميلاد</label>' +
-        '<input type="number" class="child-birth-year" value="' + (data.birth_year || (data.age ? (currentYear - parseInt(data.age)) : '') || '') + '" min="1990" max="2026" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<input type="number" class="child-birth-year" value="' + (data.birth_year || data.birthYear || (data.age ? (currentYear - parseInt(data.age)) : '') || '') + '" min="1990" max="2026" style="font-size:0.8rem;padding:4px 6px;"></div>' +
         '<div class="form-group"><label style="font-size:0.7rem;">التحصيل العلمي</label>' +
         '<select class="child-education" style="font-size:0.8rem;padding:4px 6px;">' + eduOpts + '</select></div>' +
         '<div class="form-group"><label style="font-size:0.7rem;">المدرسة/الجامعة</label>' +

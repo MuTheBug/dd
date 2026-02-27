@@ -38,12 +38,31 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB per request
 
 ADMIN_PASSWORD = 'haqquna2024'
 
+def _normalize_children(children):
+    """Normalize children data: map camelCase keys to snake_case."""
+    for c in children:
+        if 'birthYear' in c and 'birth_year' not in c:
+            c['birth_year'] = c['birthYear']
+        if 'healthDetails' in c and 'health_notes' not in c:
+            c['health_notes'] = c['healthDetails']
+        if 'healthStatus' in c and 'health_notes' not in c:
+            c['health_notes'] = c.get('healthDetails', '')
+        if 'job' in c and 'employment' not in c:
+            c['employment'] = c['job']
+        if 'university' in c and 'school' not in c:
+            c['school'] = c['university']
+    return children
+
+
 # Register JSON filter for templates
 @app.template_filter('from_json')
 def from_json_filter(value):
     """Parse JSON string to Python object in templates."""
     try:
-        return json.loads(value) if value else []
+        data = json.loads(value) if value else []
+        if isinstance(data, list):
+            _normalize_children(data)
+        return data
     except (json.JSONDecodeError, TypeError):
         return []
 
@@ -268,6 +287,7 @@ def record_has_child_in_age_range(record, age_from=None, age_to=None):
     current_year = datetime.now().year
     try:
         children = json.loads(record['children_data']) if record['children_data'] else []
+        _normalize_children(children)
     except (json.JSONDecodeError, TypeError):
         return False
     if not children:
@@ -1734,6 +1754,7 @@ def export_kids_no_birthdate():
     for r in rows:
         try:
             children = json.loads(r['children_data']) if r['children_data'] else []
+            _normalize_children(children)
         except (json.JSONDecodeError, TypeError):
             continue
         # Find children with no birth_year and no age
@@ -1794,6 +1815,7 @@ def serialize_record_for_picker(r, minor_threshold=18):
             try:
                 cd = _get('children_data', '')
                 ch = json.loads(cd) if cd else []
+                _normalize_children(ch)
                 parts = []
                 for c in ch:
                     name = c.get('name', '')
@@ -1810,6 +1832,7 @@ def serialize_record_for_picker(r, minor_threshold=18):
             try:
                 cd = _get('children_data', '')
                 ch = json.loads(cd) if cd else []
+                _normalize_children(ch)
                 parts = []
                 for c in ch:
                     age = None
@@ -1834,6 +1857,7 @@ def serialize_record_for_picker(r, minor_threshold=18):
             try:
                 cd = _get('children_data', '')
                 ch = json.loads(cd) if cd else []
+                _normalize_children(ch)
                 names = []
                 for c in ch:
                     age = None
@@ -1852,6 +1876,7 @@ def serialize_record_for_picker(r, minor_threshold=18):
             try:
                 cd = _get('children_data', '')
                 ch = json.loads(cd) if cd else []
+                _normalize_children(ch)
                 ages = []
                 for c in ch:
                     age = None

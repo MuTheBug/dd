@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}مدفوعات {{ member.full_name }} - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+        مدفوعات: {{ member.full_name }}
+        <span style="font-size: 0.85rem; color: var(--text-light);">
+            ({{ member.membership_type or 'منتسب' }}{% if member.membership_number %} - رقم {{ member.membership_number }}{% endif %})
+        </span>
+    </h1>
+    <a href="{{ url_for('admin_members') }}" class="btn btn-outline btn-sm">&#x2190; العودة للمنتسبين</a>
+</div>
+
+<!-- Summary Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+    <div class="card" style="padding: 0.8rem; text-align: center;">
+        <div style="font-size: 1.3rem; font-weight: 700; color: var(--survivor);">{{ '{:,}'.format(total_paid) }}</div>
+        <div style="font-size: 0.8rem; color: var(--text-light);">ل.س مدفوع</div>
+    </div>
+    <div class="card" style="padding: 0.8rem; text-align: center;">
+        <div style="font-size: 1.3rem; font-weight: 700; color: var(--deceased);">{{ '{:,}'.format(total_due) }}</div>
+        <div style="font-size: 0.8rem; color: var(--text-light);">ل.س متبقي</div>
+    </div>
+    <div class="card" style="padding: 0.8rem; text-align: center;">
+        <div style="font-size: 1.3rem; font-weight: 700; color: var(--primary);">{{ paid_count }}</div>
+        <div style="font-size: 0.8rem; color: var(--text-light);">شهر مدفوع</div>
+    </div>
+    <div class="card" style="padding: 0.8rem; text-align: center;">
+        <div style="font-size: 1.3rem; font-weight: 700; color: var(--enforced);">{{ unpaid_count }}</div>
+        <div style="font-size: 0.8rem; color: var(--text-light);">شهر غير مدفوع</div>
+    </div>
+</div>
+
+<!-- Fee explanation -->
+<div class="card" style="padding: 0.75rem 1rem; margin-bottom: 1rem; background: var(--filter-preset-bg); border: 1px solid var(--filter-preset-border);">
+    <div style="font-size: 0.85rem; color: var(--text-light);">
+        نظام الاشتراكات: <strong>{{ '{:,}'.format(MONTHLY_FEE) }} ل.س</strong> شهرياً —
+        كل <strong>5 أشهر</strong> (عدا الشهر الأول): <strong>{{ '{:,}'.format(FIFTH_MONTH_FEE) }} ل.س</strong>
+    </div>
+</div>
+
+<!-- Generate Payments -->
+<div class="card" style="padding: 0.75rem 1rem; margin-bottom: 1rem;">
+    <form method="POST" action="{{ url_for('admin_member_generate_payments', mid=member.id) }}" style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: end;">
+        <div class="form-group" style="margin-bottom:0; min-width: 120px;">
+            <label style="font-size: 0.82rem;">عدد الأشهر</label>
+            <input type="number" name="num_months" value="12" min="1" max="60" style="font-size: 0.9rem;">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">توليد دفعات جديدة</button>
+    </form>
+</div>
+
+<!-- Payments Table -->
+{% if payments %}
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>الشهر</th>
+                    <th>المبلغ (ل.س)</th>
+                    <th>الحالة</th>
+                    <th>تاريخ الدفع</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr style="{% if p.status == 'paid' %}background: rgba(39,174,96,0.06);{% endif %}">
+                    <td style="font-weight: 600;">{{ p.period_label or ('الشهر ' ~ p.month_number) }}</td>
+                    <td>
+                        <span style="font-weight: 600; {% if p.amount == FIFTH_MONTH_FEE %}color: var(--enforced);{% endif %}">
+                            {{ '{:,}'.format(p.amount) }}
+                        </span>
+                        {% if p.amount == FIFTH_MONTH_FEE %}
+                        <span style="font-size: 0.7rem; color: var(--enforced);">(شهر خامس)</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if p.status == 'paid' %}
+                        <span class="status-badge status-survivor">مدفوع</span>
+                        {% else %}
+                        <span class="status-badge status-deceased">غير مدفوع</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ p.payment_date or '-' }}</td>
+                    <td>
+                        <div class="btn-group" style="flex-wrap: nowrap;">
+                            <form method="POST" action="{{ url_for('admin_member_toggle_payment', mid=member.id, pid=p.id) }}" style="display:inline;">
+                                {% if p.status == 'paid' %}
+                                <button type="submit" class="btn btn-outline btn-sm" title="إلغاء الدفع">&#x21A9;&#xFE0F;</button>
+                                {% else %}
+                                <button type="submit" class="btn btn-primary btn-sm" title="تسجيل الدفع" style="background: var(--survivor);">&#x2713;</button>
+                                {% endif %}
+                            </form>
+                            <form method="POST" action="{{ url_for('admin_member_delete_payment', mid=member.id, pid=p.id) }}" style="display:inline;" onsubmit="return confirm('حذف هذه الدفعة؟')">
+                                <button type="submit" class="btn btn-danger btn-sm" title="حذف">&#x1F5D1;</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" style="text-align: center; padding: 2rem; color: var(--text-light);">
+    لا توجد دفعات مسجلة. استخدم زر "توليد دفعات جديدة" لإنشاء جدول الدفعات.
+</div>
+{% endif %}
+{% endblock %}

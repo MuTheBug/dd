@@ -620,6 +620,73 @@
 </div>
 
 </form>
+
+<!-- Services Section (only shown when editing existing record) -->
+<div id="services-section" class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <div class="card-icon">&#x1F4CB;</div>
+        <h3>الخدمات المقدمة</h3>
+    </div>
+
+    {% if services %}
+    <div class="table-wrapper" style="margin-bottom: 1rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>الخدمة</th>
+                    <th>التاريخ</th>
+                    <th>الجهة المقدمة</th>
+                    <th>ملاحظات</th>
+                    <th>حذف</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in services %}
+                <tr>
+                    <td style="font-weight: 600;">{{ s.service_name }}</td>
+                    <td>{{ s.service_date or '-' }}</td>
+                    <td>{{ s.provider or '-' }}</td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ s.notes or '-' }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('admin_record_delete_service', record_id=record.id, sid=s.id) }}" style="display:inline;" onsubmit="return confirm('حذف هذه الخدمة؟')">
+                            <button type="submit" class="btn btn-danger btn-sm">&#x1F5D1;</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1rem;">لا توجد خدمات مسجلة بعد.</p>
+    {% endif %}
+
+    <!-- Add new service form -->
+    <div style="padding: 1rem; background: var(--filter-preset-bg); border-radius: 8px; border: 1px solid var(--filter-preset-border);">
+        <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem;">+ إضافة خدمة جديدة</div>
+        <form method="POST" action="{{ url_for('admin_record_add_service', record_id=record.id) }}">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.6rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem;">اسم الخدمة <span style="color: var(--deceased);">*</span></label>
+                    <input type="text" name="service_name" required placeholder="مثال: سلة غذائية، دعم نفسي..." style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem;">التاريخ</label>
+                    <input type="date" name="service_date" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem;">الجهة المقدمة</label>
+                    <input type="text" name="provider" placeholder="اسم الجمعية أو الجهة" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem;">ملاحظات</label>
+                    <input type="text" name="service_notes" placeholder="تفاصيل إضافية..." style="font-size: 0.88rem;">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 0.6rem;">إضافة الخدمة</button>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}

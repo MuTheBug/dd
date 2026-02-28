@@ -449,6 +449,36 @@ def migrate_db():
         )
     """)
 
+    # -- Member payments table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS member_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            member_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            month_number INTEGER NOT NULL,
+            period_label TEXT DEFAULT '',
+            payment_date TEXT DEFAULT '',
+            status TEXT DEFAULT 'unpaid',
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+        )
+    """)
+
+    # -- Record services table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS record_services (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id INTEGER NOT NULL,
+            service_name TEXT NOT NULL,
+            service_date TEXT DEFAULT '',
+            provider TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -1231,7 +1261,10 @@ def admin_record_detail(record_id):
     if not record:
         flash('السجل غير موجود', 'error')
         return redirect(url_for('admin_records'))
-    return render_template('admin_record_detail.html', record=record)
+    services = db.execute(
+        "SELECT * FROM record_services WHERE record_id=? ORDER BY created_at DESC", (record_id,)
+    ).fetchall()
+    return render_template('admin_record_detail.html', record=record, services=services)
 
 
 @app.route('/admin/record/<int:record_id>/edit', methods=['GET', 'POST'])
@@ -1407,8 +1440,12 @@ def admin_record_edit(record_id):
     volunteer_names = db.execute(
         "SELECT DISTINCT full_name FROM (SELECT full_name FROM volunteers WHERE status='active' UNION SELECT full_name FROM members WHERE status='active') ORDER BY full_name"
     ).fetchall()
+    services = db.execute(
+        "SELECT * FROM record_services WHERE record_id=? ORDER BY created_at DESC", (record_id,)
+    ).fetchall()
     return render_template('admin_record_edit.html', record=record,
-                           volunteer_names=[v['full_name'] for v in volunteer_names])
+                           volunteer_names=[v['full_name'] for v in volunteer_names],
+                           services=services)
 
 
 @app.route('/admin/record/<int:record_id>/delete', methods=['POST'])
@@ -2297,6 +2334,144 @@ def api_members_list():
         "SELECT id, full_name, membership_type FROM members WHERE status='active' ORDER BY full_name"
     ).fetchall()
     return jsonify([{'id': m['id'], 'name': m['full_name'], 'type': m['membership_type']} for m in mems])
+
+
+# ---------------------------------------------------------------------------
+# Member payments
+# ---------------------------------------------------------------------------
+MONTHLY_FEE = 15000       # Regular monthly fee (SYP)
+FIFTH_MONTH_FEE = 25000   # Every 5th month fee (SYP), excluding month 1
+
+
+def compute_expected_fee(month_number):
+    """Return the expected fee for a given month number.
+    Month 1 = 15000, months 5,10,15,... = 25000, rest = 15000."""
+    if month_number > 1 and month_number % 5 == 0:
+        return FIFTH_MONTH_FEE
+    return MONTHLY_FEE
+
+
+@app.route('/admin/member/<int:mid>/payments')
+@admin_required
+def admin_member_payments(mid):
+    db = get_db()
+    member = db.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
+    if not member:
+        flash('المنتسب غير موجود', 'error')
+        return redirect(url_for('admin_members'))
+
+    payments = db.execute(
+        "SELECT * FROM member_payments WHERE member_id=? ORDER BY month_number ASC", (mid,)
+    ).fetchall()
+
+    # Summary stats
+    total_paid = sum(p['amount'] for p in payments if p['status'] == 'paid')
+    total_due = sum(p['amount'] for p in payments if p['status'] == 'unpaid')
+    paid_count = sum(1 for p in payments if p['status'] == 'paid')
+    unpaid_count = sum(1 for p in payments if p['status'] == 'unpaid')
+
+    return render_template('admin_member_payments.html',
+                           member=member, payments=payments,
+                           total_paid=total_paid, total_due=total_due,
+                           paid_count=paid_count, unpaid_count=unpaid_count,
+                           MONTHLY_FEE=MONTHLY_FEE, FIFTH_MONTH_FEE=FIFTH_MONTH_FEE)
+
+
+@app.route('/admin/member/<int:mid>/payments/generate', methods=['POST'])
+@admin_required
+def admin_member_generate_payments(mid):
+    """Generate payment rows for N months starting from last recorded month."""
+    db = get_db()
+    member = db.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
+    if not member:
+        flash('المنتسب غير موجود', 'error')
+        return redirect(url_for('admin_members'))
+
+    num_months = int(request.form.get('num_months', 12))
+    if num_months < 1 or num_months > 60:
+        num_months = 12
+
+    # Find the last month_number already generated
+    last = db.execute(
+        "SELECT MAX(month_number) as mx FROM member_payments WHERE member_id=?", (mid,)
+    ).fetchone()
+    start = (last['mx'] or 0) + 1
+
+    for i in range(num_months):
+        mn = start + i
+        amount = compute_expected_fee(mn)
+        db.execute("""
+            INSERT INTO member_payments (member_id, amount, month_number, period_label, status)
+            VALUES (?, ?, ?, ?, 'unpaid')
+        """, (mid, amount, mn, f'الشهر {mn}'))
+    db.commit()
+    flash(f'تم توليد {num_months} شهر من الدفعات (من الشهر {start} إلى {start + num_months - 1})', 'success')
+    return redirect(url_for('admin_member_payments', mid=mid))
+
+
+@app.route('/admin/member/<int:mid>/payment/<int:pid>/toggle', methods=['POST'])
+@admin_required
+def admin_member_toggle_payment(mid, pid):
+    """Toggle payment status between paid/unpaid."""
+    db = get_db()
+    payment = db.execute("SELECT * FROM member_payments WHERE id=? AND member_id=?", (pid, mid)).fetchone()
+    if not payment:
+        flash('الدفعة غير موجودة', 'error')
+        return redirect(url_for('admin_member_payments', mid=mid))
+
+    new_status = 'unpaid' if payment['status'] == 'paid' else 'paid'
+    pay_date = datetime.now().strftime('%Y-%m-%d') if new_status == 'paid' else ''
+    db.execute("UPDATE member_payments SET status=?, payment_date=? WHERE id=?",
+               (new_status, pay_date, pid))
+    db.commit()
+    return redirect(url_for('admin_member_payments', mid=mid))
+
+
+@app.route('/admin/member/<int:mid>/payment/<int:pid>/delete', methods=['POST'])
+@admin_required
+def admin_member_delete_payment(mid, pid):
+    db = get_db()
+    db.execute("DELETE FROM member_payments WHERE id=? AND member_id=?", (pid, mid))
+    db.commit()
+    flash('تم حذف الدفعة', 'success')
+    return redirect(url_for('admin_member_payments', mid=mid))
+
+
+# ---------------------------------------------------------------------------
+# Record services
+# ---------------------------------------------------------------------------
+@app.route('/admin/record/<int:record_id>/service/add', methods=['POST'])
+@admin_required
+def admin_record_add_service(record_id):
+    db = get_db()
+    record = db.execute("SELECT id FROM records WHERE id=?", (record_id,)).fetchone()
+    if not record:
+        flash('السجل غير موجود', 'error')
+        return redirect(url_for('admin_records'))
+
+    db.execute("""
+        INSERT INTO record_services (record_id, service_name, service_date, provider, notes)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        record_id,
+        request.form.get('service_name', '').strip(),
+        request.form.get('service_date', ''),
+        request.form.get('provider', '').strip(),
+        request.form.get('service_notes', '').strip(),
+    ))
+    db.commit()
+    flash('تم إضافة الخدمة بنجاح', 'success')
+    return redirect(url_for('admin_record_edit', record_id=record_id) + '#services-section')
+
+
+@app.route('/admin/record/<int:record_id>/service/<int:sid>/delete', methods=['POST'])
+@admin_required
+def admin_record_delete_service(record_id, sid):
+    db = get_db()
+    db.execute("DELETE FROM record_services WHERE id=? AND record_id=?", (sid, record_id))
+    db.commit()
+    flash('تم حذف الخدمة', 'success')
+    return redirect(url_for('admin_record_edit', record_id=record_id) + '#services-section')
 
 
 # ---------------------------------------------------------------------------

@@ -84,6 +84,7 @@
                     </td>
                     <td>
                         <div class="btn-group" style="flex-wrap: nowrap;">
+                            <a href="{{ url_for('admin_member_payments', mid=m.id) }}" class="btn btn-primary btn-sm" title="المدفوعات" style="background: var(--enforced);">&#x1F4B0;</a>
                             <a href="{{ url_for('admin_member_edit', mid=m.id) }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
                             <form method="POST" action="{{ url_for('admin_member_delete', mid=m.id) }}" style="display:inline;" onsubmit="return confirm('هل تريد حذف هذا المنتسب؟')">
                                 <button type="submit" class="btn btn-danger btn-sm" title="حذف">&#x1F5D1;</button>

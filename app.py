@@ -426,6 +426,29 @@ def migrate_db():
         )
     """)
 
+    # -- Members table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            father_name TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            national_id TEXT DEFAULT '',
+            birth_year INTEGER DEFAULT 0,
+            gender TEXT DEFAULT '',
+            province TEXT DEFAULT '',
+            address TEXT DEFAULT '',
+            membership_type TEXT DEFAULT '',
+            membership_number TEXT DEFAULT '',
+            join_date TEXT DEFAULT '',
+            status TEXT DEFAULT 'active',
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -440,6 +463,19 @@ VOLUNTEER_STATUSES = [
 VOLUNTEER_ROLES = [
     'جامع بيانات', 'محقق ميداني', 'مدقق معلومات', 'مترجم',
     'دعم نفسي', 'مستشار قانوني', 'إداري', 'متطوع عام', 'أخرى'
+]
+
+# Member statuses
+MEMBER_STATUSES = [
+    ('active', 'نشط'),
+    ('inactive', 'غير نشط'),
+    ('suspended', 'معلّق'),
+    ('honorary', 'فخري'),
+]
+
+MEMBERSHIP_TYPES = [
+    'عضو مؤسس', 'عضو عامل', 'عضو منتسب', 'عضو فخري',
+    'عضو داعم', 'أخرى'
 ]
 
 
@@ -507,6 +543,8 @@ def inject_constants():
         'DEFAULT_PDF_COLS': DEFAULT_PDF_COLS,
         'VOLUNTEER_STATUSES': VOLUNTEER_STATUSES,
         'VOLUNTEER_ROLES': VOLUNTEER_ROLES,
+        'MEMBER_STATUSES': MEMBER_STATUSES,
+        'MEMBERSHIP_TYPES': MEMBERSHIP_TYPES,
     }
 
 
@@ -549,7 +587,7 @@ def index():
 def entry_form():
     db = get_db()
     volunteer_names = db.execute(
-        "SELECT DISTINCT full_name FROM volunteers WHERE status='active' ORDER BY full_name"
+        "SELECT DISTINCT full_name FROM (SELECT full_name FROM volunteers WHERE status='active' UNION SELECT full_name FROM members WHERE status='active') ORDER BY full_name"
     ).fetchall()
     return render_template('entry.html', volunteer_names=[v['full_name'] for v in volunteer_names])
 
@@ -1174,7 +1212,7 @@ def admin_records():
 
     # Fetch active volunteers for collector_name filter dropdown
     volunteer_names = db.execute(
-        "SELECT DISTINCT full_name FROM volunteers WHERE status='active' ORDER BY full_name"
+        "SELECT DISTINCT full_name FROM (SELECT full_name FROM volunteers WHERE status='active' UNION SELECT full_name FROM members WHERE status='active') ORDER BY full_name"
     ).fetchall()
 
     return render_template('admin_records.html',
@@ -1367,7 +1405,7 @@ def admin_record_edit(record_id):
         return redirect(url_for('admin_record_detail', record_id=record_id))
 
     volunteer_names = db.execute(
-        "SELECT DISTINCT full_name FROM volunteers WHERE status='active' ORDER BY full_name"
+        "SELECT DISTINCT full_name FROM (SELECT full_name FROM volunteers WHERE status='active' UNION SELECT full_name FROM members WHERE status='active') ORDER BY full_name"
     ).fetchall()
     return render_template('admin_record_edit.html', record=record,
                            volunteer_names=[v['full_name'] for v in volunteer_names])
@@ -2128,6 +2166,137 @@ def api_volunteers_list():
         "SELECT id, full_name, role FROM volunteers WHERE status='active' ORDER BY full_name"
     ).fetchall()
     return jsonify([{'id': v['id'], 'name': v['full_name'], 'role': v['role']} for v in vols])
+
+
+# ---------------------------------------------------------------------------
+# Members management
+# ---------------------------------------------------------------------------
+@app.route('/admin/members')
+@admin_required
+def admin_members():
+    db = get_db()
+    search = request.args.get('search', '').strip()
+    status_filter = request.args.get('status', '')
+    membership_type_filter = request.args.get('membership_type', '')
+
+    where = []
+    params = []
+    if search:
+        where.append("(full_name LIKE ? OR phone LIKE ? OR national_id LIKE ? OR membership_number LIKE ?)")
+        params.extend([f'%{search}%'] * 4)
+    if status_filter:
+        where.append("status = ?")
+        params.append(status_filter)
+    if membership_type_filter:
+        where.append("membership_type = ?")
+        params.append(membership_type_filter)
+
+    where_clause = " AND ".join(where) if where else "1=1"
+    members = db.execute(
+        f"SELECT * FROM members WHERE {where_clause} ORDER BY created_at DESC", params
+    ).fetchall()
+
+    total = db.execute("SELECT COUNT(*) FROM members").fetchone()[0]
+    active = db.execute("SELECT COUNT(*) FROM members WHERE status='active'").fetchone()[0]
+
+    return render_template('admin_members.html',
+                           members=members,
+                           total=total,
+                           active_count=active,
+                           filters={'search': search, 'status': status_filter,
+                                    'membership_type': membership_type_filter})
+
+
+@app.route('/admin/member/add', methods=['GET', 'POST'])
+@admin_required
+def admin_member_add():
+    if request.method == 'POST':
+        db = get_db()
+        db.execute("""
+            INSERT INTO members (full_name, father_name, phone, email, national_id,
+                                 birth_year, gender, province, address,
+                                 membership_type, membership_number, join_date, status, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            request.form.get('full_name', '').strip(),
+            request.form.get('father_name', '').strip(),
+            request.form.get('phone', '').strip(),
+            request.form.get('email', '').strip(),
+            request.form.get('national_id', '').strip(),
+            int(request.form.get('birth_year', 0) or 0),
+            request.form.get('gender', ''),
+            request.form.get('province', ''),
+            request.form.get('address', '').strip(),
+            request.form.get('membership_type', ''),
+            request.form.get('membership_number', '').strip(),
+            request.form.get('join_date', ''),
+            request.form.get('status', 'active'),
+            request.form.get('notes', '').strip(),
+        ))
+        db.commit()
+        flash('تم إضافة المنتسب بنجاح', 'success')
+        return redirect(url_for('admin_members'))
+    return render_template('admin_member_form.html', member=None)
+
+
+@app.route('/admin/member/<int:mid>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_member_edit(mid):
+    db = get_db()
+    member = db.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
+    if not member:
+        flash('المنتسب غير موجود', 'error')
+        return redirect(url_for('admin_members'))
+
+    if request.method == 'POST':
+        db.execute("""
+            UPDATE members SET full_name=?, father_name=?, phone=?, email=?, national_id=?,
+                               birth_year=?, gender=?, province=?, address=?,
+                               membership_type=?, membership_number=?, join_date=?, status=?,
+                               notes=?, updated_at=datetime('now','localtime')
+            WHERE id=?
+        """, (
+            request.form.get('full_name', '').strip(),
+            request.form.get('father_name', '').strip(),
+            request.form.get('phone', '').strip(),
+            request.form.get('email', '').strip(),
+            request.form.get('national_id', '').strip(),
+            int(request.form.get('birth_year', 0) or 0),
+            request.form.get('gender', ''),
+            request.form.get('province', ''),
+            request.form.get('address', '').strip(),
+            request.form.get('membership_type', ''),
+            request.form.get('membership_number', '').strip(),
+            request.form.get('join_date', ''),
+            request.form.get('status', 'active'),
+            request.form.get('notes', '').strip(),
+            mid,
+        ))
+        db.commit()
+        flash('تم تعديل بيانات المنتسب بنجاح', 'success')
+        return redirect(url_for('admin_members'))
+    return render_template('admin_member_form.html', member=member)
+
+
+@app.route('/admin/member/<int:mid>/delete', methods=['POST'])
+@admin_required
+def admin_member_delete(mid):
+    db = get_db()
+    db.execute("DELETE FROM members WHERE id=?", (mid,))
+    db.commit()
+    flash('تم حذف المنتسب', 'success')
+    return redirect(url_for('admin_members'))
+
+
+@app.route('/api/members')
+@admin_required
+def api_members_list():
+    """API endpoint returning active member names for filter dropdowns."""
+    db = get_db()
+    mems = db.execute(
+        "SELECT id, full_name, membership_type FROM members WHERE status='active' ORDER BY full_name"
+    ).fetchall()
+    return jsonify([{'id': m['id'], 'name': m['full_name'], 'type': m['membership_type']} for m in mems])
 
 
 # ---------------------------------------------------------------------------

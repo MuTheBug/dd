@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ 'تعديل منتسب' if member else 'إضافة منتسب' }} - حقنا{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark); margin-bottom: 1rem;">
+        {{ 'تعديل بيانات المنتسب' if member else 'إضافة منتسب جديد' }}
+    </h1>
+
+    <form method="POST" class="card" style="padding: 1.5rem;">
+        <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+
+            <div class="form-group">
+                <label>الاسم الكامل <span style="color: var(--deceased);">*</span></label>
+                <input type="text" name="full_name" value="{{ member.full_name if member else '' }}" required placeholder="الاسم الثلاثي">
+            </div>
+
+            <div class="form-group">
+                <label>اسم الأب</label>
+                <input type="text" name="father_name" value="{{ member.father_name if member else '' }}" placeholder="اسم الأب">
+            </div>
+
+            <div class="form-group">
+                <label>رقم الهاتف</label>
+                <input type="text" name="phone" value="{{ member.phone if member else '' }}" placeholder="رقم الهاتف" dir="ltr">
+            </div>
+
+            <div class="form-group">
+                <label>البريد الإلكتروني</label>
+                <input type="email" name="email" value="{{ member.email if member else '' }}" placeholder="email@example.com" dir="ltr">
+            </div>
+
+            <div class="form-group">
+                <label>الرقم الوطني</label>
+                <input type="text" name="national_id" value="{{ member.national_id if member else '' }}" placeholder="الرقم الوطني" dir="ltr">
+            </div>
+
+            <div class="form-group">
+                <label>سنة الميلاد</label>
+                <input type="number" name="birth_year" value="{{ member.birth_year if member and member.birth_year else '' }}" placeholder="سنة الميلاد" min="1900" max="2026">
+            </div>
+
+            <div class="form-group">
+                <label>الجنس</label>
+                <select name="gender">
+                    <option value="">-- اختر --</option>
+                    <option value="male" {{ 'selected' if member and member.gender=='male' }}>ذكر</option>
+                    <option value="female" {{ 'selected' if member and member.gender=='female' }}>أنثى</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>المحافظة</label>
+                <select name="province">
+                    <option value="">-- اختر --</option>
+                    {% for p in PROVINCES %}
+                    <option value="{{ p }}" {{ 'selected' if member and member.province==p }}>{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>العنوان</label>
+                <input type="text" name="address" value="{{ member.address if member else '' }}" placeholder="العنوان التفصيلي">
+            </div>
+
+            <div class="form-group">
+                <label>نوع العضوية</label>
+                <select name="membership_type">
+                    <option value="">-- اختر --</option>
+                    {% for t in MEMBERSHIP_TYPES %}
+                    <option value="{{ t }}" {{ 'selected' if member and member.membership_type==t }}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>رقم العضوية</label>
+                <input type="text" name="membership_number" value="{{ member.membership_number if member else '' }}" placeholder="رقم العضوية">
+            </div>
+
+            <div class="form-group">
+                <label>تاريخ الانضمام</label>
+                <input type="date" name="join_date" value="{{ member.join_date if member else '' }}">
+            </div>
+
+            <div class="form-group">
+                <label>الحالة</label>
+                <select name="status">
+                    {% for code, label in MEMBER_STATUSES %}
+                    <option value="{{ code }}" {{ 'selected' if member and member.status==code }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 1rem;">
+            <label>ملاحظات</label>
+            <textarea name="notes" rows="3" placeholder="أي ملاحظات إضافية...">{{ member.notes if member else '' }}</textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">{{ 'حفظ التعديلات' if member else 'إضافة المنتسب' }}</button>
+            <a href="{{ url_for('admin_members') }}" class="btn btn-outline">إلغاء</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

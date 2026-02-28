@@ -298,7 +298,7 @@
                 <div class="form-date-group">
                     <input type="number" name="birth_day" placeholder="اليوم" min="0" max="31">
                     <input type="number" name="birth_month" placeholder="الشهر" min="0" max="12">
-                    <input type="number" name="birth_year" placeholder="السنة" min="1930" max="2010">
+                    <input type="number" name="birth_year" placeholder="السنة" min="1900" max="2026">
                 </div>
             </div>
             <div class="form-group">
@@ -1089,7 +1089,7 @@ function addEntryChild(data) {
         '<div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.6rem;">' +
         '<div class="form-group"><label>\u0627\u0644\u0627\u0633\u0645</label><input type="text" class="ec-name" value="' + (data.name||'') + '"></div>' +
         '<div class="form-group"><label>\u0627\u0644\u062c\u0646\u0633</label><select class="ec-gender"><option value="">--</option><option value="male"' + (data.gender==='male'?' selected':'') + '>\u0630\u0643\u0631</option><option value="female"' + (data.gender==='female'?' selected':'') + '>\u0623\u0646\u062b\u0649</option></select></div>' +
-        '<div class="form-group"><label>\u0633\u0646\u0629 \u0627\u0644\u0645\u064a\u0644\u0627\u062f</label><input type="number" class="ec-birth" value="' + (data.birth_year || data.birthYear || (data.age ? (entryCurrentYear - parseInt(data.age)) : '') || '') + '" min="1990" max="2026"></div>' +
+        '<div class="form-group"><label>\u0633\u0646\u0629 \u0627\u0644\u0645\u064a\u0644\u0627\u062f</label><input type="number" class="ec-birth" value="' + (data.birth_year || data.birthYear || (data.age ? (entryCurrentYear - parseInt(data.age)) : '') || '') + '" min="1900" max="2026"></div>' +
         '<div class="form-group"><label>\u0627\u0644\u062a\u062d\u0635\u064a\u0644 \u0627\u0644\u0639\u0644\u0645\u064a</label><select class="ec-edu">' + eduOpts + '</select></div>' +
         '<div class="form-group"><label>\u0627\u0644\u0645\u062f\u0631\u0633\u0629/\u0627\u0644\u062c\u0627\u0645\u0639\u0629</label><input type="text" class="ec-school" value="' + (data.school||'') + '"></div>' +
         '<div class="form-group"><label>\u0627\u0644\u0639\u0645\u0644</label><input type="text" class="ec-work" value="' + (data.employment||data.job||'') + '"></div>' +

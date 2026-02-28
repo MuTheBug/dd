@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}المنتسبون - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+        المنتسبون
+        <span style="font-size: 0.95rem; color: var(--text-light);">({{ total }} منتسب — {{ active_count }} نشط)</span>
+    </h1>
+    <a href="{{ url_for('admin_member_add') }}" class="btn btn-primary btn-sm">+ إضافة منتسب</a>
+</div>
+
+<!-- Filter Bar -->
+<div class="card" style="padding: 0.75rem 1rem; margin-bottom: 1rem;">
+    <form method="GET" action="{{ url_for('admin_members') }}" style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: end;">
+        <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 180px;">
+            <label style="font-size: 0.82rem;">بحث</label>
+            <input type="text" name="search" value="{{ filters.search }}" placeholder="اسم، هاتف، رقم وطني، رقم عضوية..." style="font-size: 0.9rem;">
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width: 130px;">
+            <label style="font-size: 0.82rem;">الحالة</label>
+            <select name="status" style="font-size: 0.9rem;">
+                <option value="">الكل</option>
+                {% for code, label in MEMBER_STATUSES %}
+                <option value="{{ code }}" {{ 'selected' if filters.status==code }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width: 130px;">
+            <label style="font-size: 0.82rem;">نوع العضوية</label>
+            <select name="membership_type" style="font-size: 0.9rem;">
+                <option value="">الكل</option>
+                {% for t in MEMBERSHIP_TYPES %}
+                <option value="{{ t }}" {{ 'selected' if filters.membership_type==t }}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display: flex; gap: 0.4rem;">
+            <button type="submit" class="btn btn-primary btn-sm">تصفية</button>
+            <a href="{{ url_for('admin_members') }}" class="btn btn-outline btn-sm">مسح</a>
+        </div>
+    </form>
+</div>
+
+<!-- Members Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>الاسم الكامل</th>
+                    <th>اسم الأب</th>
+                    <th>الهاتف</th>
+                    <th>المحافظة</th>
+                    <th>نوع العضوية</th>
+                    <th>رقم العضوية</th>
+                    <th>تاريخ الانضمام</th>
+                    <th>الحالة</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in members %}
+                <tr>
+                    <td>{{ m.id }}</td>
+                    <td style="font-weight: 600;">{{ m.full_name }}</td>
+                    <td>{{ m.father_name or '-' }}</td>
+                    <td dir="ltr" style="text-align: right;">{{ m.phone or '-' }}</td>
+                    <td>{{ m.province or '-' }}</td>
+                    <td>{{ m.membership_type or '-' }}</td>
+                    <td>{{ m.membership_number or '-' }}</td>
+                    <td>{{ m.join_date or '-' }}</td>
+                    <td>
+                        {% if m.status == 'active' %}
+                        <span class="status-badge status-survivor">نشط</span>
+                        {% elif m.status == 'inactive' %}
+                        <span class="status-badge" style="background: #eee; color: #666;">غير نشط</span>
+                        {% elif m.status == 'suspended' %}
+                        <span class="status-badge status-enforced">معلّق</span>
+                        {% elif m.status == 'honorary' %}
+                        <span class="status-badge" style="background: #dbeafe; color: #1e40af;">فخري</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group" style="flex-wrap: nowrap;">
+                            <a href="{{ url_for('admin_member_edit', mid=m.id) }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
+                            <form method="POST" action="{{ url_for('admin_member_delete', mid=m.id) }}" style="display:inline;" onsubmit="return confirm('هل تريد حذف هذا المنتسب؟')">
+                                <button type="submit" class="btn btn-danger btn-sm" title="حذف">&#x1F5D1;</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                        لا يوجد منتسبون مسجلون
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

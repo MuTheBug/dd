@@ -2549,6 +2549,45 @@ def admin_custom_list_detail(lid):
     return render_template('admin_custom_list_detail.html', clist=clist, items=items)
 
 
+@app.route('/admin/list/<int:lid>/pdf')
+@admin_required
+def admin_custom_list_pdf(lid):
+    db = get_db()
+    clist = db.execute("SELECT * FROM custom_lists WHERE id=?", (lid,)).fetchone()
+    if not clist:
+        flash('القائمة غير موجودة', 'error')
+        return redirect(url_for('admin_custom_lists'))
+
+    items = db.execute("""
+        SELECT r.*, cli.added_at
+        FROM custom_list_items cli
+        JOIN records r ON cli.record_id = r.id
+        WHERE cli.list_id = ?
+        ORDER BY cli.added_at ASC
+    """, (lid,)).fetchall()
+
+    # Logo
+    logo_b64 = ''
+    logo_path = os.path.join(BASE_DIR, 'static', 'img', 'logo.jpg')
+    if os.path.exists(logo_path):
+        with open(logo_path, 'rb') as f:
+            logo_b64 = base64.b64encode(f.read()).decode()
+
+    html = render_template('pdf_custom_list.html',
+                           clist=clist, items=items, logo_b64=logo_b64,
+                           STATUS_MAP=STATUS_MAP,
+                           now=datetime.now().strftime('%Y-%m-%d'))
+
+    from weasyprint import HTML
+    pdf_bytes = HTML(string=html, base_url=BASE_DIR).write_pdf()
+
+    response = make_response(pdf_bytes)
+    encoded_name = quote(f"list_{clist['name']}.pdf")
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f"inline; filename=list_{lid}.pdf; filename*=UTF-8''{encoded_name}"
+    return response
+
+
 @app.route('/admin/list/<int:lid>/delete', methods=['POST'])
 @admin_required
 def admin_delete_list(lid):

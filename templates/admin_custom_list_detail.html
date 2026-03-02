@@ -7,7 +7,12 @@
         {{ clist.name }}
         <span style="font-size: 0.95rem; color: var(--text-light);">({{ items|length }} سجل)</span>
     </h1>
-    <a href="{{ url_for('admin_custom_lists') }}" class="btn btn-outline btn-sm">&#x2190; العودة للقوائم</a>
+    <div class="btn-group">
+        {% if items %}
+        <a href="{{ url_for('admin_custom_list_pdf', lid=clist.id) }}" class="btn btn-primary btn-sm" target="_blank">&#x1F5A8; طباعة PDF</a>
+        {% endif %}
+        <a href="{{ url_for('admin_custom_lists') }}" class="btn btn-outline btn-sm">&#x2190; العودة للقوائم</a>
+    </div>
 </div>
 
 {% if clist.description %}

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<style>
+@page {
+    size: A4 portrait;
+    margin: 1.2cm 1.5cm;
+    @top-center {
+        content: "حقنا — {{ clist.name }}";
+        font-size: 8pt;
+        color: #a0aec0;
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    }
+    @bottom-left {
+        content: "صفحة " counter(page) " من " counter(pages);
+        font-size: 8pt;
+        color: #a0aec0;
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #2d3748;
+    direction: rtl;
+}
+
+.header-band {
+    background: #1a365d;
+    color: white;
+    padding: 12px 18px;
+    margin: -1.2cm -1.5cm 0 -1.5cm;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.logo {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5);
+}
+.header-band h1 { font-size: 16pt; font-weight: 800; }
+.header-band .subtitle { font-size: 9pt; opacity: 0.85; }
+
+.list-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0 10px 0;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 10px;
+    font-size: 9pt;
+    color: #718096;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10pt;
+}
+thead th {
+    background: #1a365d;
+    color: white;
+    padding: 7px 8px;
+    text-align: right;
+    font-weight: 700;
+    font-size: 9pt;
+}
+tbody td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+}
+tbody tr:nth-child(even) { background: #f7fafc; }
+
+.status-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 8pt;
+    font-weight: 600;
+}
+.status-survivor { background: #c6f6d5; color: #22543d; }
+.status-enforced { background: #feebc8; color: #7b341e; }
+.status-deceased { background: #fed7d7; color: #822727; }
+
+.phone-label { font-size: 7pt; color: #a0aec0; }
+</style>
+</head>
+<body>
+
+<div class="header-band">
+    {% if logo_b64 %}
+    <img src="data:image/jpeg;base64,{{ logo_b64 }}" class="logo">
+    {% endif %}
+    <div>
+        <h1>{{ clist.name }}</h1>
+        {% if clist.description %}
+        <div class="subtitle">{{ clist.description }}</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="list-info">
+    <span>عدد السجلات: <strong>{{ items|length }}</strong></span>
+    <span>تاريخ الطباعة: {{ now }}</span>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th style="width:30px;">#</th>
+            <th>الاسم</th>
+            <th>الأب</th>
+            <th>الكنية</th>
+            <th>الحالة</th>
+            <th>المحافظة</th>
+            <th>الهاتف</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in items %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td style="font-weight: 600;">{{ r.first_name }}</td>
+            <td>{{ r.father_name or '' }}</td>
+            <td>{{ r.last_name or '' }}</td>
+            <td>
+                {% if r.status == 'survivor' %}
+                <span class="status-badge status-survivor">ناجٍ</span>
+                {% elif r.status == 'enforced' %}
+                <span class="status-badge status-enforced">مغيّب</span>
+                {% elif r.status == 'deceased' %}
+                <span class="status-badge status-deceased">متوفى</span>
+                {% endif %}
+            </td>
+            <td>{{ r.province or '' }}</td>
+            <td dir="ltr" style="text-align: right;">
+                {% if r.phone %}{{ r.phone }}
+                {% elif r.spouse_phone %}{{ r.spouse_phone }} <span class="phone-label">(زوج/ة)</span>
+                {% elif r.guardian_phone %}{{ r.guardian_phone }} <span class="phone-label">(ولي أمر)</span>
+                {% elif r.reporter_phone %}{{ r.reporter_phone }} <span class="phone-label">(مبلغ)</span>
+                {% else %}-{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</body>
+</html>

@@ -35,8 +35,8 @@
 <!-- Fee explanation -->
 <div class="card" style="padding: 0.75rem 1rem; margin-bottom: 1rem; background: var(--filter-preset-bg); border: 1px solid var(--filter-preset-border);">
     <div style="font-size: 0.85rem; color: var(--text-light);">
-        نظام الاشتراكات: <strong>{{ '{:,}'.format(MONTHLY_FEE) }} ل.س</strong> شهرياً —
-        كل <strong>5 أشهر</strong> (عدا الشهر الأول): <strong>{{ '{:,}'.format(FIFTH_MONTH_FEE) }} ل.س</strong>
+        نظام الاشتراكات: الشهر الأول <strong>{{ '{:,}'.format(FIRST_MONTH_FEE) }} ل.س</strong> —
+        باقي الأشهر: <strong>{{ '{:,}'.format(MONTHLY_FEE) }} ل.س</strong> شهرياً
     </div>
 </div>
 
@@ -70,11 +70,11 @@
                 <tr style="{% if p.status == 'paid' %}background: rgba(39,174,96,0.06);{% endif %}">
                     <td style="font-weight: 600;">{{ p.period_label or ('الشهر ' ~ p.month_number) }}</td>
                     <td>
-                        <span style="font-weight: 600; {% if p.amount == FIFTH_MONTH_FEE %}color: var(--enforced);{% endif %}">
+                        <span style="font-weight: 600; {% if p.amount == FIRST_MONTH_FEE %}color: var(--enforced);{% endif %}">
                             {{ '{:,}'.format(p.amount) }}
                         </span>
-                        {% if p.amount == FIFTH_MONTH_FEE %}
-                        <span style="font-size: 0.7rem; color: var(--enforced);">(شهر خامس)</span>
+                        {% if p.amount == FIRST_MONTH_FEE %}
+                        <span style="font-size: 0.7rem; color: var(--enforced);">(دفعة أولى)</span>
                         {% endif %}
                     </td>
                     <td>

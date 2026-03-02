@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}{{ clist.name }} - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+        {{ clist.name }}
+        <span style="font-size: 0.95rem; color: var(--text-light);">({{ items|length }} سجل)</span>
+    </h1>
+    <a href="{{ url_for('admin_custom_lists') }}" class="btn btn-outline btn-sm">&#x2190; العودة للقوائم</a>
+</div>
+
+{% if clist.description %}
+<p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem;">{{ clist.description }}</p>
+{% endif %}
+
+<!-- Search and Add -->
+<div class="card" style="padding: 1rem; margin-bottom: 1rem;">
+    <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem;">+ إضافة سجل للقائمة</div>
+    <div style="position: relative;">
+        <input type="text" id="listSearchInput" placeholder="ابحث بالاسم، الرقم الوطني، أو الهاتف..." style="font-size: 0.9rem; width: 100%;" oninput="searchForList(this.value)">
+        <div id="listSearchResults" style="display:none; position:absolute; top:100%; right:0; left:0; z-index:100; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-lg); max-height: 300px; overflow-y: auto; margin-top: 2px;"></div>
+    </div>
+</div>
+
+<!-- List Items Table -->
+{% if items %}
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>الاسم</th>
+                    <th>الأب</th>
+                    <th>الكنية</th>
+                    <th>الحالة</th>
+                    <th>المحافظة</th>
+                    <th>هاتف</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in items %}
+                <tr>
+                    <td>{{ r.id }}</td>
+                    <td style="font-weight: 600;">{{ r.first_name }}</td>
+                    <td>{{ r.father_name or '-' }}</td>
+                    <td>{{ r.last_name or '-' }}</td>
+                    <td>
+                        {% if r.status == 'survivor' %}
+                        <span class="status-badge status-survivor">ناجٍ</span>
+                        {% elif r.status == 'enforced' %}
+                        <span class="status-badge status-enforced">مغيّب</span>
+                        {% elif r.status == 'deceased' %}
+                        <span class="status-badge status-deceased">متوفى</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ r.province or '-' }}</td>
+                    <td dir="ltr" style="text-align: right; white-space: nowrap;">
+                        {% set phone = r.phone or r.spouse_phone or r.guardian_phone or r.reporter_phone %}
+                        {% if phone %}
+                        <a href="tel:{{ phone }}" style="color: var(--primary); text-decoration: none; font-size: 0.85rem;">&#x1F4DE; {{ phone }}</a>
+                        {% if not r.phone %}<span style="font-size:0.65rem; color:var(--text-light); display:block; direction:rtl;">{% if r.spouse_phone == phone %}زوج/ة{% elif r.guardian_phone == phone %}ولي أمر{% else %}مبلغ{% endif %}</span>{% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group" style="flex-wrap: nowrap;">
+                            <a href="{{ url_for('admin_record_detail', record_id=r.id) }}" class="btn btn-primary btn-sm" title="عرض">&#x1F441;</a>
+                            <form method="POST" action="{{ url_for('admin_list_remove_record', lid=clist.id, item_id=r.item_id) }}" style="display:inline;" onsubmit="return confirm('حذف هذا السجل من القائمة؟')">
+                                <button type="submit" class="btn btn-danger btn-sm" title="إزالة من القائمة">&#x2716;</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" style="text-align: center; padding: 2rem; color: var(--text-light);">
+    القائمة فارغة. ابحث أعلاه لإضافة سجلات.
+</div>
+{% endif %}
+
+<script>
+var searchTimeout = null;
+function searchForList(q) {
+    clearTimeout(searchTimeout);
+    var box = document.getElementById('listSearchResults');
+    if (q.length < 2) { box.style.display = 'none'; return; }
+    searchTimeout = setTimeout(function() {
+        fetch('{{ url_for("api_search_for_list") }}?q=' + encodeURIComponent(q))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.length) {
+                    box.innerHTML = '<div style="padding:1rem; text-align:center; color:var(--text-light);">لا توجد نتائج</div>';
+                    box.style.display = 'block';
+                    return;
+                }
+                var html = '';
+                for (var i = 0; i < data.length; i++) {
+                    var d = data[i];
+                    var phone = d.phone ? ' - ' + d.phone : '';
+                    html += '<form method="POST" action="{{ url_for("admin_list_add_record", lid=clist.id) }}" style="display:block;">' +
+                        '<input type="hidden" name="record_id" value="' + d.id + '">' +
+                        '<button type="submit" style="width:100%; text-align:right; padding:0.6rem 1rem; border:none; background:transparent; cursor:pointer; border-bottom:1px solid var(--border); font-size:0.88rem; font-family:inherit;">' +
+                        '<strong>' + d.name + '</strong>' +
+                        '<span style="color:var(--text-light); font-size:0.8rem;"> (' + d.status + ' - ' + d.province + phone + ')</span>' +
+                        '</button></form>';
+                }
+                box.innerHTML = html;
+                box.style.display = 'block';
+            });
+    }, 300);
+}
+
+document.addEventListener('click', function(e) {
+    var box = document.getElementById('listSearchResults');
+    if (!e.target.closest('#listSearchInput') && !e.target.closest('#listSearchResults')) {
+        box.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

@@ -66,7 +66,13 @@
                     <td>{{ m.id }}</td>
                     <td style="font-weight: 600;">{{ m.full_name }}</td>
                     <td>{{ m.father_name or '-' }}</td>
-                    <td dir="ltr" style="text-align: right;">{{ m.phone or '-' }}</td>
+                    <td dir="ltr" style="text-align: right;">
+                        {% if m.phone %}
+                        <a href="tel:{{ m.phone }}" style="color: var(--primary); text-decoration: none;">&#x1F4DE; {{ m.phone }}</a>
+                        {% else %}
+                        <span style="color: var(--text-light);">لا يوجد رقم</span>
+                        {% endif %}
+                    </td>
                     <td>{{ m.province or '-' }}</td>
                     <td>{{ m.membership_type or '-' }}</td>
                     <td>{{ m.membership_number or '-' }}</td>

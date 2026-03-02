@@ -479,6 +479,29 @@ def migrate_db():
         )
     """)
 
+    # -- Custom lists table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS custom_lists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
+
+    # -- Custom list items table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS custom_list_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            list_id INTEGER NOT NULL,
+            record_id INTEGER NOT NULL,
+            added_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (list_id) REFERENCES custom_lists(id) ON DELETE CASCADE,
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE,
+            UNIQUE(list_id, record_id)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -2340,14 +2363,14 @@ def api_members_list():
 # Member payments
 # ---------------------------------------------------------------------------
 MONTHLY_FEE = 15000       # Regular monthly fee (SYP)
-FIFTH_MONTH_FEE = 25000   # Every 5th month fee (SYP), excluding month 1
+FIRST_MONTH_FEE = 25000   # First month fee (SYP)
 
 
 def compute_expected_fee(month_number):
     """Return the expected fee for a given month number.
-    Month 1 = 15000, months 5,10,15,... = 25000, rest = 15000."""
-    if month_number > 1 and month_number % 5 == 0:
-        return FIFTH_MONTH_FEE
+    Month 1 = 25000, all others = 15000."""
+    if month_number == 1:
+        return FIRST_MONTH_FEE
     return MONTHLY_FEE
 
 
@@ -2374,7 +2397,7 @@ def admin_member_payments(mid):
                            member=member, payments=payments,
                            total_paid=total_paid, total_due=total_due,
                            paid_count=paid_count, unpaid_count=unpaid_count,
-                           MONTHLY_FEE=MONTHLY_FEE, FIFTH_MONTH_FEE=FIFTH_MONTH_FEE)
+                           MONTHLY_FEE=MONTHLY_FEE, FIRST_MONTH_FEE=FIRST_MONTH_FEE)
 
 
 @app.route('/admin/member/<int:mid>/payments/generate', methods=['POST'])
@@ -2472,6 +2495,126 @@ def admin_record_delete_service(record_id, sid):
     db.commit()
     flash('تم حذف الخدمة', 'success')
     return redirect(url_for('admin_record_edit', record_id=record_id) + '#services-section')
+
+
+# ---------------------------------------------------------------------------
+# Custom lists
+# ---------------------------------------------------------------------------
+@app.route('/admin/lists')
+@admin_required
+def admin_custom_lists():
+    db = get_db()
+    lists = db.execute("""
+        SELECT cl.*, COUNT(cli.id) as item_count
+        FROM custom_lists cl
+        LEFT JOIN custom_list_items cli ON cl.id = cli.list_id
+        GROUP BY cl.id
+        ORDER BY cl.created_at DESC
+    """).fetchall()
+    return render_template('admin_custom_lists.html', lists=lists)
+
+
+@app.route('/admin/list/create', methods=['POST'])
+@admin_required
+def admin_create_list():
+    name = request.form.get('name', '').strip()
+    desc = request.form.get('description', '').strip()
+    if not name:
+        flash('يرجى إدخال اسم القائمة', 'error')
+        return redirect(url_for('admin_custom_lists'))
+    db = get_db()
+    db.execute("INSERT INTO custom_lists (name, description) VALUES (?, ?)", (name, desc))
+    db.commit()
+    flash(f'تم إنشاء القائمة: {name}', 'success')
+    return redirect(url_for('admin_custom_lists'))
+
+
+@app.route('/admin/list/<int:lid>')
+@admin_required
+def admin_custom_list_detail(lid):
+    db = get_db()
+    clist = db.execute("SELECT * FROM custom_lists WHERE id=?", (lid,)).fetchone()
+    if not clist:
+        flash('القائمة غير موجودة', 'error')
+        return redirect(url_for('admin_custom_lists'))
+
+    items = db.execute("""
+        SELECT r.*, cli.id as item_id, cli.added_at
+        FROM custom_list_items cli
+        JOIN records r ON cli.record_id = r.id
+        WHERE cli.list_id = ?
+        ORDER BY cli.added_at DESC
+    """, (lid,)).fetchall()
+
+    return render_template('admin_custom_list_detail.html', clist=clist, items=items)
+
+
+@app.route('/admin/list/<int:lid>/delete', methods=['POST'])
+@admin_required
+def admin_delete_list(lid):
+    db = get_db()
+    db.execute("DELETE FROM custom_list_items WHERE list_id=?", (lid,))
+    db.execute("DELETE FROM custom_lists WHERE id=?", (lid,))
+    db.commit()
+    flash('تم حذف القائمة', 'success')
+    return redirect(url_for('admin_custom_lists'))
+
+
+@app.route('/admin/list/<int:lid>/add', methods=['POST'])
+@admin_required
+def admin_list_add_record(lid):
+    record_id = request.form.get('record_id', type=int)
+    if not record_id:
+        flash('يرجى اختيار سجل', 'error')
+        return redirect(url_for('admin_custom_list_detail', lid=lid))
+    db = get_db()
+    try:
+        db.execute("INSERT INTO custom_list_items (list_id, record_id) VALUES (?, ?)",
+                   (lid, record_id))
+        db.commit()
+        flash('تم إضافة السجل للقائمة', 'success')
+    except sqlite3.IntegrityError:
+        flash('السجل موجود مسبقاً في هذه القائمة', 'error')
+    return redirect(url_for('admin_custom_list_detail', lid=lid))
+
+
+@app.route('/admin/list/<int:lid>/remove/<int:item_id>', methods=['POST'])
+@admin_required
+def admin_list_remove_record(lid, item_id):
+    db = get_db()
+    db.execute("DELETE FROM custom_list_items WHERE id=? AND list_id=?", (item_id, lid))
+    db.commit()
+    flash('تم حذف السجل من القائمة', 'success')
+    return redirect(url_for('admin_custom_list_detail', lid=lid))
+
+
+@app.route('/api/search_for_list')
+@admin_required
+def api_search_for_list():
+    """Search records for adding to custom lists."""
+    q = request.args.get('q', '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    db = get_db()
+    term = f'%{q}%'
+    rows = db.execute("""
+        SELECT id, first_name, father_name, last_name, phone, status, province
+        FROM records
+        WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
+              OR national_id LIKE ? OR phone LIKE ?
+        ORDER BY first_name LIMIT 20
+    """, (term, term, term, term, term)).fetchall()
+    results = []
+    for r in rows:
+        status_ar = STATUS_MAP.get(r['status'], r['status'] or '')
+        results.append({
+            'id': r['id'],
+            'name': f"{r['first_name']} {r['father_name'] or ''} {r['last_name'] or ''}".strip(),
+            'phone': r['phone'] or '',
+            'status': status_ar,
+            'province': r['province'] or '',
+        })
+    return jsonify(results)
 
 
 # ---------------------------------------------------------------------------

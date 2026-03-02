@@ -646,6 +646,7 @@
                         </a>
                     </th>
                     <th>الجهة</th>
+                    <th>هاتف</th>
                     <th>الزوج/ة</th>
                     <th>قاصرين</th>
                     <th>إجراءات</th>
@@ -672,6 +673,15 @@
                     <td>{{ r.province }}</td>
                     <td>{{ r.arrest_year if r.arrest_year else '-' }}</td>
                     <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.arrest_authority or '-' }}</td>
+                    <td dir="ltr" style="text-align: right; white-space: nowrap;">
+                        {% set phone = r.phone or r.spouse_phone or r.guardian_phone or r.reporter_phone %}
+                        {% if phone %}
+                        <a href="tel:{{ phone }}" style="color: var(--primary); text-decoration: none; font-size: 0.85rem;" title="{{ phone }}{% if not r.phone %} ({% if r.spouse_phone == phone %}زوج/ة{% elif r.guardian_phone == phone %}ولي أمر{% else %}مبلغ{% endif %}){% endif %}">&#x1F4DE; {{ phone }}</a>
+                        {% if not r.phone %}<span style="font-size:0.65rem; color:var(--text-light); display:block; direction:rtl;">{% if r.spouse_phone == phone %}زوج/ة{% elif r.guardian_phone == phone %}ولي أمر{% else %}مبلغ{% endif %}</span>{% endif %}
+                        {% else %}
+                        <span style="color: var(--text-light); font-size: 0.8rem;">-</span>
+                        {% endif %}
+                    </td>
                     <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.spouse_name or '-' }}</td>
                     <td>{{ r.kids_under_18_count if r.kids_under_18_count else '-' }}</td>
                     <td>
@@ -683,7 +693,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    <td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-light);">
                         لا توجد سجلات مطابقة للفلاتر المحددة
                     </td>
                 </tr>

@@ -98,6 +98,11 @@
                     </td>
                     <td style="font-size: 0.85rem; color: var(--text-light);">
                         {{ STATUS_MAP.get(r.status, '') }} — {{ r.province or '' }}
+                        {% if r.marital == 'married' and r.gender == 'male' and r.status in ('deceased', 'enforced') %}
+                        <span style="display:inline-block; font-size:0.65rem; padding:1px 4px; border-radius:3px; margin-right:4px; {% if r.status == 'deceased' %}background:#fde68a; color:#92400e;{% else %}background:#fed7aa; color:#9a3412;{% endif %}">
+                            {% if r.status == 'deceased' %}زوجته أرملة{% else %}زوجة مغيّب{% endif %}
+                        </span>
+                        {% endif %}
                     </td>
                     <td>
                         <div class="btn-group" style="flex-wrap: nowrap;">

@@ -1215,8 +1215,9 @@ def admin_records():
             first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
             OR mother_name LIKE ? OR national_id LIKE ? OR phone LIKE ?
             OR address LIKE ? OR notes LIKE ? OR reporter_name LIKE ?
+            OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
         )""")
-        params.extend([search_term] * 9)
+        params.extend([search_term] * 10)
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -1598,8 +1599,9 @@ def build_pdf_filter_conditions(args):
             first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
             OR mother_name LIKE ? OR national_id LIKE ? OR phone LIKE ?
             OR address LIKE ? OR notes LIKE ? OR reporter_name LIKE ?
+            OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
         )""")
-        params.extend([s] * 9)
+        params.extend([s] * 10)
     if args.get('arrest_year_from'):
         conditions.append("arrest_year >= ?")
         params.append(int(args['arrest_year_from']))
@@ -2086,7 +2088,8 @@ def api_search_records():
     s = f"%{q}%"
     rows = db.execute(
         "SELECT * FROM records WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? "
-        "ORDER BY id DESC LIMIT 20", (s, s, s)
+        "OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ? "
+        "ORDER BY id DESC LIMIT 20", (s, s, s, s)
     ).fetchall()
     return jsonify([serialize_record_for_picker(r) for r in rows])
 
@@ -2694,8 +2697,9 @@ def api_search_for_list():
         FROM records
         WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
               OR national_id LIKE ? OR phone LIKE ?
+              OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
         ORDER BY first_name LIMIT 20
-    """, (term, term, term, term, term)).fetchall()
+    """, (term, term, term, term, term, term)).fetchall()
     results = []
     for r in rows:
         status_ar = STATUS_MAP.get(r['status'], r['status'] or '')

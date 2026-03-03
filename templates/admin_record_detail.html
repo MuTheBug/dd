@@ -264,10 +264,29 @@
                 {{ '-' if not record.marital }}
             </div>
         </div>
+        {% if record.marital == 'married' and record.gender == 'male' and record.status in ('deceased', 'enforced') %}
+        <div class="detail-field" style="background: #fef3c7; padding: 0.5rem; border-radius: 6px;">
+            <div class="detail-field-label" style="color: #92400e;">حالة الزوجة</div>
+            <div class="detail-field-value" style="color: #92400e; font-weight: 600;">
+                {% if record.status == 'deceased' %}
+                أرملة (زوجها متوفى)
+                {% else %}
+                زوجة مغيّب قسراً
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
         {% if record.spouse_name %}
         <div class="detail-field">
             <div class="detail-field-label">اسم الزوج/ة</div>
-            <div class="detail-field-value">{{ record.spouse_name }}</div>
+            <div class="detail-field-value">
+                {{ record.spouse_name }}
+                {% if record.marital == 'married' and record.gender == 'male' and record.status in ('deceased', 'enforced') %}
+                <span style="display: inline-block; font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; margin-right: 6px; {% if record.status == 'deceased' %}background: #fde68a; color: #92400e;{% else %}background: #fed7aa; color: #9a3412;{% endif %}">
+                    {% if record.status == 'deceased' %}أرملة{% else %}زوجة مغيّب{% endif %}
+                </span>
+                {% endif %}
+            </div>
         </div>
         {% endif %}
         <div class="detail-field">

@@ -682,7 +682,14 @@
                         <span style="color: var(--text-light); font-size: 0.8rem;">-</span>
                         {% endif %}
                     </td>
-                    <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.spouse_name or '-' }}</td>
+                    <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ r.spouse_name or '-' }}
+                        {% if r.spouse_name and r.marital == 'married' and r.gender == 'male' and r.status in ('deceased', 'enforced') %}
+                        <span style="display:block; font-size:0.65rem; padding:1px 4px; border-radius:3px; margin-top:2px; {% if r.status == 'deceased' %}background:#fde68a; color:#92400e;{% else %}background:#fed7aa; color:#9a3412;{% endif %}">
+                            {% if r.status == 'deceased' %}أرملة{% else %}زوجة مغيّب{% endif %}
+                        </span>
+                        {% endif %}
+                    </td>
                     <td>{{ r.kids_under_18_count if r.kids_under_18_count else '-' }}</td>
                     <td>
                         <div class="btn-group" style="flex-wrap: nowrap;">

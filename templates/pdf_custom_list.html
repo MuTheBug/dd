@@ -131,7 +131,12 @@ tbody tr:nth-child(even) { background: #f7fafc; }
                 {% elif r.reporter_phone %}{{ r.reporter_phone }} <span class="phone-label">(مبلغ)</span>
                 {% else %}-{% endif %}
             </td>
-            <td class="note-text">{{ r.province or '' }}</td>
+            <td class="note-text">
+                {{ r.province or '' }}
+                {% if r.marital == 'married' and r.gender == 'male' and r.status in ('deceased', 'enforced') %}
+                <br><span style="font-size: 7pt; color: #92400e;">{% if r.status == 'deceased' %}زوجته أرملة{% else %}زوجة مغيّب{% endif %}</span>
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </tbody>

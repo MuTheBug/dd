@@ -78,18 +78,8 @@ tbody td {
 }
 tbody tr:nth-child(even) { background: #f7fafc; }
 
-.status-badge {
-    display: inline-block;
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: 8pt;
-    font-weight: 600;
-}
-.status-survivor { background: #c6f6d5; color: #22543d; }
-.status-enforced { background: #feebc8; color: #7b341e; }
-.status-deceased { background: #fed7d7; color: #822727; }
-
 .phone-label { font-size: 7pt; color: #a0aec0; }
+.note-text { font-size: 8pt; color: #718096; }
 </style>
 </head>
 <body>
@@ -107,7 +97,7 @@ tbody tr:nth-child(even) { background: #f7fafc; }
 </div>
 
 <div class="list-info">
-    <span>عدد السجلات: <strong>{{ items|length }}</strong></span>
+    <span>العدد الإجمالي: <strong>{{ total_count }}</strong></span>
     <span>تاريخ الطباعة: {{ now }}</span>
 </div>
 
@@ -116,30 +106,24 @@ tbody tr:nth-child(even) { background: #f7fafc; }
         <tr>
             <th style="width:30px;">#</th>
             <th>الاسم</th>
-            <th>الأب</th>
-            <th>الكنية</th>
-            <th>الحالة</th>
-            <th>المحافظة</th>
             <th>الهاتف</th>
+            <th>ملاحظات</th>
         </tr>
     </thead>
     <tbody>
+        {% set counter = {'n': 1} %}
+        {% for m in manual_items %}
+        <tr>
+            <td>{{ counter.n }}{% if counter.update({'n': counter.n + 1}) %}{% endif %}</td>
+            <td style="font-weight: 600;">{{ m.full_name }}</td>
+            <td dir="ltr" style="text-align: right;">{{ m.phone or '-' }}</td>
+            <td class="note-text">{{ m.notes or '' }}</td>
+        </tr>
+        {% endfor %}
         {% for r in items %}
         <tr>
-            <td>{{ loop.index }}</td>
-            <td style="font-weight: 600;">{{ r.first_name }}</td>
-            <td>{{ r.father_name or '' }}</td>
-            <td>{{ r.last_name or '' }}</td>
-            <td>
-                {% if r.status == 'survivor' %}
-                <span class="status-badge status-survivor">ناجٍ</span>
-                {% elif r.status == 'enforced' %}
-                <span class="status-badge status-enforced">مغيّب</span>
-                {% elif r.status == 'deceased' %}
-                <span class="status-badge status-deceased">متوفى</span>
-                {% endif %}
-            </td>
-            <td>{{ r.province or '' }}</td>
+            <td>{{ counter.n }}{% if counter.update({'n': counter.n + 1}) %}{% endif %}</td>
+            <td style="font-weight: 600;">{{ r.first_name }} {{ r.father_name or '' }} {{ r.last_name or '' }}</td>
             <td dir="ltr" style="text-align: right;">
                 {% if r.phone %}{{ r.phone }}
                 {% elif r.spouse_phone %}{{ r.spouse_phone }} <span class="phone-label">(زوج/ة)</span>
@@ -147,6 +131,7 @@ tbody tr:nth-child(even) { background: #f7fafc; }
                 {% elif r.reporter_phone %}{{ r.reporter_phone }} <span class="phone-label">(مبلغ)</span>
                 {% else %}-{% endif %}
             </td>
+            <td class="note-text">{{ r.province or '' }}</td>
         </tr>
         {% endfor %}
     </tbody>

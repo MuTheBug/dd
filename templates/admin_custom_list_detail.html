@@ -2,13 +2,14 @@
 {% block title %}{{ clist.name }} - حقنا{% endblock %}
 
 {% block content %}
+{% set total = items|length + manual_items|length %}
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
     <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
         {{ clist.name }}
-        <span style="font-size: 0.95rem; color: var(--text-light);">({{ items|length }} سجل)</span>
+        <span style="font-size: 0.95rem; color: var(--text-light);">({{ total }} اسم)</span>
     </h1>
     <div class="btn-group">
-        {% if items %}
+        {% if total > 0 %}
         <a href="{{ url_for('admin_custom_list_pdf', lid=clist.id) }}" class="btn btn-primary btn-sm" target="_blank">&#x1F5A8; طباعة PDF</a>
         {% endif %}
         <a href="{{ url_for('admin_custom_lists') }}" class="btn btn-outline btn-sm">&#x2190; العودة للقوائم</a>
@@ -19,49 +20,75 @@
 <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem;">{{ clist.description }}</p>
 {% endif %}
 
-<!-- Search and Add -->
+<!-- Add manual name -->
 <div class="card" style="padding: 1rem; margin-bottom: 1rem;">
-    <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem;">+ إضافة سجل للقائمة</div>
+    <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem;">+ إضافة اسم يدوي</div>
+    <form method="POST" action="{{ url_for('admin_list_add_manual', lid=clist.id) }}" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end;">
+        <div class="form-group" style="margin-bottom:0; flex: 2; min-width: 180px;">
+            <label style="font-size: 0.8rem;">الاسم <span style="color: var(--deceased);">*</span></label>
+            <input type="text" name="full_name" required placeholder="الاسم الكامل" style="font-size: 0.9rem;">
+        </div>
+        <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 130px;">
+            <label style="font-size: 0.8rem;">الهاتف</label>
+            <input type="text" name="phone" placeholder="رقم الهاتف" dir="ltr" style="font-size: 0.9rem;">
+        </div>
+        <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 130px;">
+            <label style="font-size: 0.8rem;">ملاحظات</label>
+            <input type="text" name="notes" placeholder="ملاحظة..." style="font-size: 0.9rem;">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">إضافة</button>
+    </form>
+</div>
+
+<!-- Search and add from records -->
+<div class="card" style="padding: 1rem; margin-bottom: 1rem;">
+    <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem;">+ إضافة من السجلات</div>
     <div style="position: relative;">
         <input type="text" id="listSearchInput" placeholder="ابحث بالاسم، الرقم الوطني، أو الهاتف..." style="font-size: 0.9rem; width: 100%;" oninput="searchForList(this.value)">
         <div id="listSearchResults" style="display:none; position:absolute; top:100%; right:0; left:0; z-index:100; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-lg); max-height: 300px; overflow-y: auto; margin-top: 2px;"></div>
     </div>
 </div>
 
-<!-- List Items Table -->
-{% if items %}
+<!-- Combined Table -->
+{% if total > 0 %}
 <div class="card" style="padding: 0; overflow: hidden;">
     <div class="table-wrapper">
         <table>
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th style="width:35px;">#</th>
                     <th>الاسم</th>
-                    <th>الأب</th>
-                    <th>الكنية</th>
-                    <th>الحالة</th>
-                    <th>المحافظة</th>
                     <th>هاتف</th>
-                    <th>إجراءات</th>
+                    <th>ملاحظات / تفاصيل</th>
+                    <th style="width:80px;">إجراءات</th>
                 </tr>
             </thead>
             <tbody>
-                {% for r in items %}
+                {% set counter = {'n': 1} %}
+                {% for m in manual_items %}
                 <tr>
-                    <td>{{ r.id }}</td>
-                    <td style="font-weight: 600;">{{ r.first_name }}</td>
-                    <td>{{ r.father_name or '-' }}</td>
-                    <td>{{ r.last_name or '-' }}</td>
-                    <td>
-                        {% if r.status == 'survivor' %}
-                        <span class="status-badge status-survivor">ناجٍ</span>
-                        {% elif r.status == 'enforced' %}
-                        <span class="status-badge status-enforced">مغيّب</span>
-                        {% elif r.status == 'deceased' %}
-                        <span class="status-badge status-deceased">متوفى</span>
-                        {% endif %}
+                    <td>{{ counter.n }}{% if counter.update({'n': counter.n + 1}) %}{% endif %}</td>
+                    <td style="font-weight: 600;">{{ m.full_name }}</td>
+                    <td dir="ltr" style="text-align: right; white-space: nowrap;">
+                        {% if m.phone %}
+                        <a href="tel:{{ m.phone }}" style="color: var(--primary); text-decoration: none; font-size: 0.85rem;">&#x1F4DE; {{ m.phone }}</a>
+                        {% else %}-{% endif %}
                     </td>
-                    <td>{{ r.province or '-' }}</td>
+                    <td style="font-size: 0.85rem; color: var(--text-light);">{{ m.notes or '-' }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('admin_list_remove_manual', lid=clist.id, mid=m.id) }}" style="display:inline;" onsubmit="return confirm('حذف من القائمة؟')">
+                            <button type="submit" class="btn btn-danger btn-sm" title="حذف">&#x2716;</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% for r in items %}
+                <tr style="background: rgba(37,99,235,0.03);">
+                    <td>{{ counter.n }}{% if counter.update({'n': counter.n + 1}) %}{% endif %}</td>
+                    <td style="font-weight: 600;">
+                        {{ r.first_name }} {{ r.father_name or '' }} {{ r.last_name or '' }}
+                        <span style="font-size: 0.7rem; color: var(--primary); margin-right: 4px;">(سجل #{{ r.id }})</span>
+                    </td>
                     <td dir="ltr" style="text-align: right; white-space: nowrap;">
                         {% set phone = r.phone or r.spouse_phone or r.guardian_phone or r.reporter_phone %}
                         {% if phone %}
@@ -69,11 +96,14 @@
                         {% if not r.phone %}<span style="font-size:0.65rem; color:var(--text-light); display:block; direction:rtl;">{% if r.spouse_phone == phone %}زوج/ة{% elif r.guardian_phone == phone %}ولي أمر{% else %}مبلغ{% endif %}</span>{% endif %}
                         {% else %}-{% endif %}
                     </td>
+                    <td style="font-size: 0.85rem; color: var(--text-light);">
+                        {{ STATUS_MAP.get(r.status, '') }} — {{ r.province or '' }}
+                    </td>
                     <td>
                         <div class="btn-group" style="flex-wrap: nowrap;">
                             <a href="{{ url_for('admin_record_detail', record_id=r.id) }}" class="btn btn-primary btn-sm" title="عرض">&#x1F441;</a>
-                            <form method="POST" action="{{ url_for('admin_list_remove_record', lid=clist.id, item_id=r.item_id) }}" style="display:inline;" onsubmit="return confirm('حذف هذا السجل من القائمة؟')">
-                                <button type="submit" class="btn btn-danger btn-sm" title="إزالة من القائمة">&#x2716;</button>
+                            <form method="POST" action="{{ url_for('admin_list_remove_record', lid=clist.id, item_id=r.item_id) }}" style="display:inline;" onsubmit="return confirm('حذف من القائمة؟')">
+                                <button type="submit" class="btn btn-danger btn-sm" title="حذف">&#x2716;</button>
                             </form>
                         </div>
                     </td>
@@ -85,7 +115,7 @@
 </div>
 {% else %}
 <div class="card" style="text-align: center; padding: 2rem; color: var(--text-light);">
-    القائمة فارغة. ابحث أعلاه لإضافة سجلات.
+    القائمة فارغة. أضف أسماء يدوياً أو ابحث في السجلات أعلاه.
 </div>
 {% endif %}
 

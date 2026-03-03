@@ -502,6 +502,19 @@ def migrate_db():
         )
     """)
 
+    # -- Custom list manual entries --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS custom_list_manual_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            list_id INTEGER NOT NULL,
+            full_name TEXT NOT NULL,
+            phone TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            added_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (list_id) REFERENCES custom_lists(id) ON DELETE CASCADE
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -2505,10 +2518,10 @@ def admin_record_delete_service(record_id, sid):
 def admin_custom_lists():
     db = get_db()
     lists = db.execute("""
-        SELECT cl.*, COUNT(cli.id) as item_count
+        SELECT cl.*,
+            (SELECT COUNT(*) FROM custom_list_items WHERE list_id=cl.id) +
+            (SELECT COUNT(*) FROM custom_list_manual_items WHERE list_id=cl.id) as item_count
         FROM custom_lists cl
-        LEFT JOIN custom_list_items cli ON cl.id = cli.list_id
-        GROUP BY cl.id
         ORDER BY cl.created_at DESC
     """).fetchall()
     return render_template('admin_custom_lists.html', lists=lists)
@@ -2546,7 +2559,12 @@ def admin_custom_list_detail(lid):
         ORDER BY cli.added_at DESC
     """, (lid,)).fetchall()
 
-    return render_template('admin_custom_list_detail.html', clist=clist, items=items)
+    manual_items = db.execute(
+        "SELECT * FROM custom_list_manual_items WHERE list_id=? ORDER BY added_at DESC", (lid,)
+    ).fetchall()
+
+    return render_template('admin_custom_list_detail.html',
+                           clist=clist, items=items, manual_items=manual_items)
 
 
 @app.route('/admin/list/<int:lid>/pdf')
@@ -2566,6 +2584,10 @@ def admin_custom_list_pdf(lid):
         ORDER BY cli.added_at ASC
     """, (lid,)).fetchall()
 
+    manual_items = db.execute(
+        "SELECT * FROM custom_list_manual_items WHERE list_id=? ORDER BY added_at ASC", (lid,)
+    ).fetchall()
+
     # Logo
     logo_b64 = ''
     logo_path = os.path.join(BASE_DIR, 'static', 'img', 'logo.jpg')
@@ -2573,8 +2595,10 @@ def admin_custom_list_pdf(lid):
         with open(logo_path, 'rb') as f:
             logo_b64 = base64.b64encode(f.read()).decode()
 
+    total_count = len(items) + len(manual_items)
     html = render_template('pdf_custom_list.html',
-                           clist=clist, items=items, logo_b64=logo_b64,
+                           clist=clist, items=items, manual_items=manual_items,
+                           total_count=total_count, logo_b64=logo_b64,
                            STATUS_MAP=STATUS_MAP,
                            now=datetime.now().strftime('%Y-%m-%d'))
 
@@ -2593,6 +2617,7 @@ def admin_custom_list_pdf(lid):
 def admin_delete_list(lid):
     db = get_db()
     db.execute("DELETE FROM custom_list_items WHERE list_id=?", (lid,))
+    db.execute("DELETE FROM custom_list_manual_items WHERE list_id=?", (lid,))
     db.execute("DELETE FROM custom_lists WHERE id=?", (lid,))
     db.commit()
     flash('تم حذف القائمة', 'success')
@@ -2624,6 +2649,34 @@ def admin_list_remove_record(lid, item_id):
     db.execute("DELETE FROM custom_list_items WHERE id=? AND list_id=?", (item_id, lid))
     db.commit()
     flash('تم حذف السجل من القائمة', 'success')
+    return redirect(url_for('admin_custom_list_detail', lid=lid))
+
+
+@app.route('/admin/list/<int:lid>/add_manual', methods=['POST'])
+@admin_required
+def admin_list_add_manual(lid):
+    name = request.form.get('full_name', '').strip()
+    if not name:
+        flash('يرجى إدخال الاسم', 'error')
+        return redirect(url_for('admin_custom_list_detail', lid=lid))
+    db = get_db()
+    db.execute("""
+        INSERT INTO custom_list_manual_items (list_id, full_name, phone, notes)
+        VALUES (?, ?, ?, ?)
+    """, (lid, name, request.form.get('phone', '').strip(),
+          request.form.get('notes', '').strip()))
+    db.commit()
+    flash(f'تم إضافة: {name}', 'success')
+    return redirect(url_for('admin_custom_list_detail', lid=lid))
+
+
+@app.route('/admin/list/<int:lid>/remove_manual/<int:mid>', methods=['POST'])
+@admin_required
+def admin_list_remove_manual(lid, mid):
+    db = get_db()
+    db.execute("DELETE FROM custom_list_manual_items WHERE id=? AND list_id=?", (mid, lid))
+    db.commit()
+    flash('تم الحذف من القائمة', 'success')
     return redirect(url_for('admin_custom_list_detail', lid=lid))
 
 

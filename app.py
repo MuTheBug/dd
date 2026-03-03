@@ -2043,7 +2043,10 @@ def _format_cell_value(record, col_key, current_year, minor_threshold=18):
     if col_key == 'kids_under_18_count':
         return record['kids_under_18_count'] if record['kids_under_18_count'] else '-'
     if col_key == 'children_summary':
-        children = json.loads(record['children_data'] or '[]')
+        try:
+            children = json.loads(record['children_data'] or '[]')
+        except (json.JSONDecodeError, TypeError):
+            children = []
         if not children:
             return '-'
         parts = []
@@ -2057,7 +2060,10 @@ def _format_cell_value(record, col_key, current_year, minor_threshold=18):
                 parts.append(name)
         return ', '.join(parts)
     if col_key == 'minors_summary':
-        children = json.loads(record['children_data'] or '[]')
+        try:
+            children = json.loads(record['children_data'] or '[]')
+        except (json.JSONDecodeError, TypeError):
+            children = []
         mt = minor_threshold
         minors = []
         for c in children:
@@ -2078,14 +2084,20 @@ def _format_cell_value(record, col_key, current_year, minor_threshold=18):
                 parts.append(name)
         return ', '.join(parts)
     if col_key == 'kids_u13_names':
-        children = json.loads(record['children_data'] or '[]')
+        try:
+            children = json.loads(record['children_data'] or '[]')
+        except (json.JSONDecodeError, TypeError):
+            children = []
         mt = minor_threshold
         names = [c.get('name', '') for c in children
                  if (c.get('birth_year') and (current_year - int(c['birth_year'])) < mt)
                  or (c.get('age') and int(c['age']) < mt)]
         return ', '.join(names) if names else '-'
     if col_key == 'kids_u13_ages':
-        children = json.loads(record['children_data'] or '[]')
+        try:
+            children = json.loads(record['children_data'] or '[]')
+        except (json.JSONDecodeError, TypeError):
+            children = []
         mt = minor_threshold
         ages = []
         for c in children:
@@ -2870,10 +2882,11 @@ def admin_custom_list_detail(lid):
     ).fetchall()
 
     return render_template('admin_custom_list_detail.html',
-                           clist=clist, items=items, manual_items=manual_items)
+                           clist=clist, items=items, manual_items=manual_items,
+                           PDF_COLUMNS=PDF_COLUMNS)
 
 
-@app.route('/admin/list/<int:lid>/pdf')
+@app.route('/admin/list/<int:lid>/pdf', methods=['GET', 'POST'])
 @admin_required
 def admin_custom_list_pdf(lid):
     db = get_db()
@@ -2894,6 +2907,16 @@ def admin_custom_list_pdf(lid):
         "SELECT * FROM custom_list_manual_items WHERE list_id=? ORDER BY added_at ASC", (lid,)
     ).fetchall()
 
+    # Determine selected columns
+    args = request.form if request.method == 'POST' else request.args
+    selected_cols = args.getlist('cols')
+    col_map = dict(PDF_COLUMNS)
+    if selected_cols:
+        pdf_cols = [(k, col_map[k]) for k in selected_cols if k in col_map]
+    else:
+        pdf_cols = [('first_name', 'الاسم'), ('father_name', 'الأب'), ('last_name', 'الكنية'),
+                    ('phone', 'الهاتف'), ('status', 'الحالة'), ('notes', 'ملاحظات')]
+
     # Logo
     logo_b64 = ''
     logo_path = os.path.join(BASE_DIR, 'static', 'img', 'logo.jpg')
@@ -2901,11 +2924,19 @@ def admin_custom_list_pdf(lid):
         with open(logo_path, 'rb') as f:
             logo_b64 = base64.b64encode(f.read()).decode()
 
+    current_year = datetime.now().year
     total_count = len(items) + len(manual_items)
     html = render_template('pdf_custom_list.html',
                            clist=clist, items=items, manual_items=manual_items,
                            total_count=total_count, logo_b64=logo_b64,
+                           pdf_cols=pdf_cols, current_year=current_year,
                            STATUS_MAP=STATUS_MAP,
+                           MARITAL_STATUSES=MARITAL_STATUSES,
+                           CASE_TYPES=CASE_TYPES,
+                           EVIDENCE_LEVELS=EVIDENCE_LEVELS,
+                           VERIFICATION_STATUSES=VERIFICATION_STATUSES,
+                           DIGITAL_EVIDENCE_TYPES=DIGITAL_EVIDENCE_TYPES,
+                           CIVIL_REGISTRY_STATUSES=CIVIL_REGISTRY_STATUSES,
                            now=datetime.now().strftime('%Y-%m-%d'))
 
     from weasyprint import HTML
@@ -2918,11 +2949,12 @@ def admin_custom_list_pdf(lid):
     return response
 
 
-@app.route('/admin/list/<int:lid>/excel')
+@app.route('/admin/list/<int:lid>/excel', methods=['GET', 'POST'])
 @admin_required
 def admin_custom_list_excel(lid):
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
 
     db = get_db()
     clist = db.execute("SELECT * FROM custom_lists WHERE id=?", (lid,)).fetchone()
@@ -2942,9 +2974,21 @@ def admin_custom_list_excel(lid):
         "SELECT * FROM custom_list_manual_items WHERE list_id=? ORDER BY added_at ASC", (lid,)
     ).fetchall()
 
+    # Determine selected columns
+    args = request.form if request.method == 'POST' else request.args
+    selected_cols = args.getlist('cols')
+    col_map = dict(PDF_COLUMNS)
+    if selected_cols:
+        pdf_cols = [(k, col_map[k]) for k in selected_cols if k in col_map]
+    else:
+        pdf_cols = [('first_name', 'الاسم'), ('father_name', 'الأب'), ('last_name', 'الكنية'),
+                    ('phone', 'الهاتف'), ('status', 'الحالة'), ('notes', 'ملاحظات')]
+
+    current_year = datetime.now().year
+
     wb = Workbook()
     ws = wb.active
-    ws.title = clist['name'][:31]  # Excel sheet name max 31 chars
+    ws.title = clist['name'][:31]
     ws.sheet_view.rightToLeft = True
 
     header_fill = PatternFill(start_color='1a5276', end_color='1a5276', fill_type='solid')
@@ -2955,7 +2999,8 @@ def admin_custom_list_excel(lid):
     )
     wrap_align = Alignment(horizontal='right', vertical='center', wrap_text=True)
 
-    headers = ['#', 'الاسم', 'الهاتف', 'الحالة', 'ملاحظات']
+    # Header row: # + selected columns
+    headers = ['#'] + [label for _, label in pdf_cols]
     for col_idx, h in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_idx, value=h)
         cell.font = header_font
@@ -2966,27 +3011,35 @@ def admin_custom_list_excel(lid):
     row_num = 2
     counter = 1
 
-    # Manual items first
+    # Manual items first (only fill columns that match manual item fields)
+    manual_field_map = {'first_name': 'full_name', 'father_name': None, 'last_name': None,
+                        'phone': 'phone', 'notes': 'notes'}
     for m in manual_items:
-        vals = [counter, m['full_name'], m['phone'] or '', '', m['notes'] or '']
-        for col_idx, val in enumerate(vals, 1):
+        cell = ws.cell(row=row_num, column=1, value=counter)
+        cell.alignment = wrap_align
+        cell.border = thin_border
+        for col_idx, (col_key, _) in enumerate(pdf_cols, 2):
+            if col_key == 'first_name':
+                val = m['full_name']
+            elif col_key == 'phone':
+                val = m['phone'] or ''
+            elif col_key == 'notes':
+                val = m['notes'] or ''
+            else:
+                val = ''
             cell = ws.cell(row=row_num, column=col_idx, value=val)
             cell.alignment = wrap_align
             cell.border = thin_border
         row_num += 1
         counter += 1
 
-    # Record items
+    # Record items using _format_cell_value
     for r in items:
-        name = f"{r['first_name']} {r['father_name'] or ''} {r['last_name'] or ''}".strip()
-        phone = r['phone'] or r['spouse_phone'] or r['guardian_phone'] or r['reporter_phone'] or ''
-        status = STATUS_MAP.get(r['status'], r['status'] or '')
-        # Widow indicator
-        if r['marital'] == 'married' and r['gender'] == 'male' and r['status'] in ('deceased', 'enforced'):
-            status += ' — ' + ('زوجته أرملة' if r['status'] == 'deceased' else 'زوجة مغيّب')
-        notes = r['province'] or ''
-        vals = [counter, name, phone, status, notes]
-        for col_idx, val in enumerate(vals, 1):
+        cell = ws.cell(row=row_num, column=1, value=counter)
+        cell.alignment = wrap_align
+        cell.border = thin_border
+        for col_idx, (col_key, _) in enumerate(pdf_cols, 2):
+            val = _format_cell_value(r, col_key, current_year)
             cell = ws.cell(row=row_num, column=col_idx, value=val)
             cell.alignment = wrap_align
             cell.border = thin_border
@@ -2995,10 +3048,8 @@ def admin_custom_list_excel(lid):
 
     # Auto-fit widths
     ws.column_dimensions['A'].width = 6
-    ws.column_dimensions['B'].width = 30
-    ws.column_dimensions['C'].width = 18
-    ws.column_dimensions['D'].width = 18
-    ws.column_dimensions['E'].width = 20
+    for i in range(len(pdf_cols)):
+        ws.column_dimensions[get_column_letter(i + 2)].width = 18
 
     ws.freeze_panes = 'A2'
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <style>
 @page {
-    size: A4 portrait;
+    size: A4 landscape;
     margin: 1.2cm 1.5cm;
     @top-center {
         content: "حقنا — {{ clist.name }}";
@@ -23,7 +23,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
     font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-    font-size: 11pt;
+    font-size: 10pt;
     line-height: 1.5;
     color: #2d3748;
     direction: rtl;
@@ -61,22 +61,36 @@ body {
 table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 10pt;
+    font-size: 9pt;
 }
 thead th {
     background: #1a365d;
     color: white;
-    padding: 7px 8px;
+    padding: 6px 6px;
     text-align: right;
     font-weight: 700;
-    font-size: 9pt;
+    font-size: 8pt;
+    white-space: nowrap;
 }
 tbody td {
-    padding: 6px 8px;
+    padding: 5px 6px;
     border-bottom: 1px solid #e2e8f0;
     vertical-align: top;
 }
 tbody tr:nth-child(even) { background: #f7fafc; }
+
+.badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 8pt;
+    font-weight: 700;
+    color: white;
+    white-space: nowrap;
+}
+.badge-survivor { background: #38a169; }
+.badge-enforced { background: #dd6b20; }
+.badge-deceased { background: #e53e3e; }
 
 .phone-label { font-size: 7pt; color: #a0aec0; }
 .note-text { font-size: 8pt; color: #718096; }
@@ -101,42 +115,103 @@ tbody tr:nth-child(even) { background: #f7fafc; }
     <span>تاريخ الطباعة: {{ now }}</span>
 </div>
 
+{% set mt = 18 %}
+
 <table>
     <thead>
         <tr>
-            <th style="width:30px;">#</th>
-            <th>الاسم</th>
-            <th>الهاتف</th>
-            <th>ملاحظات</th>
+            <th style="width:25px;">#</th>
+            {% for col_key, col_label in pdf_cols %}
+            <th>{{ col_label }}</th>
+            {% endfor %}
         </tr>
     </thead>
     <tbody>
         {% set counter = {'n': 1} %}
+        {# Manual items first #}
         {% for m in manual_items %}
         <tr>
             <td>{{ counter.n }}{% if counter.update({'n': counter.n + 1}) %}{% endif %}</td>
-            <td style="font-weight: 600;">{{ m.full_name }}</td>
-            <td dir="ltr" style="text-align: right;">{{ m.phone or '-' }}</td>
-            <td class="note-text">{{ m.notes or '' }}</td>
+            {% for col_key, col_label in pdf_cols %}
+            <td>
+                {% if col_key == 'first_name' %}
+                    <strong>{{ m.full_name }}</strong>
+                {% elif col_key == 'phone' %}
+                    {{ m.phone or '-' }}
+                {% elif col_key == 'notes' %}
+                    {{ m.notes or '' }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            {% endfor %}
         </tr>
         {% endfor %}
+        {# Record items #}
         {% for r in items %}
         <tr>
             <td>{{ counter.n }}{% if counter.update({'n': counter.n + 1}) %}{% endif %}</td>
-            <td style="font-weight: 600;">{{ r.first_name }} {{ r.father_name or '' }} {{ r.last_name or '' }}</td>
-            <td dir="ltr" style="text-align: right;">
-                {% if r.phone %}{{ r.phone }}
-                {% elif r.spouse_phone %}{{ r.spouse_phone }} <span class="phone-label">(زوج/ة)</span>
-                {% elif r.guardian_phone %}{{ r.guardian_phone }} <span class="phone-label">(ولي أمر)</span>
-                {% elif r.reporter_phone %}{{ r.reporter_phone }} <span class="phone-label">(مبلغ)</span>
-                {% else %}-{% endif %}
-            </td>
-            <td class="note-text">
-                {{ r.province or '' }}
-                {% if r.marital == 'married' and r.gender == 'male' and r.status in ('deceased', 'enforced') %}
-                <br><span style="font-size: 7pt; color: #92400e;">{% if r.status == 'deceased' %}زوجته أرملة{% else %}زوجة مغيّب{% endif %}</span>
+            {% for col_key, col_label in pdf_cols %}
+            <td>
+                {% if col_key == 'status' %}
+                    {% if r.status == 'survivor' %}<span class="badge badge-survivor">ناجٍ</span>
+                    {% elif r.status == 'enforced' %}<span class="badge badge-enforced">مغيّب</span>
+                    {% elif r.status == 'deceased' %}<span class="badge badge-deceased">متوفى</span>
+                    {% else %}-{% endif %}
+                    {% if r.marital == 'married' and r.gender == 'male' and r.status in ('deceased', 'enforced') %}
+                    <br><span style="font-size:7pt; color:#92400e;">{% if r.status == 'deceased' %}زوجته أرملة{% else %}زوجة مغيّب{% endif %}</span>
+                    {% endif %}
+                {% elif col_key == 'gender' %}
+                    {{ 'ذكر' if r.gender == 'male' else 'أنثى' if r.gender == 'female' else '-' }}
+                {% elif col_key == 'marital' %}
+                    {% for c,l in MARITAL_STATUSES %}{% if r.marital==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.marital }}
+                {% elif col_key == 'case_type' %}
+                    {% for c,l in CASE_TYPES %}{% if r.case_type==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.case_type }}
+                {% elif col_key == 'evidence_level' %}
+                    {% for c,l in EVIDENCE_LEVELS %}{% if r.evidence_level==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.evidence_level }}
+                {% elif col_key == 'verification_status' %}
+                    {% for c,l in VERIFICATION_STATUSES %}{% if r.verification_status==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.verification_status }}
+                {% elif col_key == 'digital_evidence_type' %}
+                    {% for c,l in DIGITAL_EVIDENCE_TYPES %}{% if r.digital_evidence_type==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.digital_evidence_type }}
+                {% elif col_key == 'civil_registry_status' %}
+                    {% for c,l in CIVIL_REGISTRY_STATUSES %}{% if r.civil_registry_status==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not r.civil_registry_status }}
+                {% elif col_key in ('has_special_needs', 'has_hypertension', 'has_diabetes', 'has_conflicting_info', 'is_officially_registered') %}
+                    {{ 'نعم' if r[col_key] else '-' }}
+                {% elif col_key == 'kids_count' %}
+                    {{ r.kids_count if r.has_kids == 'yes' else '-' }}
+                {% elif col_key == 'kids_under_18_count' %}
+                    {{ r.kids_under_18_count if r.kids_under_18_count else '-' }}
+                {% elif col_key == 'children_summary' %}
+                    {% set ch = r.children_data|from_json %}
+                    {% if ch %}{% for c in ch %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ current_year - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                {% elif col_key == 'minors_summary' %}
+                    {% set ch = r.children_data|from_json %}
+                    {% set minors = [] %}
+                    {% if ch %}{% for c in ch %}{% if c.birth_year and (current_year - c.birth_year|int) < mt %}{% if minors.append(c) %}{% endif %}{% elif c.age and c.age|int < mt %}{% if minors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if minors %}{% for c in minors %}{{ c.name }}{% if c.birth_year %}({{ c.birth_year }}){% elif c.age %}(~{{ current_year - c.age|int }}){% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                {% elif col_key == 'kids_u13_names' %}
+                    {% set ch = r.children_data|from_json %}
+                    {% set uminors = [] %}
+                    {% if ch %}{% for c in ch %}{% if c.birth_year and (current_year - c.birth_year|int) < mt %}{% if uminors.append(c) %}{% endif %}{% elif c.age and c.age|int < mt %}{% if uminors.append(c) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if uminors %}{% for c in uminors %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                {% elif col_key == 'kids_u13_ages' %}
+                    {% set ch = r.children_data|from_json %}
+                    {% set ages = [] %}
+                    {% if ch %}{% for c in ch %}{% if c.birth_year and (current_year - c.birth_year|int) < mt %}{% if ages.append(current_year - c.birth_year|int) %}{% endif %}{% elif c.age and c.age|int < mt %}{% if ages.append(c.age|int) %}{% endif %}{% endif %}{% endfor %}{% endif %}
+                    {% if ages %}{% for a in ages %}{{ a }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                {% elif col_key == 'phone' %}
+                    {% if r.phone %}{{ r.phone }}
+                    {% elif r.spouse_phone %}{{ r.spouse_phone }} <span class="phone-label">(زوج/ة)</span>
+                    {% elif r.guardian_phone %}{{ r.guardian_phone }} <span class="phone-label">(ولي أمر)</span>
+                    {% elif r.reporter_phone %}{{ r.reporter_phone }} <span class="phone-label">(مبلغ)</span>
+                    {% else %}-{% endif %}
+                {% elif col_key == 'first_name' %}
+                    <strong>{{ r[col_key] or '-' }}</strong>
+                {% else %}
+                    {{ r[col_key] or '-' }}
                 {% endif %}
             </td>
+            {% endfor %}
         </tr>
         {% endfor %}
     </tbody>

@@ -37,7 +37,15 @@
                     <a href="{{ url_for('admin_records', status='survivor') }}" class="btn btn-outline btn-sm">الناجون</a>
                     <a href="{{ url_for('admin_records', status='enforced') }}" class="btn btn-outline btn-sm">المغيّبون</a>
                     <a href="{{ url_for('admin_records', status='deceased') }}" class="btn btn-outline btn-sm">المتوفون</a>
-                    <a href="{{ url_for('admin_records', sort_by_need='1') }}" class="btn btn-outline btn-sm" style="background:#dc2626; color:white; border-color:#dc2626;">&#x1F198; الأكثر احتياجاً</a>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--filter-preset-border);">
+                    <span style="font-size:0.82rem; font-weight:600; color:#dc2626; align-self:center;">&#x1F198; الأكثر احتياجاً:</span>
+                    <a href="{{ url_for('admin_records', sort_by_need='1') }}" class="btn btn-outline btn-sm" style="border-color:#dc2626; color:#dc2626;">الكل</a>
+                    <a href="{{ url_for('admin_records', sort_by_need='1', status='survivor') }}" class="btn btn-outline btn-sm" style="border-color:#dc2626; color:#dc2626;">الناجون</a>
+                    <a href="{{ url_for('admin_records', sort_by_need='1', status='enforced') }}" class="btn btn-outline btn-sm" style="border-color:#dc2626; color:#dc2626;">المغيّبون</a>
+                    <a href="{{ url_for('admin_records', sort_by_need='1', status='deceased') }}" class="btn btn-outline btn-sm" style="border-color:#dc2626; color:#dc2626;">المتوفون</a>
+                    <a href="{{ url_for('admin_records', sort_by_need='1', status='deceased,enforced') }}" class="btn btn-outline btn-sm" style="border-color:#dc2626; color:#dc2626;">متوفون + مغيّبون</a>
+                    <a href="{{ url_for('admin_records', sort_by_need='1', status='survivor,enforced') }}" class="btn btn-outline btn-sm" style="border-color:#dc2626; color:#dc2626;">ناجون + مغيّبون</a>
                 </div>
             </div>
 

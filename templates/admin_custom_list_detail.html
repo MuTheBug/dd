@@ -11,6 +11,7 @@
     <div class="btn-group">
         {% if total > 0 %}
         <a href="{{ url_for('admin_custom_list_pdf', lid=clist.id) }}" class="btn btn-primary btn-sm" target="_blank">&#x1F5A8; طباعة PDF</a>
+        <a href="{{ url_for('admin_custom_list_excel', lid=clist.id) }}" class="btn btn-outline btn-sm" style="background:#217346; color:white; border-color:#217346;">&#x1F4CA; تصدير Excel</a>
         {% endif %}
         <a href="{{ url_for('admin_custom_lists') }}" class="btn btn-outline btn-sm">&#x2190; العودة للقوائم</a>
     </div>

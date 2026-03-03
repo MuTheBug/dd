@@ -1901,6 +1901,201 @@ def records_list_pdf():
 
 
 # ---------------------------------------------------------------------------
+# Export: records list → Excel
+# ---------------------------------------------------------------------------
+def _format_cell_value(record, col_key, current_year, minor_threshold=18):
+    """Format a record's column value for Excel export (mirrors PDF template logic)."""
+    if col_key == 'status':
+        return STATUS_MAP.get(record['status'], record['status'] or '-')
+    if col_key == 'gender':
+        return {'male': 'ذكر', 'female': 'أنثى'}.get(record['gender'], '-')
+    if col_key == 'marital':
+        mmap = dict(MARITAL_STATUSES)
+        return mmap.get(record['marital'], record['marital'] or '-')
+    if col_key == 'case_type':
+        cmap = dict(CASE_TYPES)
+        return cmap.get(record['case_type'], record['case_type'] or '-')
+    if col_key == 'evidence_level':
+        emap = dict(EVIDENCE_LEVELS)
+        return emap.get(record['evidence_level'], record['evidence_level'] or '-')
+    if col_key == 'verification_status':
+        vmap = dict(VERIFICATION_STATUSES)
+        return vmap.get(record['verification_status'], record['verification_status'] or '-')
+    if col_key == 'digital_evidence_type':
+        dmap = dict(DIGITAL_EVIDENCE_TYPES)
+        return dmap.get(record['digital_evidence_type'], record['digital_evidence_type'] or '-')
+    if col_key == 'civil_registry_status':
+        crmap = dict(CIVIL_REGISTRY_STATUSES)
+        return crmap.get(record['civil_registry_status'], record['civil_registry_status'] or '-')
+    if col_key in ('has_special_needs', 'has_hypertension', 'has_diabetes',
+                    'has_conflicting_info', 'is_officially_registered'):
+        return 'نعم' if record[col_key] else '-'
+    if col_key == 'kids_count':
+        return record['kids_count'] if record['has_kids'] == 'yes' else '-'
+    if col_key == 'kids_under_18_count':
+        return record['kids_under_18_count'] if record['kids_under_18_count'] else '-'
+    if col_key == 'children_summary':
+        children = json.loads(record['children_data'] or '[]')
+        if not children:
+            return '-'
+        parts = []
+        for c in children:
+            name = c.get('name', '')
+            if c.get('birth_year'):
+                parts.append(f"{name}({c['birth_year']})")
+            elif c.get('age'):
+                parts.append(f"{name}(~{current_year - int(c['age'])})")
+            else:
+                parts.append(name)
+        return ', '.join(parts)
+    if col_key == 'minors_summary':
+        children = json.loads(record['children_data'] or '[]')
+        mt = minor_threshold
+        minors = []
+        for c in children:
+            if c.get('birth_year') and (current_year - int(c['birth_year'])) < mt:
+                minors.append(c)
+            elif c.get('age') and int(c['age']) < mt:
+                minors.append(c)
+        if not minors:
+            return '-'
+        parts = []
+        for c in minors:
+            name = c.get('name', '')
+            if c.get('birth_year'):
+                parts.append(f"{name}({c['birth_year']})")
+            elif c.get('age'):
+                parts.append(f"{name}(~{current_year - int(c['age'])})")
+            else:
+                parts.append(name)
+        return ', '.join(parts)
+    if col_key == 'kids_u13_names':
+        children = json.loads(record['children_data'] or '[]')
+        mt = minor_threshold
+        names = [c.get('name', '') for c in children
+                 if (c.get('birth_year') and (current_year - int(c['birth_year'])) < mt)
+                 or (c.get('age') and int(c['age']) < mt)]
+        return ', '.join(names) if names else '-'
+    if col_key == 'kids_u13_ages':
+        children = json.loads(record['children_data'] or '[]')
+        mt = minor_threshold
+        ages = []
+        for c in children:
+            if c.get('birth_year') and (current_year - int(c['birth_year'])) < mt:
+                ages.append(str(current_year - int(c['birth_year'])))
+            elif c.get('age') and int(c['age']) < mt:
+                ages.append(str(int(c['age'])))
+        return ', '.join(ages) if ages else '-'
+    # Default
+    val = record[col_key] if col_key in record.keys() else ''
+    return val if val not in (None, '') else '-'
+
+
+@app.route('/admin/records/excel', methods=['GET', 'POST'])
+@admin_required
+def records_list_excel():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    db = get_db()
+    args = request.form if request.method == 'POST' else request.args
+
+    conditions, params, pdf_status_list = build_pdf_filter_conditions(args)
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    records = db.execute(
+        f"SELECT * FROM records{where} ORDER BY id DESC LIMIT 500", params
+    ).fetchall()
+
+    # Post-filters (same as PDF)
+    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
+    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
+    if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
+        records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
+    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+    if args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18:
+        if args['has_kids_under_18'] == 'yes':
+            records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]
+        else:
+            records = [r for r in records if not record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]
+
+    # Custom record ordering
+    record_order = args.getlist('record_order')
+    if record_order:
+        ordered_ids = [int(x) for x in record_order if x.isdigit()]
+        rec_map = {r['id']: r for r in records}
+        missing_ids = [rid for rid in ordered_ids if rid not in rec_map]
+        if missing_ids:
+            placeholders = ','.join(['?'] * len(missing_ids))
+            extra = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", missing_ids).fetchall()
+            for r in extra:
+                rec_map[r['id']] = r
+        records = [rec_map[rid] for rid in ordered_ids if rid in rec_map]
+
+    pdf_limit = args.get('pdf_limit', '').strip()
+    if pdf_limit and pdf_limit.isdigit() and int(pdf_limit) > 0:
+        records = records[:int(pdf_limit)]
+
+    selected_cols = args.getlist('cols')
+    if not selected_cols:
+        selected_cols = DEFAULT_PDF_COLS
+    col_map = dict(PDF_COLUMNS)
+    excel_cols = [(c, col_map.get(c, c)) for c in selected_cols if c in col_map]
+    current_year = datetime.now().year
+
+    # Create workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'السجلات'
+    ws.sheet_view.rightToLeft = True
+
+    # Styles
+    header_font = Font(bold=True, size=11)
+    header_fill = PatternFill(start_color='1a5276', end_color='1a5276', fill_type='solid')
+    header_font_white = Font(bold=True, size=11, color='FFFFFF')
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    wrap_alignment = Alignment(horizontal='right', vertical='center', wrap_text=True)
+
+    # Write headers
+    for col_idx, (col_key, col_label) in enumerate(excel_cols, 1):
+        cell = ws.cell(row=1, column=col_idx, value=col_label)
+        cell.font = header_font_white
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin_border
+
+    # Write data rows
+    for row_idx, record in enumerate(records, 2):
+        for col_idx, (col_key, _) in enumerate(excel_cols, 1):
+            val = _format_cell_value(record, col_key, current_year, pdf_minor_threshold)
+            cell = ws.cell(row=row_idx, column=col_idx, value=val if val != '-' else '')
+            cell.alignment = wrap_alignment
+            cell.border = thin_border
+
+    # Auto-fit column widths (approximate)
+    for col_idx, (col_key, col_label) in enumerate(excel_cols, 1):
+        max_len = len(col_label)
+        for row_idx in range(2, min(len(records) + 2, 50)):
+            cell_val = str(ws.cell(row=row_idx, column=col_idx).value or '')
+            max_len = max(max_len, min(len(cell_val), 40))
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = max_len + 4
+
+    # Freeze header row
+    ws.freeze_panes = 'A2'
+
+    # Write to buffer
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f'records_report_{int(time.time())}.xlsx'
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
+
+# ---------------------------------------------------------------------------
 # Export: kids missing birth dates
 # ---------------------------------------------------------------------------
 @app.route('/admin/export/kids_no_birthdate')
@@ -2613,6 +2808,99 @@ def admin_custom_list_pdf(lid):
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = f"inline; filename=list_{lid}.pdf; filename*=UTF-8''{encoded_name}"
     return response
+
+
+@app.route('/admin/list/<int:lid>/excel')
+@admin_required
+def admin_custom_list_excel(lid):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    db = get_db()
+    clist = db.execute("SELECT * FROM custom_lists WHERE id=?", (lid,)).fetchone()
+    if not clist:
+        flash('القائمة غير موجودة', 'error')
+        return redirect(url_for('admin_custom_lists'))
+
+    items = db.execute("""
+        SELECT r.*, cli.added_at
+        FROM custom_list_items cli
+        JOIN records r ON cli.record_id = r.id
+        WHERE cli.list_id = ?
+        ORDER BY cli.added_at ASC
+    """, (lid,)).fetchall()
+
+    manual_items = db.execute(
+        "SELECT * FROM custom_list_manual_items WHERE list_id=? ORDER BY added_at ASC", (lid,)
+    ).fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = clist['name'][:31]  # Excel sheet name max 31 chars
+    ws.sheet_view.rightToLeft = True
+
+    header_fill = PatternFill(start_color='1a5276', end_color='1a5276', fill_type='solid')
+    header_font = Font(bold=True, size=11, color='FFFFFF')
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    wrap_align = Alignment(horizontal='right', vertical='center', wrap_text=True)
+
+    headers = ['#', 'الاسم', 'الهاتف', 'الحالة', 'ملاحظات']
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin_border
+
+    row_num = 2
+    counter = 1
+
+    # Manual items first
+    for m in manual_items:
+        vals = [counter, m['full_name'], m['phone'] or '', '', m['notes'] or '']
+        for col_idx, val in enumerate(vals, 1):
+            cell = ws.cell(row=row_num, column=col_idx, value=val)
+            cell.alignment = wrap_align
+            cell.border = thin_border
+        row_num += 1
+        counter += 1
+
+    # Record items
+    for r in items:
+        name = f"{r['first_name']} {r['father_name'] or ''} {r['last_name'] or ''}".strip()
+        phone = r['phone'] or r['spouse_phone'] or r['guardian_phone'] or r['reporter_phone'] or ''
+        status = STATUS_MAP.get(r['status'], r['status'] or '')
+        # Widow indicator
+        if r['marital'] == 'married' and r['gender'] == 'male' and r['status'] in ('deceased', 'enforced'):
+            status += ' — ' + ('زوجته أرملة' if r['status'] == 'deceased' else 'زوجة مغيّب')
+        notes = r['province'] or ''
+        vals = [counter, name, phone, status, notes]
+        for col_idx, val in enumerate(vals, 1):
+            cell = ws.cell(row=row_num, column=col_idx, value=val)
+            cell.alignment = wrap_align
+            cell.border = thin_border
+        row_num += 1
+        counter += 1
+
+    # Auto-fit widths
+    ws.column_dimensions['A'].width = 6
+    ws.column_dimensions['B'].width = 30
+    ws.column_dimensions['C'].width = 18
+    ws.column_dimensions['D'].width = 18
+    ws.column_dimensions['E'].width = 20
+
+    ws.freeze_panes = 'A2'
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f'list_{lid}_{int(time.time())}.xlsx'
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
 
 
 @app.route('/admin/list/<int:lid>/delete', methods=['POST'])

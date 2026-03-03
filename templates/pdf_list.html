@@ -276,6 +276,12 @@ tfoot td {
                     {% set ages = [] %}
                     {% if ch %}{% for c in ch %}{% if c.birth_year and (current_year - c.birth_year|int) < mt %}{% if ages.append(current_year - c.birth_year|int) %}{% endif %}{% elif c.age and c.age|int < mt %}{% if ages.append(c.age|int) %}{% endif %}{% endif %}{% endfor %}{% endif %}
                     {% if ages %}{% for a in ages %}{{ a }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}
+                {% elif col_key == 'contact_phone' %}
+                    {% if r.phone %}{{ r.phone }}
+                    {% elif r.spouse_phone %}{{ r.spouse_phone }}
+                    {% elif r.guardian_phone %}{{ r.guardian_phone }}
+                    {% elif r.reporter_phone %}{{ r.reporter_phone }}
+                    {% else %}-{% endif %}
                 {% elif col_key == 'first_name' %}
                     <strong>{{ r[col_key] or '-' }}</strong>
                 {% else %}

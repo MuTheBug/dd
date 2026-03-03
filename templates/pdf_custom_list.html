@@ -136,7 +136,7 @@ tbody tr:nth-child(even) { background: #f7fafc; }
             <td>
                 {% if col_key == 'first_name' %}
                     <strong>{{ m.full_name }}</strong>
-                {% elif col_key == 'phone' %}
+                {% elif col_key in ('phone', 'contact_phone') %}
                     {{ m.phone or '-' }}
                 {% elif col_key == 'notes' %}
                     {{ m.notes or '' }}
@@ -204,6 +204,12 @@ tbody tr:nth-child(even) { background: #f7fafc; }
                     {% elif r.spouse_phone %}{{ r.spouse_phone }} <span class="phone-label">(زوج/ة)</span>
                     {% elif r.guardian_phone %}{{ r.guardian_phone }} <span class="phone-label">(ولي أمر)</span>
                     {% elif r.reporter_phone %}{{ r.reporter_phone }} <span class="phone-label">(مبلغ)</span>
+                    {% else %}-{% endif %}
+                {% elif col_key == 'contact_phone' %}
+                    {% if r.phone %}{{ r.phone }}
+                    {% elif r.spouse_phone %}{{ r.spouse_phone }}
+                    {% elif r.guardian_phone %}{{ r.guardian_phone }}
+                    {% elif r.reporter_phone %}{{ r.reporter_phone }}
                     {% else %}-{% endif %}
                 {% elif col_key == 'first_name' %}
                     <strong>{{ r[col_key] or '-' }}</strong>

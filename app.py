@@ -77,6 +77,7 @@ PDF_COLUMNS = [
     ('province', 'المحافظة'),
     ('national_id', 'الرقم الوطني'),
     ('phone', 'الهاتف'),
+    ('contact_phone', 'رقم التواصل'),
     ('gender', 'الجنس'),
     ('birth_year', 'سنة الميلاد'),
     ('arrest_year', 'سنة الاعتقال'),
@@ -2035,6 +2036,9 @@ def _format_cell_value(record, col_key, current_year, minor_threshold=18):
     if col_key == 'civil_registry_status':
         crmap = dict(CIVIL_REGISTRY_STATUSES)
         return crmap.get(record['civil_registry_status'], record['civil_registry_status'] or '-')
+    if col_key == 'contact_phone':
+        return (record['phone'] or record['spouse_phone'] or
+                record['guardian_phone'] or record['reporter_phone'] or '-')
     if col_key in ('has_special_needs', 'has_hypertension', 'has_diabetes',
                     'has_conflicting_info', 'is_officially_registered'):
         return 'نعم' if record[col_key] else '-'

@@ -141,7 +141,7 @@
             <label>الرقم الوطني</label>
             <input type="text" name="national_id" value="{{ record.national_id }}" required>
         </div>
-        <div class="form-group">
+        <div class="form-group" {% if record.status in ('deceased', 'enforced') %}style="display:none"{% endif %}>
             <label>الهاتف</label>
             <input type="tel" name="phone" value="{{ record.phone or '' }}">
         </div>
@@ -525,29 +525,18 @@
 <div class="form-section">
     <div class="form-section-title">&#x1F3E5; الحالة الصحية</div>
     <div class="form-grid">
-        <div class="form-group">
-            <label>أمراض مزمنة</label>
-            <input type="text" name="chronic" value="{{ record.chronic or '' }}">
-        </div>
-        <div class="form-group">
-            <label>أمراض</label>
-            <input type="text" name="diseases" value="{{ record.diseases or '' }}">
-        </div>
-        <div class="form-group">
-            <label class="checkbox-label">
-                <input type="checkbox" name="has_hypertension" value="1" {{ 'checked' if record.has_hypertension }}>
-                ضغط دم
-            </label>
-        </div>
-        <div class="form-group">
-            <label class="checkbox-label">
-                <input type="checkbox" name="has_diabetes" value="1" {{ 'checked' if record.has_diabetes }}>
-                سكري
-            </label>
-        </div>
-        <div class="form-group">
-            <label>أمراض أخرى</label>
-            <input type="text" name="other_diseases" value="{{ record.other_diseases or '' }}">
+        {% set current_chronic = (record.chronic or '') %}
+        <div class="form-group full-width">
+            <label>الأمراض المزمنة (اختر ما ينطبق)</label>
+            <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:0.3rem; padding:0.4rem 0;">
+                {% for disease in CHRONIC_DISEASES %}
+                <label class="checkbox-label" style="font-size:0.88rem;">
+                    <input type="checkbox" name="chronic_list" value="{{ disease }}" {{ 'checked' if disease in current_chronic }}>
+                    {{ disease }}
+                </label>
+                {% endfor %}
+            </div>
+            <input type="text" name="other_diseases" value="{{ record.other_diseases or '' }}" placeholder="أمراض أخرى غير مذكورة..." style="margin-top:0.4rem;">
         </div>
         <div class="form-group">
             <label class="checkbox-label">
@@ -564,14 +553,14 @@
 
 <!-- Legal -->
 <div class="form-section">
-    <div class="form-section-title">&#x2696;&#xFE0F; القانوني والجمعيات</div>
+    <div class="form-section-title">&#x2696;&#xFE0F; المشاكل القانونية والجمعيات</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>إجراء قانوني</label>
+            <label>مشاكل قانونية</label>
             <input type="text" name="legal" value="{{ record.legal or '' }}">
         </div>
         <div class="form-group full-width">
-            <label>تفاصيل قانونية</label>
+            <label>تفاصيل المشاكل القانونية</label>
             <textarea name="legal_details" rows="2">{{ record.legal_details or '' }}</textarea>
         </div>
         <div class="form-group">
@@ -725,14 +714,15 @@ function addChild(data) {
         '<input type="number" class="child-birth-year" value="' + (data.birth_year || data.birthYear || (data.age ? (currentYear - parseInt(data.age)) : '') || '') + '" min="1900" max="2026" style="font-size:0.8rem;padding:4px 6px;"></div>' +
         '<div class="form-group"><label style="font-size:0.7rem;">التحصيل العلمي</label>' +
         '<select class="child-education" style="font-size:0.8rem;padding:4px 6px;">' + eduOpts + '</select></div>' +
-        '<div class="form-group"><label style="font-size:0.7rem;">المدرسة/الجامعة</label>' +
-        '<input type="text" class="child-school" value="' + (data.school || '') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div class="form-group"><label style="font-size:0.7rem;">شو عم يدرس هلق؟</label>' +
+        '<input type="text" class="child-school" value="' + (data.school || '') + '" style="font-size:0.8rem;padding:4px 6px;" placeholder="إذا عم يكمل دراسة"></div>' +
         '<div class="form-group"><label style="font-size:0.7rem;">العمل</label>' +
         '<input type="text" class="child-employment" value="' + (data.employment || data.job || '') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
         '<div class="form-group"><label style="font-size:0.7rem;">ملاحظات صحية</label>' +
         '<input type="text" class="child-health" value="' + (data.health_notes || data.healthDetails || '') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
         '<div class="form-group"><label style="font-size:0.7rem;">احتياجات خاصة</label>' +
-        '<input type="text" class="child-special" value="' + (data.special_needs || '') + '" style="font-size:0.8rem;padding:4px 6px;"></div>' +
+        '<div style="display:flex;gap:0.6rem;padding:0.1rem 0;"><label style="font-size:0.75rem;"><input type="radio" name="child_special_' + idx + '" class="child-special" value="نعم"' + (data.special_needs==='نعم'?' checked':'') + '> نعم</label>' +
+        '<label style="font-size:0.75rem;"><input type="radio" name="child_special_' + idx + '" class="child-special" value="لا"' + (data.special_needs==='لا'||!data.special_needs?' checked':'') + '> لا</label></div></div>' +
         '</div>';
 
     container.appendChild(div);
@@ -767,7 +757,7 @@ function updateChildrenData() {
             school: e.querySelector('.child-school').value,
             employment: e.querySelector('.child-employment').value,
             health_notes: e.querySelector('.child-health').value,
-            special_needs: e.querySelector('.child-special').value
+            special_needs: (e.querySelector('.child-special:checked') || {}).value || ''
         };
         children.push(child);
         if (by > 0 && (currentYear - by) < 18) under18++;

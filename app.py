@@ -134,7 +134,7 @@ PDF_COLUMNS = [
     ('reporter_phone', 'هاتف المبلغ'),
     ('collector_name', 'جامع البيانات'),
     ('collection_date', 'تاريخ الجمع'),
-    ('legal', 'إجراء قانوني'),
+    ('legal', 'مشاكل قانونية'),
     ('assoc_name', 'الجمعية'),
     ('service_type', 'نوع الخدمة'),
     ('is_officially_registered', 'مسجل رسمياً'),
@@ -252,6 +252,16 @@ MARITAL_STATUSES = [
 ]
 
 HOUSING_TYPES = ['ملك', 'إيجار', 'رهن', 'مستضاف', 'أخرى']
+
+CHRONIC_DISEASES = [
+    'ضغط الدم', 'السكري', 'الربو', 'أمراض القلب', 'الكلى',
+    'الكبد', 'السرطان', 'الصرع', 'الثلاسيميا', 'فقر الدم',
+    'التهاب المفاصل', 'هشاشة العظام', 'الغدة الدرقية',
+    'أمراض الجهاز الهضمي', 'أمراض الجهاز التنفسي',
+    'أمراض نفسية', 'اكتئاب', 'اضطراب ما بعد الصدمة (PTSD)',
+    'إعاقة حركية', 'إعاقة بصرية', 'إعاقة سمعية',
+    'أخرى'
+]
 
 REPORTER_RELATIONS = [
     'أم', 'أب', 'أخ', 'أخت', 'زوج/ة', 'ابن/ة', 'قريب',
@@ -604,6 +614,7 @@ def inject_constants():
         'EDU_TYPES': EDU_TYPES,
         'MARITAL_STATUSES': MARITAL_STATUSES,
         'HOUSING_TYPES': HOUSING_TYPES,
+        'CHRONIC_DISEASES': CHRONIC_DISEASES,
         'REPORTER_RELATIONS': REPORTER_RELATIONS,
         'PDF_COLUMNS': PDF_COLUMNS,
         'DEFAULT_PDF_COLS': DEFAULT_PDF_COLS,
@@ -707,6 +718,12 @@ def entry_submit():
     children_data = form.get('children_data', '[]')
     children_data_w = form.get('children_data_w', '[]')
 
+    # Process chronic diseases checkboxes
+    chronic_list = form.getlist('chronic_list')
+    chronic_value = '، '.join(chronic_list) if chronic_list else form.get('chronic', '')
+    has_hypertension = 1 if 'ضغط الدم' in chronic_list else int(form.get('has_hypertension', 0) or 0)
+    has_diabetes = 1 if 'السكري' in chronic_list else int(form.get('has_diabetes', 0) or 0)
+
     # Determine record_slug
     slug = f"{form.get('first_name', '')}-{form.get('last_name', '')}-{int(time.time())}".replace(' ', '-')
 
@@ -782,9 +799,9 @@ def entry_submit():
         form.get('employer', ''), form.get('breadwinner', ''),
         form.get('breadwinner_job', ''), form.get('breadwinner_relation', ''),
         form.get('breadwinner_relation_other', ''),
-        form.get('chronic', ''), form.get('diseases', ''),
-        int(form.get('has_hypertension', 0) or 0),
-        int(form.get('has_diabetes', 0) or 0), form.get('other_diseases', ''),
+        chronic_value, form.get('diseases', ''),
+        has_hypertension,
+        has_diabetes, form.get('other_diseases', ''),
         int(form.get('has_special_needs', 0) or 0),
         form.get('special_needs_details', ''),
         form.get('education', ''), form.get('edu_type', ''),
@@ -906,6 +923,81 @@ def admin_dashboard():
     return render_template('admin_dashboard.html', stats=stats)
 
 
+def compute_need_score(record):
+    """Compute a vulnerability/need score (higher = more in need).
+    Factors: widow with kids, many minor children, young kids, rent,
+    chronic diseases, special needs, low education, no breadwinner."""
+    score = 0
+    current_year = datetime.now().year
+
+    # Widow/wife of missing (married male deceased/enforced) = very high need
+    if record['gender'] == 'male' and record['marital'] == 'married' and record['status'] in ('deceased', 'enforced'):
+        score += 30
+
+    # Number of minor children (under 18)
+    kids_u18 = record['kids_under_18_count'] or 0
+    score += kids_u18 * 8  # 8 points per minor child
+
+    # Young children (under 6) get extra points
+    try:
+        children = json.loads(record['children_data'] or '[]')
+        for c in children:
+            age = None
+            if c.get('birth_year'):
+                age = current_year - int(c['birth_year'])
+            elif c.get('age'):
+                age = int(c['age'])
+            if age is not None and age < 6:
+                score += 5  # extra for very young children
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Rent (paying rent = more vulnerable)
+    if record['housing_type'] == 'إيجار':
+        score += 10
+    rent = record['rent_amount'] or ''
+    if rent:
+        try:
+            rent_val = int(str(rent).replace(',', '').strip())
+            if rent_val > 0:
+                score += min(rent_val // 50000, 10)  # up to 10 extra points for high rent
+        except (ValueError, TypeError):
+            pass
+
+    # Chronic diseases
+    chronic = record['chronic'] or ''
+    if chronic and chronic not in ('لا', ''):
+        disease_count = len([d for d in chronic.split('، ') if d.strip()])
+        score += 5 + disease_count * 2
+
+    if record['has_hypertension']:
+        score += 3
+    if record['has_diabetes']:
+        score += 3
+
+    # Special needs
+    if record['has_special_needs']:
+        score += 12
+
+    # Low education
+    edu = record['education'] or ''
+    low_edu = ['أمّي', 'ابتدائية', 'إعدادية']
+    if edu in low_edu:
+        score += 6
+
+    # No breadwinner or self-breadwinner for deceased/enforced
+    breadwinner = record['breadwinner'] or ''
+    if not breadwinner or breadwinner == 'لا يوجد':
+        score += 8
+
+    # Legal problems
+    legal = record['legal'] or ''
+    if legal == 'نعم':
+        score += 4
+
+    return score
+
+
 @app.route('/admin/records')
 @admin_required
 def admin_records():
@@ -988,6 +1080,7 @@ def admin_records():
         'kids_age_from': request.args.get('kids_age_from', ''),
         'kids_age_to': request.args.get('kids_age_to', ''),
         'collector_name': request.args.get('collector_name', ''),
+        'sort_by_need': request.args.get('sort_by_need', ''),
     }
 
     if status_list:
@@ -1243,7 +1336,8 @@ def admin_records():
     if sort_dir not in ('asc', 'desc'):
         sort_dir = 'desc'
 
-    needs_post_filter = needs_kids_age_filter or needs_minor_threshold_filter
+    sort_by_need = filters['sort_by_need'] == '1'
+    needs_post_filter = needs_kids_age_filter or needs_minor_threshold_filter or sort_by_need
     if needs_post_filter:
         # Fetch all matching records, then filter by children age, then paginate
         all_records = db.execute(
@@ -1256,6 +1350,8 @@ def admin_records():
                 all_records = [r for r in all_records if record_has_child_in_age_range(r, 0, minor_threshold - 1)]
             elif filters['has_kids_under_18'] == 'no':
                 all_records = [r for r in all_records if not record_has_child_in_age_range(r, 0, minor_threshold - 1)]
+        if sort_by_need:
+            all_records = sorted(all_records, key=lambda r: compute_need_score(r), reverse=True)
         count = len(all_records)
         offset = (page - 1) * per_page
         records = all_records[offset:offset + per_page]
@@ -1282,11 +1378,17 @@ def admin_records():
         "SELECT DISTINCT full_name FROM (SELECT full_name FROM volunteers WHERE status='active' UNION SELECT full_name FROM members WHERE status='active') ORDER BY full_name"
     ).fetchall()
 
+    # Compute need scores if sorting by need
+    need_scores = {}
+    if sort_by_need:
+        need_scores = {r['id']: compute_need_score(r) for r in records}
+
     return render_template('admin_records.html',
         records=records, filters=filters, page=page,
         per_page=per_page, total_pages=total_pages, total_count=count,
         sort_by=sort_by, sort_dir=sort_dir, filter_params=filter_params,
-        volunteer_names=[v['full_name'] for v in volunteer_names]
+        volunteer_names=[v['full_name'] for v in volunteer_names],
+        need_scores=need_scores
     )
 
 
@@ -1366,6 +1468,12 @@ def admin_record_edit(record_id):
             if new_cvp:
                 cv_photo_path = new_cvp
 
+        # Process chronic diseases checkboxes
+        chronic_list = form.getlist('chronic_list')
+        chronic_value = '، '.join(chronic_list) if chronic_list else form.get('chronic', '')
+        edit_has_hypertension = 1 if 'ضغط الدم' in chronic_list else int(form.get('has_hypertension', 0) or 0)
+        edit_has_diabetes = 1 if 'السكري' in chronic_list else int(form.get('has_diabetes', 0) or 0)
+
         db.execute("""UPDATE records SET
             first_name=?, father_name=?, last_name=?, gender=?, mother_name=?,
             birth_day=?, birth_month=?, birth_year=?, province=?, national_id=?,
@@ -1430,9 +1538,9 @@ def admin_record_edit(record_id):
             form.get('employer', ''), form.get('breadwinner', ''),
             form.get('breadwinner_job', ''), form.get('breadwinner_relation', ''),
             form.get('breadwinner_relation_other', ''),
-            form.get('chronic', ''), form.get('diseases', ''),
-            int(form.get('has_hypertension', 0) or 0),
-            int(form.get('has_diabetes', 0) or 0), form.get('other_diseases', ''),
+            chronic_value, form.get('diseases', ''),
+            edit_has_hypertension,
+            edit_has_diabetes, form.get('other_diseases', ''),
             int(form.get('has_special_needs', 0) or 0),
             form.get('special_needs_details', ''),
             form.get('education', ''), form.get('edu_type', ''),

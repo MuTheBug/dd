@@ -37,6 +37,7 @@
                     <a href="{{ url_for('admin_records', status='survivor') }}" class="btn btn-outline btn-sm">الناجون</a>
                     <a href="{{ url_for('admin_records', status='enforced') }}" class="btn btn-outline btn-sm">المغيّبون</a>
                     <a href="{{ url_for('admin_records', status='deceased') }}" class="btn btn-outline btn-sm">المتوفون</a>
+                    <a href="{{ url_for('admin_records', sort_by_need='1') }}" class="btn btn-outline btn-sm" style="background:#dc2626; color:white; border-color:#dc2626;">&#x1F198; الأكثر احتياجاً</a>
                 </div>
             </div>
 
@@ -539,7 +540,7 @@
         <span class="filter-tag">عمر أطفال إلى: {{ filters.kids_age_to }}</span>
         {% endif %}
         {% if filters.has_legal == 'yes' %}
-        <span class="filter-tag">إجراء قانوني</span>
+        <span class="filter-tag">مشاكل قانونية</span>
         {% endif %}
         {% if filters.has_assoc == 'yes' %}
         <span class="filter-tag">مسجل بجمعية</span>
@@ -611,6 +612,9 @@
         {% if filters.digital_evidence_url_status %}
         <span class="filter-tag">حالة رابط: {{ filters.digital_evidence_url_status }}</span>
         {% endif %}
+        {% if filters.sort_by_need == '1' %}
+        <span class="filter-tag" style="background:#dc2626; color:white;">&#x1F198; مرتب حسب الاحتياج</span>
+        {% endif %}
         <a href="{{ url_for('admin_records') }}" style="font-size: 0.82rem; color: var(--deceased);">مسح الكل</a>
     </div>
     {% endif %}
@@ -649,6 +653,7 @@
                     <th>هاتف</th>
                     <th>الزوج/ة</th>
                     <th>قاصرين</th>
+                    {% if need_scores %}<th style="background:#dc2626; color:white;">درجة الاحتياج</th>{% endif %}
                     <th>إجراءات</th>
                 </tr>
             </thead>
@@ -691,6 +696,12 @@
                         {% endif %}
                     </td>
                     <td>{{ r.kids_under_18_count if r.kids_under_18_count else '-' }}</td>
+                    {% if need_scores %}
+                    <td style="text-align:center; font-weight:700;">
+                        {% set score = need_scores.get(r.id, 0) %}
+                        <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.85rem; {% if score >= 60 %}background:#dc2626; color:white;{% elif score >= 40 %}background:#f97316; color:white;{% elif score >= 20 %}background:#eab308; color:#422006;{% else %}background:#e5e7eb; color:#374151;{% endif %}">{{ score }}</span>
+                    </td>
+                    {% endif %}
                     <td>
                         <div class="btn-group" style="flex-wrap: nowrap;">
                             <a href="{{ url_for('admin_record_detail', record_id=r.id) }}" class="btn btn-primary btn-sm" title="عرض">&#x1F441;</a>
@@ -700,7 +711,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    <td colspan="{{ 13 if need_scores else 12 }}" style="text-align: center; padding: 2rem; color: var(--text-light);">
                         لا توجد سجلات مطابقة للفلاتر المحددة
                     </td>
                 </tr>

@@ -314,7 +314,7 @@
                 <label>الرقم الوطني <span class="required">*</span></label>
                 <input type="text" name="national_id" required placeholder="الرقم الوطني">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="phoneGroup">
                 <label>رقم الهاتف</label>
                 <input type="tel" name="phone" placeholder="رقم الهاتف">
             </div>
@@ -798,27 +798,16 @@
         <div class="entry-section-title">&#x1F3E5; الحالة الصحية</div>
         <div class="entry-section-desc status-deceased-hint" style="display:none; background: rgba(220,38,38,0.08); border-right-color: var(--deceased);">هذا القسم غير مطلوب للمتوفين والمغيّبين قسراً.</div>
         <div class="form-grid">
-            <div class="form-group">
-                <label>أمراض مزمنة؟</label>
-                <select name="chronic">
-                    <option value="">-- اختر --</option>
-                    <option value="نعم">نعم</option>
-                    <option value="لا">لا</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" name="has_hypertension" value="1"> ضغط دم
-                </label>
-            </div>
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" name="has_diabetes" value="1"> سكري
-                </label>
-            </div>
-            <div class="form-group">
-                <label>أمراض أخرى</label>
-                <input type="text" name="other_diseases" placeholder="اذكر الأمراض الأخرى">
+            <div class="form-group full-width">
+                <label>الأمراض المزمنة (اختر ما ينطبق)</label>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:0.3rem; padding:0.4rem 0;">
+                    {% for disease in CHRONIC_DISEASES %}
+                    <label class="checkbox-label" style="font-size:0.88rem;">
+                        <input type="checkbox" name="chronic_list" value="{{ disease }}"> {{ disease }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <input type="text" name="other_diseases" placeholder="أمراض أخرى غير مذكورة..." style="margin-top:0.4rem;">
             </div>
             <div class="form-group">
                 <label class="checkbox-label">
@@ -843,10 +832,10 @@
 <!-- STEP 7: Legal & Notes -->
 <div class="form-step" data-step="7">
     <div class="entry-section">
-        <div class="entry-section-title">&#x2696;&#xFE0F; الوضع القانوني والجمعيات</div>
+        <div class="entry-section-title">&#x2696;&#xFE0F; المشاكل القانونية والجمعيات</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>هل يوجد إجراء قانوني؟</label>
+                <label>هل يوجد مشاكل قانونية؟</label>
                 <select name="legal" onchange="document.getElementById('legalDetails').style.display=this.value==='نعم'?'block':'none'">
                     <option value="">-- اختر --</option>
                     <option value="نعم">نعم</option>
@@ -854,7 +843,7 @@
                 </select>
             </div>
             <div class="form-group" id="legalDetails" style="display:none">
-                <label>تفاصيل الإجراء القانوني</label>
+                <label>تفاصيل المشاكل القانونية</label>
                 <textarea name="legal_details" rows="2"></textarea>
             </div>
             <div class="form-group">
@@ -1009,6 +998,14 @@ function handleStatusChange() {
         caseType.innerHTML += '<option value="deceased_caesar_files">متوفى - ملفات قيصر</option>';
     }
 
+    // Hide phone for deceased and enforced
+    var phoneGroup = document.getElementById('phoneGroup');
+    if (status === 'deceased' || status === 'enforced') {
+        phoneGroup.classList.add('status-hidden');
+    } else {
+        phoneGroup.classList.remove('status-hidden');
+    }
+
     // Hide blood type for deceased and enforced (no blood sample available)
     var bloodGroup = document.getElementById('bloodTypeGroup');
     if (status === 'deceased' || status === 'enforced') {
@@ -1091,10 +1088,12 @@ function addEntryChild(data) {
         '<div class="form-group"><label>\u0627\u0644\u062c\u0646\u0633</label><select class="ec-gender"><option value="">--</option><option value="male"' + (data.gender==='male'?' selected':'') + '>\u0630\u0643\u0631</option><option value="female"' + (data.gender==='female'?' selected':'') + '>\u0623\u0646\u062b\u0649</option></select></div>' +
         '<div class="form-group"><label>\u0633\u0646\u0629 \u0627\u0644\u0645\u064a\u0644\u0627\u062f</label><input type="number" class="ec-birth" value="' + (data.birth_year || data.birthYear || (data.age ? (entryCurrentYear - parseInt(data.age)) : '') || '') + '" min="1900" max="2026"></div>' +
         '<div class="form-group"><label>\u0627\u0644\u062a\u062d\u0635\u064a\u0644 \u0627\u0644\u0639\u0644\u0645\u064a</label><select class="ec-edu">' + eduOpts + '</select></div>' +
-        '<div class="form-group"><label>\u0627\u0644\u0645\u062f\u0631\u0633\u0629/\u0627\u0644\u062c\u0627\u0645\u0639\u0629</label><input type="text" class="ec-school" value="' + (data.school||'') + '"></div>' +
+        '<div class="form-group"><label>\u0634\u0648 \u0639\u0645 \u064a\u062f\u0631\u0633 \u0647\u0644\u0642\u061f</label><input type="text" class="ec-school" value="' + (data.school||'') + '" placeholder="\u0625\u0630\u0627 \u0639\u0645 \u064a\u0643\u0645\u0644 \u062f\u0631\u0627\u0633\u0629"></div>' +
         '<div class="form-group"><label>\u0627\u0644\u0639\u0645\u0644</label><input type="text" class="ec-work" value="' + (data.employment||data.job||'') + '"></div>' +
         '<div class="form-group"><label>\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0635\u062d\u064a\u0629</label><input type="text" class="ec-health" value="' + (data.health_notes||data.healthDetails||'') + '"></div>' +
-        '<div class="form-group"><label>\u0627\u062d\u062a\u064a\u0627\u062c\u0627\u062a \u062e\u0627\u0635\u0629</label><input type="text" class="ec-special" value="' + (data.special_needs||'') + '"></div>' +
+        '<div class="form-group"><label>\u0627\u062d\u062a\u064a\u0627\u062c\u0627\u062a \u062e\u0627\u0635\u0629</label>' +
+        '<div style="display:flex;gap:0.8rem;padding:0.2rem 0;"><label style="font-size:0.85rem;"><input type="radio" name="ec_special_' + idx + '" class="ec-special" value="\u0646\u0639\u0645"' + (data.special_needs==='\u0646\u0639\u0645'?' checked':'') + '> \u0646\u0639\u0645</label>' +
+        '<label style="font-size:0.85rem;"><input type="radio" name="ec_special_' + idx + '" class="ec-special" value="\u0644\u0627"' + (data.special_needs==='\u0644\u0627'||!data.special_needs?' checked':'') + '> \u0644\u0627</label></div></div>' +
         '</div>';
     container.appendChild(div);
     updateEntryChildren();
@@ -1112,7 +1111,8 @@ function updateEntryChildren() {
     var children = []; var u18 = 0;
     for (var i = 0; i < entries.length; i++) {
         var e = entries[i]; var by = parseInt(e.querySelector('.ec-birth').value) || 0;
-        children.push({name:e.querySelector('.ec-name').value, gender:e.querySelector('.ec-gender').value, birth_year:by, education:e.querySelector('.ec-edu').value, school:e.querySelector('.ec-school').value, employment:e.querySelector('.ec-work').value, health_notes:e.querySelector('.ec-health').value, special_needs:e.querySelector('.ec-special').value});
+        var specialRadio = e.querySelector('.ec-special:checked');
+        children.push({name:e.querySelector('.ec-name').value, gender:e.querySelector('.ec-gender').value, birth_year:by, education:e.querySelector('.ec-edu').value, school:e.querySelector('.ec-school').value, employment:e.querySelector('.ec-work').value, health_notes:e.querySelector('.ec-health').value, special_needs: specialRadio ? specialRadio.value : ''});
         if (by > 0 && (entryCurrentYear - by) < 18) u18++;
     }
     document.getElementById('entryChildrenData').value = JSON.stringify(children);

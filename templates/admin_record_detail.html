@@ -76,10 +76,12 @@
             <div class="detail-field-label">الرقم الوطني</div>
             <div class="detail-field-value">{{ record.national_id or '-' }}</div>
         </div>
+        {% if record.status not in ('deceased', 'enforced') %}
         <div class="detail-field">
             <div class="detail-field-label">الهاتف</div>
             <div class="detail-field-value">{{ record.phone or '-' }}</div>
         </div>
+        {% endif %}
         <div class="detail-field">
             <div class="detail-field-label">زمرة الدم</div>
             <div class="detail-field-value">{{ record.blood_type or '-' }}</div>
@@ -318,7 +320,7 @@
                         <th>الجنس</th>
                         <th>سنة الميلاد</th>
                         <th>التحصيل العلمي</th>
-                        <th>المدرسة/الجامعة</th>
+                        <th>شو عم يدرس هلق؟</th>
                         <th>العمل</th>
                         <th>ملاحظات صحية</th>
                         <th>احتياجات خاصة</th>

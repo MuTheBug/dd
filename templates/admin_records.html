@@ -9,6 +9,7 @@
     <div class="btn-group">
         <a href="{{ url_for('export_kids_no_birthdate') }}" class="btn btn-outline btn-sm" style="color:#856404; border-color:#ffc107;">&#x1F4CB; أطفال بدون تاريخ ميلاد</a>
         <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('pdfColModal').style.display='flex'">&#x1F4E5; تصدير PDF / Excel</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="openExportToList()" style="color:#065f46; border-color:#10b981;">&#x1F4CB; تصدير لقائمة</button>
         <a href="{{ url_for('entry_form') }}" class="btn btn-primary btn-sm">+ إضافة حالة</a>
     </div>
 </div>
@@ -820,6 +821,32 @@
     </div>
 </div>
 
+<!-- Export to Custom List Modal -->
+<div id="exportToListModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:var(--card); border-radius:12px; max-width:500px; width:100%; padding:1.5rem; position:relative; color:var(--text);">
+        <button onclick="document.getElementById('exportToListModal').style.display='none'" style="position:absolute; top:10px; left:10px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
+        <h3 style="color:var(--primary-dark); margin-bottom:0.3rem;">&#x1F4CB; تصدير لقائمة مخصصة</h3>
+        <p id="etlCount" style="font-size:0.85rem; color:var(--text-light); margin-bottom:1rem;"></p>
+
+        <div style="margin-bottom:1rem;">
+            <label style="font-size:0.88rem; font-weight:600; display:block; margin-bottom:0.3rem;">اختر قائمة موجودة:</label>
+            <select id="etlListSelect" style="width:100%; font-size:0.9rem; padding:0.5rem;">
+                <option value="">-- اختر قائمة --</option>
+            </select>
+        </div>
+
+        <div style="text-align:center; font-size:0.82rem; color:var(--text-light); margin-bottom:0.8rem;">— أو —</div>
+
+        <div style="margin-bottom:1rem;">
+            <label style="font-size:0.88rem; font-weight:600; display:block; margin-bottom:0.3rem;">إنشاء قائمة جديدة:</label>
+            <input type="text" id="etlNewName" placeholder="اسم القائمة الجديدة..." style="width:100%; font-size:0.9rem; padding:0.5rem;">
+        </div>
+
+        <button type="button" onclick="doExportToList()" class="btn btn-primary" style="width:100%;">&#x2705; تصدير السجلات</button>
+        <div id="etlResult" style="display:none; margin-top:0.8rem; padding:0.6rem; border-radius:8px; font-size:0.88rem;"></div>
+    </div>
+</div>
+
 <!-- Full-screen Record Editor -->
 <div id="recordEditor" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:var(--card); z-index:1100; direction:rtl;">
     <!-- Top bar -->
@@ -1262,6 +1289,80 @@ function toggleFilters() {
         fb.style.display = 'none';
         arrow.innerHTML = '&#x25BC;';
     }
+}
+
+/* ── Export to Custom List ────────────────────── */
+function openExportToList() {
+    var modal = document.getElementById('exportToListModal');
+    var countEl = document.getElementById('etlCount');
+    var sel = document.getElementById('etlListSelect');
+    document.getElementById('etlResult').style.display = 'none';
+    document.getElementById('etlNewName').value = '';
+
+    // Determine record count from visible table rows
+    var rows = document.querySelectorAll('#recordsTable tbody tr');
+    var count = rows.length;
+    countEl.textContent = 'سيتم تصدير ' + count + ' سجل حسب الفلاتر الحالية';
+
+    // Load existing lists
+    fetch('{{ url_for("api_custom_lists_json") }}')
+        .then(function(r) { return r.json(); })
+        .then(function(lists) {
+            sel.innerHTML = '<option value="">-- اختر قائمة --</option>';
+            for (var i = 0; i < lists.length; i++) {
+                sel.innerHTML += '<option value="' + lists[i].id + '">' + lists[i].name + ' (' + lists[i].count + ')</option>';
+            }
+        });
+    modal.style.display = 'flex';
+}
+
+function doExportToList() {
+    var listId = document.getElementById('etlListSelect').value;
+    var newName = document.getElementById('etlNewName').value.trim();
+    var resultEl = document.getElementById('etlResult');
+
+    if (!listId && !newName) {
+        alert('يرجى اختيار قائمة أو إدخال اسم قائمة جديدة');
+        return;
+    }
+
+    // Collect record IDs from visible table
+    var ids = [];
+    document.querySelectorAll('#recordsTable tbody tr').forEach(function(tr) {
+        var link = tr.querySelector('a[href*="/admin/record/"]');
+        if (link) {
+            var match = link.href.match(/\/admin\/record\/(\d+)/);
+            if (match) ids.push(parseInt(match[1]));
+        }
+    });
+
+    if (ids.length === 0) {
+        alert('لا توجد سجلات للتصدير');
+        return;
+    }
+
+    var body = { record_ids: ids };
+    if (listId) body.list_id = parseInt(listId);
+    if (newName && !listId) body.list_name = newName;
+
+    fetch('{{ url_for("api_export_to_list") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) {
+            resultEl.style.background = '#fee2e2';
+            resultEl.style.color = '#991b1b';
+            resultEl.textContent = data.error;
+        } else {
+            resultEl.style.background = '#d1fae5';
+            resultEl.style.color = '#065f46';
+            resultEl.innerHTML = 'تم إضافة ' + data.added + ' سجل للقائمة. <a href="/admin/list/' + data.list_id + '" style="color:#065f46; font-weight:700;">فتح القائمة</a>';
+        }
+        resultEl.style.display = 'block';
+    });
 }
 </script>
 {% endblock %}

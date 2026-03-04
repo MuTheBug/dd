@@ -3119,6 +3119,52 @@ def admin_delete_list(lid):
     return redirect(url_for('admin_custom_lists'))
 
 
+@app.route('/api/export_to_list', methods=['POST'])
+@admin_required
+def api_export_to_list():
+    """Bulk-add filtered records to an existing or new custom list."""
+    data = request.get_json()
+    list_id = data.get('list_id')
+    list_name = data.get('list_name', '').strip()
+    record_ids = data.get('record_ids', [])
+    if not record_ids:
+        return jsonify({'error': 'لا توجد سجلات'}), 400
+
+    db = get_db()
+    if list_name and not list_id:
+        # Create new list
+        cur = db.execute("INSERT INTO custom_lists (name, description) VALUES (?, ?)",
+                         (list_name, ''))
+        list_id = cur.lastrowid
+    elif not list_id:
+        return jsonify({'error': 'يرجى اختيار قائمة أو إدخال اسم جديد'}), 400
+
+    added = 0
+    for rid in record_ids:
+        try:
+            db.execute("INSERT INTO custom_list_items (list_id, record_id) VALUES (?, ?)",
+                       (list_id, rid))
+            added += 1
+        except sqlite3.IntegrityError:
+            pass
+    db.commit()
+    return jsonify({'ok': True, 'added': added, 'list_id': list_id})
+
+
+@app.route('/api/custom_lists_json')
+@admin_required
+def api_custom_lists_json():
+    """Return all custom lists as JSON for the export-to-list modal."""
+    db = get_db()
+    lists = db.execute("""
+        SELECT cl.id, cl.name,
+            (SELECT COUNT(*) FROM custom_list_items WHERE list_id=cl.id) +
+            (SELECT COUNT(*) FROM custom_list_manual_items WHERE list_id=cl.id) as item_count
+        FROM custom_lists cl ORDER BY cl.created_at DESC
+    """).fetchall()
+    return jsonify([{'id': l['id'], 'name': l['name'], 'count': l['item_count']} for l in lists])
+
+
 @app.route('/admin/list/<int:lid>/add', methods=['POST'])
 @admin_required
 def admin_list_add_record(lid):

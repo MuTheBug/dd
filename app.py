@@ -76,6 +76,7 @@ PDF_COLUMNS = [
     ('status', 'الحالة'),
     ('province', 'المحافظة'),
     ('national_id', 'الرقم الوطني'),
+    ('family_book_number', 'رقم دفتر العائلة'),
     ('phone', 'الهاتف'),
     ('contact_phone', 'رقم التواصل'),
     ('gender', 'الجنس'),
@@ -408,6 +409,7 @@ def migrate_db():
         'survivor_cv_path': "TEXT DEFAULT ''",
         'survivor_cv_text': "TEXT DEFAULT ''",
         'survivor_cv_photo_path': "TEXT DEFAULT ''",
+        'family_book_number': "TEXT DEFAULT ''",
     }
 
     for col, typedef in new_columns.items():
@@ -730,7 +732,7 @@ def entry_submit():
 
     db.execute("""INSERT INTO records (
         first_name, father_name, last_name, gender, mother_name,
-        birth_day, birth_month, birth_year, province, national_id,
+        birth_day, birth_month, birth_year, province, national_id, family_book_number,
         phone, blood_type, photo_path, document_path,
         arrest_day, arrest_month, arrest_year, arrest_place,
         arrest_authority, arrest_reason, arrest_causer,
@@ -764,7 +766,7 @@ def entry_submit():
         record_slug, photo_hash, document_hash,
         survivor_cv_path, survivor_cv_text, survivor_cv_photo_path
     ) VALUES (
-        ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?,?,
+        ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?, ?,?,?,?,
         ?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?,?,
         ?,?,?,?, ?,?,?, ?,?,?,?, ?,?,?, ?,?,?,?,?,
         ?,?, ?,?,?,?, ?,?, ?,?,?,?,?, ?,
@@ -777,6 +779,7 @@ def entry_submit():
         int(form.get('birth_day', 0) or 0), int(form.get('birth_month', 0) or 0),
         int(form.get('birth_year', 0) or 0),
         form.get('province', ''), form.get('national_id', ''),
+        form.get('family_book_number', ''),
         form.get('phone', ''), form.get('blood_type', ''),
         photo_path, doc_path,
         int(form.get('arrest_day', 0) or 0), int(form.get('arrest_month', 0) or 0),
@@ -1478,6 +1481,7 @@ def admin_record_edit(record_id):
         db.execute("""UPDATE records SET
             first_name=?, father_name=?, last_name=?, gender=?, mother_name=?,
             birth_day=?, birth_month=?, birth_year=?, province=?, national_id=?,
+            family_book_number=?,
             phone=?, blood_type=?, photo_path=?, document_path=?,
             arrest_day=?, arrest_month=?, arrest_year=?, arrest_place=?,
             arrest_authority=?, arrest_reason=?, arrest_causer=?,
@@ -1516,6 +1520,7 @@ def admin_record_edit(record_id):
             int(form.get('birth_day', 0) or 0), int(form.get('birth_month', 0) or 0),
             int(form.get('birth_year', 0) or 0),
             form.get('province', ''), form.get('national_id', ''),
+            form.get('family_book_number', ''),
             form.get('phone', ''), form.get('blood_type', ''),
             photo_path, doc_path,
             int(form.get('arrest_day', 0) or 0), int(form.get('arrest_month', 0) or 0),

@@ -76,6 +76,10 @@
             <div class="detail-field-label">الرقم الوطني</div>
             <div class="detail-field-value">{{ record.national_id or '-' }}</div>
         </div>
+        <div class="detail-field">
+            <div class="detail-field-label">رقم دفتر العائلة</div>
+            <div class="detail-field-value">{{ record.family_book_number or '-' }}</div>
+        </div>
         {% if record.status not in ('deceased', 'enforced') %}
         <div class="detail-field">
             <div class="detail-field-label">الهاتف</div>

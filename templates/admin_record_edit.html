@@ -141,6 +141,10 @@
             <label>الرقم الوطني</label>
             <input type="text" name="national_id" value="{{ record.national_id }}" required>
         </div>
+        <div class="form-group">
+            <label>رقم دفتر العائلة</label>
+            <input type="text" name="family_book_number" value="{{ record.family_book_number or '' }}">
+        </div>
         <div class="form-group" {% if record.status in ('deceased', 'enforced') %}style="display:none"{% endif %}>
             <label>الهاتف</label>
             <input type="tel" name="phone" value="{{ record.phone or '' }}">

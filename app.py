@@ -528,6 +528,27 @@ def migrate_db():
         )
     """)
 
+    # Migrate manual items table with extra fields
+    cursor.execute("PRAGMA table_info(custom_list_manual_items)")
+    mi_existing = {row[1] for row in cursor.fetchall()}
+    mi_new_cols = {
+        'father_name': "TEXT DEFAULT ''",
+        'mother_name': "TEXT DEFAULT ''",
+        'national_id': "TEXT DEFAULT ''",
+        'family_book_number': "TEXT DEFAULT ''",
+        'address': "TEXT DEFAULT ''",
+        'province': "TEXT DEFAULT ''",
+        'kids_count': "INTEGER DEFAULT 0",
+        'marital': "TEXT DEFAULT ''",
+        'status': "TEXT DEFAULT ''",
+    }
+    for col, typedef in mi_new_cols.items():
+        if col not in mi_existing:
+            try:
+                cursor.execute(f"ALTER TABLE custom_list_manual_items ADD COLUMN {col} {typedef}")
+            except sqlite3.OperationalError:
+                pass
+
     conn.commit()
     conn.close()
 
@@ -2892,7 +2913,10 @@ def admin_custom_list_detail(lid):
 
     return render_template('admin_custom_list_detail.html',
                            clist=clist, items=items, manual_items=manual_items,
-                           PDF_COLUMNS=PDF_COLUMNS)
+                           PDF_COLUMNS=PDF_COLUMNS,
+                           PROVINCES=PROVINCES,
+                           MARITAL_STATUSES=MARITAL_STATUSES,
+                           STATUS_CHOICES=[('survivor', 'ناجٍ'), ('enforced', 'مغيّب قسرياً'), ('deceased', 'متوفى')])
 
 
 @app.route('/admin/list/<int:lid>/pdf', methods=['GET', 'POST'])
@@ -3020,20 +3044,32 @@ def admin_custom_list_excel(lid):
     row_num = 2
     counter = 1
 
-    # Manual items first (only fill columns that match manual item fields)
-    manual_field_map = {'first_name': 'full_name', 'father_name': None, 'last_name': None,
-                        'phone': 'phone', 'notes': 'notes'}
+    # Manual items first
+    manual_col_map = {
+        'first_name': 'full_name', 'father_name': 'father_name',
+        'mother_name': 'mother_name', 'national_id': 'national_id',
+        'family_book_number': 'family_book_number',
+        'phone': 'phone', 'contact_phone': 'phone',
+        'province': 'province', 'address': 'address',
+        'kids_count': 'kids_count', 'marital': 'marital',
+        'status': 'status', 'notes': 'notes',
+    }
+    mmap = dict(MARITAL_STATUSES)
     for m in manual_items:
         cell = ws.cell(row=row_num, column=1, value=counter)
         cell.alignment = wrap_align
         cell.border = thin_border
         for col_idx, (col_key, _) in enumerate(pdf_cols, 2):
-            if col_key == 'first_name':
-                val = m['full_name']
-            elif col_key == 'phone':
-                val = m['phone'] or ''
-            elif col_key == 'notes':
-                val = m['notes'] or ''
+            if col_key in manual_col_map:
+                raw = m[manual_col_map[col_key]]
+                if col_key == 'status':
+                    val = STATUS_MAP.get(raw, raw or '')
+                elif col_key == 'marital':
+                    val = mmap.get(raw, raw or '')
+                elif col_key == 'kids_count':
+                    val = raw if raw else ''
+                else:
+                    val = raw or ''
             else:
                 val = ''
             cell = ws.cell(row=row_num, column=col_idx, value=val)
@@ -3120,10 +3156,25 @@ def admin_list_add_manual(lid):
         return redirect(url_for('admin_custom_list_detail', lid=lid))
     db = get_db()
     db.execute("""
-        INSERT INTO custom_list_manual_items (list_id, full_name, phone, notes)
-        VALUES (?, ?, ?, ?)
-    """, (lid, name, request.form.get('phone', '').strip(),
-          request.form.get('notes', '').strip()))
+        INSERT INTO custom_list_manual_items (
+            list_id, full_name, father_name, mother_name,
+            national_id, family_book_number, phone, province,
+            address, kids_count, marital, status, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        lid, name,
+        request.form.get('father_name', '').strip(),
+        request.form.get('mother_name', '').strip(),
+        request.form.get('national_id', '').strip(),
+        request.form.get('family_book_number', '').strip(),
+        request.form.get('phone', '').strip(),
+        request.form.get('province', '').strip(),
+        request.form.get('address', '').strip(),
+        int(request.form.get('kids_count', 0) or 0),
+        request.form.get('marital', '').strip(),
+        request.form.get('status', '').strip(),
+        request.form.get('notes', '').strip(),
+    ))
     db.commit()
     flash(f'تم إضافة: {name}', 'success')
     return redirect(url_for('admin_custom_list_detail', lid=lid))

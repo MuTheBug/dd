@@ -136,8 +136,26 @@ tbody tr:nth-child(even) { background: #f7fafc; }
             <td>
                 {% if col_key == 'first_name' %}
                     <strong>{{ m.full_name }}</strong>
+                {% elif col_key == 'father_name' %}
+                    {{ m.father_name or '-' }}
+                {% elif col_key == 'mother_name' %}
+                    {{ m.mother_name or '-' }}
+                {% elif col_key == 'national_id' %}
+                    {{ m.national_id or '-' }}
+                {% elif col_key == 'family_book_number' %}
+                    {{ m.family_book_number or '-' }}
                 {% elif col_key in ('phone', 'contact_phone') %}
                     {{ m.phone or '-' }}
+                {% elif col_key == 'province' %}
+                    {{ m.province or '-' }}
+                {% elif col_key == 'address' %}
+                    {{ m.address or '-' }}
+                {% elif col_key == 'kids_count' %}
+                    {{ m.kids_count if m.kids_count else '-' }}
+                {% elif col_key == 'marital' %}
+                    {% for c,l in MARITAL_STATUSES %}{% if m.marital==c %}{{ l }}{% endif %}{% endfor %}{{ '-' if not m.marital }}
+                {% elif col_key == 'status' %}
+                    {{ STATUS_MAP.get(m.status, m.status or '-') }}
                 {% elif col_key == 'notes' %}
                     {{ m.notes or '' }}
                 {% else %}

@@ -20,51 +20,110 @@
 <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem;">{{ clist.description }}</p>
 {% endif %}
 
-<!-- Add manual name -->
-<div class="card" style="padding: 1rem; margin-bottom: 1rem;">
-    <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem;">+ إضافة اسم يدوي</div>
-    <form method="POST" action="{{ url_for('admin_list_add_manual', lid=clist.id) }}" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end;">
-        <div class="form-group" style="margin-bottom:0; flex: 2; min-width: 180px;">
-            <label style="font-size: 0.8rem;">الاسم <span style="color: var(--deceased);">*</span></label>
-            <input type="text" name="full_name" required placeholder="الاسم الكامل" style="font-size: 0.9rem;">
-        </div>
-        <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 130px;">
-            <label style="font-size: 0.8rem;">الهاتف</label>
-            <input type="text" name="phone" placeholder="رقم الهاتف" dir="ltr" style="font-size: 0.9rem;">
-        </div>
-        <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 130px;">
-            <label style="font-size: 0.8rem;">ملاحظات</label>
-            <input type="text" name="notes" placeholder="ملاحظة..." style="font-size: 0.9rem;">
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm">إضافة</button>
-    </form>
-</div>
-
 <!-- Search and add from records / volunteers / members -->
 <div class="card" style="padding: 1rem; margin-bottom: 1rem;">
-    <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem;">+ بحث وإضافة</div>
-    <!-- Source tabs -->
-    <div style="display: flex; gap: 0; margin-bottom: 0.6rem; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
-        <button type="button" class="src-tab active" data-source="all" onclick="switchSource(this)" style="flex:1; padding: 0.45rem 0.5rem; border: none; cursor: pointer; font-size: 0.82rem; font-weight: 600; font-family: inherit; transition: all 0.2s;">الكل</button>
-        <button type="button" class="src-tab" data-source="records" onclick="switchSource(this)" style="flex:1; padding: 0.45rem 0.5rem; border: none; border-right: 1px solid var(--border); cursor: pointer; font-size: 0.82rem; font-weight: 600; font-family: inherit; transition: all 0.2s;">السجلات</button>
-        <button type="button" class="src-tab" data-source="volunteers" onclick="switchSource(this)" style="flex:1; padding: 0.45rem 0.5rem; border: none; border-right: 1px solid var(--border); cursor: pointer; font-size: 0.82rem; font-weight: 600; font-family: inherit; transition: all 0.2s;">المتطوعين</button>
-        <button type="button" class="src-tab" data-source="members" onclick="switchSource(this)" style="flex:1; padding: 0.45rem 0.5rem; border: none; border-right: 1px solid var(--border); cursor: pointer; font-size: 0.82rem; font-weight: 600; font-family: inherit; transition: all 0.2s;">المنتسبين</button>
-    </div>
+    <div style="font-size: 0.95rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 0.8rem;">+ بحث وإضافة من قاعدة البيانات</div>
     <style>
-        .src-tab { background: var(--card-bg, #fff); color: var(--text-light); }
+        .src-tab-bar { display: flex; gap: 0; margin-bottom: 0.7rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+        .src-tab { flex: 1; padding: 0.5rem 0.3rem; border: none; cursor: pointer; font-size: 0.82rem; font-weight: 600; font-family: inherit; background: var(--card-bg, #fff); color: var(--text-light); transition: all 0.2s; border-left: 1px solid var(--border); }
+        .src-tab:first-child { border-left: none; }
         .src-tab.active { background: var(--primary); color: white; }
         .src-tab:hover:not(.active) { background: var(--filter-preset-bg, #f0f4f8); }
-        .search-result-item { display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; font-size: 0.88rem; }
+        .search-result-item { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); transition: background 0.15s; font-size: 0.88rem; }
         .search-result-item:hover { background: var(--filter-preset-bg, #f0f4f8); }
         .search-result-item:last-child { border-bottom: none; }
-        .src-badge { display: inline-block; font-size: 0.65rem; padding: 1px 6px; border-radius: 4px; font-weight: 700; margin-right: 4px; }
+        .src-badge { display: inline-block; font-size: 0.65rem; padding: 2px 7px; border-radius: 4px; font-weight: 700; margin-left: 5px; vertical-align: middle; }
         .src-badge-record { background: #dbeafe; color: #1e40af; }
         .src-badge-volunteer { background: #d1fae5; color: #065f46; }
         .src-badge-member { background: #fef3c7; color: #92400e; }
     </style>
+    <div class="src-tab-bar">
+        <button type="button" class="src-tab active" data-source="all" onclick="switchSource(this)">الكل</button>
+        <button type="button" class="src-tab" data-source="records" onclick="switchSource(this)">السجلات</button>
+        <button type="button" class="src-tab" data-source="volunteers" onclick="switchSource(this)">المتطوعين</button>
+        <button type="button" class="src-tab" data-source="members" onclick="switchSource(this)">المنتسبين</button>
+    </div>
     <div style="position: relative;">
-        <input type="text" id="listSearchInput" placeholder="ابحث بالاسم، الرقم الوطني، الهاتف، رقم العضوية..." style="font-size: 0.9rem; width: 100%;" oninput="searchForList(this.value)">
-        <div id="listSearchResults" style="display:none; position:absolute; top:100%; right:0; left:0; z-index:100; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-lg); max-height: 350px; overflow-y: auto; margin-top: 2px;"></div>
+        <input type="text" id="listSearchInput" placeholder="ابحث بالاسم، الرقم الوطني، الهاتف، رقم العضوية..." style="font-size: 0.92rem; width: 100%; padding: 0.6rem 0.8rem;" oninput="searchForList(this.value)">
+        <div id="listSearchResults" style="display:none; position:absolute; top:100%; right:0; left:0; z-index:100; background: var(--card-bg); border: 1px solid var(--border); border-radius: 0 0 8px 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); max-height: 350px; overflow-y: auto;"></div>
+    </div>
+</div>
+
+<!-- Add manual entry -->
+<div class="card" style="padding: 1rem; margin-bottom: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; cursor: pointer;" onclick="var p=document.getElementById('manualFormPanel'); p.style.display=p.style.display==='none'?'block':'none'; this.querySelector('.toggle-arrow').textContent=p.style.display==='none'?'\u25BC':'\u25B2';">
+        <span style="font-size: 0.95rem; font-weight: 700; color: var(--primary-dark);">+ إضافة يدوية</span>
+        <span class="toggle-arrow" style="font-size: 0.75rem; color: var(--text-light);">&#x25BC;</span>
+    </div>
+    <div id="manualFormPanel" style="display: none;">
+        <form method="POST" action="{{ url_for('admin_list_add_manual', lid=clist.id) }}">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.6rem; margin-bottom: 0.8rem;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">الاسم <span style="color: var(--deceased);">*</span></label>
+                    <input type="text" name="full_name" required placeholder="الاسم الأول" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">اسم الأب</label>
+                    <input type="text" name="father_name" placeholder="اسم الأب" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">اسم الأم</label>
+                    <input type="text" name="mother_name" placeholder="اسم الأم" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">الرقم الوطني</label>
+                    <input type="text" name="national_id" placeholder="الرقم الوطني" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">رقم دفتر العائلة</label>
+                    <input type="text" name="family_book_number" placeholder="رقم دفتر العائلة" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">الهاتف</label>
+                    <input type="tel" name="phone" placeholder="رقم الهاتف" dir="ltr" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">المحافظة</label>
+                    <select name="province" style="font-size: 0.88rem;">
+                        <option value="">-- اختر --</option>
+                        {% for p in PROVINCES %}
+                        <option value="{{ p }}">{{ p }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">العنوان</label>
+                    <input type="text" name="address" placeholder="العنوان التفصيلي" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">عدد الأطفال</label>
+                    <input type="number" name="kids_count" min="0" placeholder="0" style="font-size: 0.88rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">الحالة الاجتماعية</label>
+                    <select name="marital" style="font-size: 0.88rem;">
+                        <option value="">-- اختر --</option>
+                        {% for val, label in MARITAL_STATUSES %}
+                        <option value="{{ val }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">الحالة</label>
+                    <select name="status" style="font-size: 0.88rem;">
+                        <option value="">-- اختر --</option>
+                        {% for val, label in STATUS_CHOICES %}
+                        <option value="{{ val }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size: 0.8rem;">ملاحظات</label>
+                    <input type="text" name="notes" placeholder="ملاحظة..." style="font-size: 0.88rem;">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">إضافة للقائمة</button>
+        </form>
     </div>
 </div>
 
@@ -87,13 +146,21 @@
                 {% for m in manual_items %}
                 <tr>
                     <td>{{ counter.n }}{% if counter.update({'n': counter.n + 1}) %}{% endif %}</td>
-                    <td style="font-weight: 600;">{{ m.full_name }}</td>
+                    <td style="font-weight: 600;">
+                        {{ m.full_name }}{% if m.father_name %} {{ m.father_name }}{% endif %}
+                        {% if m.mother_name %}<span style="font-size:0.7rem; color:var(--text-light); display:block;">الأم: {{ m.mother_name }}</span>{% endif %}
+                    </td>
                     <td dir="ltr" style="text-align: right; white-space: nowrap;">
                         {% if m.phone %}
                         <a href="tel:{{ m.phone }}" style="color: var(--primary); text-decoration: none; font-size: 0.85rem;">&#x1F4DE; {{ m.phone }}</a>
                         {% else %}-{% endif %}
                     </td>
-                    <td style="font-size: 0.85rem; color: var(--text-light);">{{ m.notes or '-' }}</td>
+                    <td style="font-size: 0.85rem; color: var(--text-light);">
+                        {% if m.status %}{{ STATUS_MAP.get(m.status, m.status) }}{% endif %}
+                        {% if m.province %} — {{ m.province }}{% endif %}
+                        {% if m.kids_count %} — {{ m.kids_count }} أطفال{% endif %}
+                        {% if m.notes %}<br>{{ m.notes }}{% endif %}
+                    </td>
                     <td>
                         <form method="POST" action="{{ url_for('admin_list_remove_manual', lid=clist.id, mid=m.id) }}" style="display:inline;" onsubmit="return confirm('حذف من القائمة؟')">
                             <button type="submit" class="btn btn-danger btn-sm" title="حذف">&#x2716;</button>

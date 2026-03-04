@@ -3139,33 +3139,120 @@ def admin_list_remove_manual(lid, mid):
     return redirect(url_for('admin_custom_list_detail', lid=lid))
 
 
+@app.route('/admin/list/<int:lid>/add_volunteer', methods=['POST'])
+@admin_required
+def admin_list_add_volunteer(lid):
+    vid = request.form.get('volunteer_id', type=int)
+    if not vid:
+        flash('يرجى اختيار متطوع', 'error')
+        return redirect(url_for('admin_custom_list_detail', lid=lid))
+    db = get_db()
+    v = db.execute("SELECT full_name, phone FROM volunteers WHERE id=?", (vid,)).fetchone()
+    if not v:
+        flash('المتطوع غير موجود', 'error')
+        return redirect(url_for('admin_custom_list_detail', lid=lid))
+    db.execute("""
+        INSERT INTO custom_list_manual_items (list_id, full_name, phone, notes)
+        VALUES (?, ?, ?, ?)
+    """, (lid, v['full_name'], v['phone'] or '', 'متطوع'))
+    db.commit()
+    flash(f"تم إضافة المتطوع: {v['full_name']}", 'success')
+    return redirect(url_for('admin_custom_list_detail', lid=lid))
+
+
+@app.route('/admin/list/<int:lid>/add_member', methods=['POST'])
+@admin_required
+def admin_list_add_member(lid):
+    mid = request.form.get('member_id', type=int)
+    if not mid:
+        flash('يرجى اختيار منتسب', 'error')
+        return redirect(url_for('admin_custom_list_detail', lid=lid))
+    db = get_db()
+    m = db.execute("SELECT full_name, father_name, phone FROM members WHERE id=?", (mid,)).fetchone()
+    if not m:
+        flash('المنتسب غير موجود', 'error')
+        return redirect(url_for('admin_custom_list_detail', lid=lid))
+    name = f"{m['full_name']} {m['father_name'] or ''}".strip()
+    db.execute("""
+        INSERT INTO custom_list_manual_items (list_id, full_name, phone, notes)
+        VALUES (?, ?, ?, ?)
+    """, (lid, name, m['phone'] or '', 'منتسب'))
+    db.commit()
+    flash(f'تم إضافة المنتسب: {name}', 'success')
+    return redirect(url_for('admin_custom_list_detail', lid=lid))
+
+
 @app.route('/api/search_for_list')
 @admin_required
 def api_search_for_list():
-    """Search records for adding to custom lists."""
+    """Search records, volunteers, and members for adding to custom lists."""
     q = request.args.get('q', '').strip()
+    source = request.args.get('source', 'all')  # all, records, volunteers, members
     if len(q) < 2:
         return jsonify([])
     db = get_db()
     term = f'%{q}%'
-    rows = db.execute("""
-        SELECT id, first_name, father_name, last_name, phone, status, province
-        FROM records
-        WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
-              OR national_id LIKE ? OR phone LIKE ?
-              OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
-        ORDER BY first_name LIMIT 20
-    """, (term, term, term, term, term, term)).fetchall()
     results = []
-    for r in rows:
-        status_ar = STATUS_MAP.get(r['status'], r['status'] or '')
-        results.append({
-            'id': r['id'],
-            'name': f"{r['first_name']} {r['father_name'] or ''} {r['last_name'] or ''}".strip(),
-            'phone': r['phone'] or '',
-            'status': status_ar,
-            'province': r['province'] or '',
-        })
+
+    # Search records
+    if source in ('all', 'records'):
+        rows = db.execute("""
+            SELECT id, first_name, father_name, last_name, phone, status, province
+            FROM records
+            WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
+                  OR national_id LIKE ? OR phone LIKE ?
+                  OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
+            ORDER BY first_name LIMIT 15
+        """, (term, term, term, term, term, term)).fetchall()
+        for r in rows:
+            status_ar = STATUS_MAP.get(r['status'], r['status'] or '')
+            results.append({
+                'id': r['id'],
+                'source': 'record',
+                'name': f"{r['first_name']} {r['father_name'] or ''} {r['last_name'] or ''}".strip(),
+                'phone': r['phone'] or '',
+                'detail': f"{status_ar} — {r['province'] or ''}",
+            })
+
+    # Search volunteers
+    if source in ('all', 'volunteers'):
+        vols = db.execute("""
+            SELECT id, full_name, phone, role, specialization, province
+            FROM volunteers
+            WHERE full_name LIKE ? OR phone LIKE ? OR national_id LIKE ? OR specialization LIKE ?
+            ORDER BY full_name LIMIT 15
+        """, (term, term, term, term)).fetchall()
+        for v in vols:
+            detail_parts = [v['role'] or '', v['specialization'] or '', v['province'] or '']
+            detail = ' — '.join(p for p in detail_parts if p)
+            results.append({
+                'id': v['id'],
+                'source': 'volunteer',
+                'name': v['full_name'],
+                'phone': v['phone'] or '',
+                'detail': detail or 'متطوع',
+            })
+
+    # Search members
+    if source in ('all', 'members'):
+        mems = db.execute("""
+            SELECT id, full_name, father_name, phone, membership_type, membership_number, province
+            FROM members
+            WHERE full_name LIKE ? OR phone LIKE ? OR national_id LIKE ? OR membership_number LIKE ?
+                  OR (COALESCE(full_name,'') || ' ' || COALESCE(father_name,'')) LIKE ?
+            ORDER BY full_name LIMIT 15
+        """, (term, term, term, term, term)).fetchall()
+        for m in mems:
+            detail_parts = [m['membership_type'] or '', m['membership_number'] or '', m['province'] or '']
+            detail = ' — '.join(p for p in detail_parts if p)
+            results.append({
+                'id': m['id'],
+                'source': 'member',
+                'name': f"{m['full_name']} {m['father_name'] or ''}".strip(),
+                'phone': m['phone'] or '',
+                'detail': detail or 'منتسب',
+            })
+
     return jsonify(results)
 
 

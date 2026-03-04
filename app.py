@@ -3107,6 +3107,36 @@ def admin_custom_list_excel(lid):
                      as_attachment=True, download_name=filename)
 
 
+@app.route('/admin/list/<int:lid>/whatsapp', methods=['POST'])
+@admin_required
+def admin_list_whatsapp(lid):
+    """Launch Playwright automation to create a WhatsApp group from list contacts."""
+    data = request.get_json()
+    group_name = data.get('group_name', '').strip()
+    phones = data.get('phones', [])
+
+    if not phones:
+        return jsonify({'error': 'لا توجد أرقام هواتف'}), 400
+    if not group_name:
+        return jsonify({'error': 'يرجى إدخال اسم المجموعة'}), 400
+
+    try:
+        from whatsapp_group import create_whatsapp_group
+        import threading
+
+        # Run in a thread so the HTTP request doesn't block
+        def run_automation():
+            create_whatsapp_group(group_name, phones, headless=False)
+
+        t = threading.Thread(target=run_automation, daemon=True)
+        t.start()
+        return jsonify({'ok': True, 'message': f'جاري إنشاء المجموعة مع {len(phones)} رقم...'})
+    except ImportError:
+        return jsonify({'error': 'Playwright غير مثبت. قم بتشغيل: pip install playwright && playwright install chromium'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/admin/list/<int:lid>/delete', methods=['POST'])
 @admin_required
 def admin_delete_list(lid):

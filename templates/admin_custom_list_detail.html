@@ -261,11 +261,17 @@
 
         <div id="waCopied" style="display:none; text-align:center; color:#065f46; font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">&#x2705; تم نسخ الأرقام!</div>
 
-        <div style="display:flex; gap:0.5rem;">
-            <button type="button" onclick="openWhatsAppWeb()" class="btn btn-primary" style="flex:1; background:#25d366; border-color:#25d366;">&#x1F310; فتح واتساب ويب</button>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+            <button type="button" onclick="launchWhatsAppAuto()" class="btn btn-primary" style="flex:1; background:#25d366; border-color:#25d366;">&#x1F916; إنشاء تلقائي (Playwright)</button>
         </div>
-        <p style="font-size:0.75rem; color:var(--text-light); margin-top:0.6rem; text-align:center;">
-            بعد فتح واتساب: أنشئ مجموعة جديدة &#x2192; الصق الأرقام لإضافة الأعضاء
+        <div id="waAutoResult" style="display:none; margin-bottom:0.5rem; padding:0.5rem; border-radius:8px; font-size:0.85rem; text-align:center;"></div>
+        <div style="display:flex; gap:0.5rem;">
+            <button type="button" onclick="copyWaPhones()" class="btn btn-outline btn-sm" style="flex:1;">&#x1F4CB; نسخ الأرقام</button>
+            <button type="button" onclick="openWhatsAppWeb()" class="btn btn-outline btn-sm" style="flex:1;">&#x1F310; فتح واتساب ويب يدوياً</button>
+        </div>
+        <p style="font-size:0.72rem; color:var(--text-light); margin-top:0.5rem; text-align:center;">
+            الزر التلقائي يفتح متصفح ويُنشئ المجموعة تلقائياً. يتطلب تثبيت Playwright.<br>
+            أول مرة ستحتاج مسح رمز QR من هاتفك.
         </p>
     </div>
 </div>
@@ -428,12 +434,46 @@ function copyWaPhones() {
 }
 
 function openWhatsAppWeb() {
-    // Copy phones first, then open WhatsApp Web
     var text = waPhones.join('\n');
     navigator.clipboard.writeText(text).then(function() {
         document.getElementById('waCopied').style.display = 'block';
     });
     window.open('https://web.whatsapp.com/', '_blank');
+}
+
+function launchWhatsAppAuto() {
+    var groupName = document.getElementById('waGroupName').value.trim();
+    if (!groupName) { alert('يرجى إدخال اسم المجموعة'); return; }
+    if (waPhones.length === 0) { alert('لا توجد أرقام هواتف'); return; }
+
+    var resultEl = document.getElementById('waAutoResult');
+    resultEl.style.background = '#dbeafe';
+    resultEl.style.color = '#1e40af';
+    resultEl.textContent = 'جاري تشغيل الأتمتة... سيفتح متصفح جديد';
+    resultEl.style.display = 'block';
+
+    fetch('{{ url_for("admin_list_whatsapp", lid=clist.id) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ group_name: groupName, phones: waPhones })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) {
+            resultEl.style.background = '#fee2e2';
+            resultEl.style.color = '#991b1b';
+            resultEl.textContent = data.error;
+        } else {
+            resultEl.style.background = '#d1fae5';
+            resultEl.style.color = '#065f46';
+            resultEl.textContent = data.message;
+        }
+    })
+    .catch(function(err) {
+        resultEl.style.background = '#fee2e2';
+        resultEl.style.color = '#991b1b';
+        resultEl.textContent = 'خطأ في الاتصال: ' + err;
+    });
 }
 </script>
 {% endblock %}

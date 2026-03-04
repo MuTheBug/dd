@@ -632,7 +632,7 @@
 <!-- Records Table -->
 <div class="card" style="padding: 0; overflow: hidden;">
     <div class="table-wrapper">
-        <table>
+        <table id="recordsTable">
             <thead>
                 <tr>
                     <th>#</th>
@@ -1301,7 +1301,11 @@ function openExportToList() {
 
     // Determine record count from visible table rows
     var rows = document.querySelectorAll('#recordsTable tbody tr');
-    var count = rows.length;
+    var count = 0;
+    rows.forEach(function(tr) {
+        var firstTd = tr.querySelector('td:first-child');
+        if (firstTd && firstTd.textContent.trim().match(/^\d+$/)) count++;
+    });
     countEl.textContent = 'سيتم تصدير ' + count + ' سجل حسب الفلاتر الحالية';
 
     // Load existing lists
@@ -1326,13 +1330,13 @@ function doExportToList() {
         return;
     }
 
-    // Collect record IDs from visible table
+    // Collect record IDs from first column of each table row
     var ids = [];
     document.querySelectorAll('#recordsTable tbody tr').forEach(function(tr) {
-        var link = tr.querySelector('a[href*="/admin/record/"]');
-        if (link) {
-            var match = link.href.match(/\/admin\/record\/(\d+)/);
-            if (match) ids.push(parseInt(match[1]));
+        var firstTd = tr.querySelector('td:first-child');
+        if (firstTd) {
+            var id = parseInt(firstTd.textContent.trim());
+            if (!isNaN(id) && id > 0) ids.push(id);
         }
     });
 

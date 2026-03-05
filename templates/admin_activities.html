@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}النشاطات - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+        النشاطات
+        <span style="font-size: 0.95rem; color: var(--text-light);">({{ activities|length }} نشاط)</span>
+    </h1>
+    <a href="{{ url_for('admin_activity_add') }}" class="btn btn-primary btn-sm">+ إضافة نشاط</a>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>اسم النشاط</th>
+                    <th>التاريخ</th>
+                    <th>الوصف</th>
+                    <th>عدد المشاركين</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in activities %}
+                <tr>
+                    <td>{{ a.id }}</td>
+                    <td style="font-weight: 600;">{{ a.name }}</td>
+                    <td>{{ a.date or '-' }}</td>
+                    <td style="max-width: 300px; font-size: 0.85rem; color: var(--text-light);">{{ a.description or '-' }}</td>
+                    <td>
+                        <span style="background: var(--primary); color: white; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.82rem; font-weight: 700;">
+                            {{ a.participant_count }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="btn-group" style="flex-wrap: nowrap;">
+                            <a href="{{ url_for('admin_activity_edit', aid=a.id) }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
+                            <form method="POST" action="{{ url_for('admin_activity_delete', aid=a.id) }}" style="display:inline;" onsubmit="return confirm('هل تريد حذف هذا النشاط؟')">
+                                <button type="submit" class="btn btn-danger btn-sm" title="حذف">&#x1F5D1;</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                        لا يوجد نشاطات مسجلة
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

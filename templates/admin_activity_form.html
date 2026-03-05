@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ 'تعديل نشاط' if activity else 'إضافة نشاط' }} - حقنا{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark); margin-bottom: 1rem;">
+        {{ 'تعديل النشاط' if activity else 'إضافة نشاط جديد' }}
+    </h1>
+
+    <form method="POST" class="card" style="padding: 1.5rem;">
+        <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+                <label>اسم النشاط <span style="color: var(--deceased);">*</span></label>
+                <input type="text" name="name" value="{{ activity.name if activity else '' }}" required placeholder="مثال: حملة توثيق ميدانية">
+            </div>
+            <div class="form-group">
+                <label>التاريخ</label>
+                <input type="date" name="date" value="{{ activity.date if activity else '' }}">
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 1rem;">
+            <label>الوصف</label>
+            <textarea name="description" rows="3" placeholder="وصف مختصر للنشاط...">{{ activity.description if activity else '' }}</textarea>
+        </div>
+
+        <div class="form-group" style="margin-top: 1rem;">
+            <label>المتطوعون المشاركون</label>
+            <div style="border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; max-height: 250px; overflow-y: auto;">
+                {% for v in volunteers %}
+                <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; cursor: pointer; font-weight: normal;">
+                    <input type="checkbox" name="volunteer_ids" value="{{ v.id }}" {{ 'checked' if v.id in selected_ids }}>
+                    <span>{{ v.full_name }}</span>
+                </label>
+                {% else %}
+                <p style="color: var(--text-light); text-align: center; padding: 1rem;">لا يوجد متطوعون نشطون</p>
+                {% endfor %}
+            </div>
+            <div style="margin-top: 0.3rem; font-size: 0.8rem; color: var(--text-light);">
+                اختر المتطوعين المشاركين في هذا النشاط
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">{{ 'حفظ التعديلات' if activity else 'إضافة النشاط' }}</button>
+            <a href="{{ url_for('admin_activities') }}" class="btn btn-outline">إلغاء</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

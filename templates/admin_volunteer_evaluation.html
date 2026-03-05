@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}تقييم {{ volunteer.full_name }} - حقنا{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 0 auto;">
+
+    <!-- Header -->
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+        <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+            تقييم المتطوع: {{ volunteer.full_name }}
+        </h1>
+        <a href="{{ url_for('admin_volunteers') }}" class="btn btn-outline btn-sm">&#x2190; العودة للمتطوعين</a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="card" style="padding: 1rem; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 800; color: var(--primary);">{{ total_days }}</div>
+            <div style="color: var(--text-light); font-size: 0.9rem;">يوم حضور</div>
+        </div>
+        <div class="card" style="padding: 1rem; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 800; color: #38a169;">{{ "%.1f"|format(total_hours) }}</div>
+            <div style="color: var(--text-light); font-size: 0.9rem;">ساعة عمل</div>
+        </div>
+        <div class="card" style="padding: 1rem; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 800; color: #dd6b20;">{{ total_activities }}</div>
+            <div style="color: var(--text-light); font-size: 0.9rem;">نشاط مشارك</div>
+        </div>
+        <div class="card" style="padding: 1rem; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 800; color: #805ad5;">{{ "%.1f"|format(total_hours / total_days if total_days else 0) }}</div>
+            <div style="color: var(--text-light); font-size: 0.9rem;">معدل ساعات/يوم</div>
+        </div>
+    </div>
+
+    <!-- Monthly Breakdown -->
+    {% if monthly %}
+    <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+        <h3 style="margin-bottom: 0.75rem; font-size: 1.1rem; color: var(--primary-dark);">ملخص شهري</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>الشهر</th>
+                        <th>أيام الحضور</th>
+                        <th>الساعات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for month, data in monthly|dictsort(reverse=true) %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ month }}</td>
+                        <td>{{ data.days }}</td>
+                        <td>{{ "%.1f"|format(data.hours) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Add Attendance Form -->
+    <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+        <h3 style="margin-bottom: 0.75rem; font-size: 1.1rem; color: var(--primary-dark);">تسجيل حضور جديد</h3>
+        <form method="POST" action="{{ url_for('admin_volunteer_attendance_add', vid=volunteer.id) }}" style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: end;">
+            <div class="form-group" style="margin-bottom:0; min-width: 140px;">
+                <label style="font-size: 0.82rem;">التاريخ</label>
+                <input type="date" name="date" required value="{{ today }}">
+            </div>
+            <div class="form-group" style="margin-bottom:0; min-width: 110px;">
+                <label style="font-size: 0.82rem;">وقت الدخول</label>
+                <input type="time" name="check_in">
+            </div>
+            <div class="form-group" style="margin-bottom:0; min-width: 110px;">
+                <label style="font-size: 0.82rem;">وقت الخروج</label>
+                <input type="time" name="check_out">
+            </div>
+            <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 150px;">
+                <label style="font-size: 0.82rem;">ملاحظات</label>
+                <input type="text" name="notes" placeholder="ملاحظات اختيارية">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">+ تسجيل</button>
+        </form>
+    </div>
+
+    <!-- Attendance Records -->
+    <div class="card" style="padding: 0; overflow: hidden; margin-bottom: 1.5rem;">
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 1.1rem; color: var(--primary-dark); margin: 0;">سجل الحضور</h3>
+            <span style="color: var(--text-light); font-size: 0.85rem;">{{ attendance|length }} سجل</span>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>الدخول</th>
+                        <th>الخروج</th>
+                        <th>الساعات</th>
+                        <th>ملاحظات</th>
+                        <th style="width: 50px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in attendance %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ a.date }}</td>
+                        <td>{{ a.check_in or '-' }}</td>
+                        <td>{{ a.check_out or '-' }}</td>
+                        <td>{{ "%.1f"|format(a.hours) if a.hours else '-' }}</td>
+                        <td style="color: var(--text-light); font-size: 0.85rem;">{{ a.notes or '' }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('admin_volunteer_attendance_delete', aid=a.id) }}" style="display:inline;" onsubmit="return confirm('حذف هذا السجل؟')">
+                                <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.15rem 0.4rem; font-size: 0.75rem;">&#x2715;</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 1.5rem; color: var(--text-light);">
+                            لا يوجد سجلات حضور بعد
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Activities -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 1.1rem; color: var(--primary-dark); margin: 0;">النشاطات المشارك فيها ({{ activities|length }})</h3>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>اسم النشاط</th>
+                        <th>التاريخ</th>
+                        <th>الوصف</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for act in activities %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ act.name }}</td>
+                        <td>{{ act.date or '-' }}</td>
+                        <td style="color: var(--text-light); font-size: 0.85rem;">{{ act.description or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center; padding: 1.5rem; color: var(--text-light);">
+                            لم يشارك في أي نشاط بعد
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

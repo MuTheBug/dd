@@ -9,7 +9,6 @@ First run will ask you to scan the QR code. Session is saved for subsequent runs
 """
 
 import argparse
-import json
 import os
 import sys
 import time
@@ -20,7 +19,7 @@ WA_SESSION_DIR = os.path.join(os.path.dirname(__file__), '.wa_session')
 def create_whatsapp_group(group_name, phone_numbers, headless=False):
     """Create a WhatsApp group and add members."""
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import sync_playwright, TimeoutError as PwTimeout
     except ImportError:
         print("Playwright not installed. Run: pip install playwright && playwright install chromium")
         return False
@@ -31,9 +30,8 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         p = p.strip().replace(' ', '').replace('-', '')
         if not p:
             continue
-        # Ensure international format
         if p.startswith('0'):
-            p = '+963' + p[1:]  # Default to Syria country code
+            p = '+963' + p[1:]
         if not p.startswith('+'):
             p = '+' + p
         phones.append(p)
@@ -43,115 +41,178 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         return False
 
     print(f"Creating group '{group_name}' with {len(phones)} contacts...")
-    print(f"Numbers: {', '.join(phones)}")
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch_persistent_context(
             user_data_dir=WA_SESSION_DIR,
             headless=headless,
-            args=['--disable-blink-features=AutomationControlled'],
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+            ],
             locale='ar',
+            viewport={'width': 1280, 'height': 900},
         )
         page = browser.pages[0] if browser.pages else browser.new_page()
-        page.goto('https://web.whatsapp.com/', wait_until='domcontentloaded')
 
-        # Wait for WhatsApp to load (either QR code or main screen)
+        # Navigate to WhatsApp Web
+        page.goto('https://web.whatsapp.com/', wait_until='domcontentloaded')
         print("Waiting for WhatsApp Web to load...")
         print("If this is your first time, scan the QR code with your phone.")
+        print("You have up to 3 minutes to scan...")
 
-        # Wait for the main chat list to appear (means logged in)
-        try:
-            page.wait_for_selector('[aria-label="قائمة المحادثات"], [aria-label="Chat list"], [data-testid="chat-list"]', timeout=120000)
-        except Exception:
-            print("Timeout waiting for WhatsApp to load. Make sure you scanned the QR code.")
+        # Wait for login - use a broad selector and long timeout for QR scanning
+        # The side panel appears after successful login
+        logged_in = False
+        for attempt in range(6):  # 6 attempts x 30s = 3 minutes total
+            try:
+                page.wait_for_selector(
+                    '#side, [data-testid="chat-list"], [aria-label="Chat list"], '
+                    '[aria-label="قائمة المحادثات"]',
+                    timeout=30000
+                )
+                logged_in = True
+                break
+            except PwTimeout:
+                print(f"  Still waiting for login... ({(attempt+1)*30}s)")
+                continue
+
+        if not logged_in:
+            print("Timeout waiting for WhatsApp login. Please try again.")
             browser.close()
             return False
 
-        print("WhatsApp loaded! Creating group...")
-        time.sleep(2)
+        print("WhatsApp loaded successfully!")
+        time.sleep(3)  # Let everything settle
 
-        # Click the new chat / menu button
+        # Step 1: Click new chat button
+        print("Opening new chat menu...")
         try:
-            # Try the "+" or new chat button
-            new_chat_btn = page.locator('[data-testid="menu-bar-new-chat"], [aria-label="محادثة جديدة"], [aria-label="New chat"]')
-            new_chat_btn.first.click()
-            time.sleep(1)
+            new_chat = page.locator(
+                '[data-testid="menu-bar-new-chat"], '
+                '[aria-label="محادثة جديدة"], [aria-label="New chat"], '
+                'div[title="محادثة جديدة"], div[title="New chat"]'
+            )
+            new_chat.first.click(timeout=10000)
+            time.sleep(2)
         except Exception as e:
             print(f"Could not find new chat button: {e}")
             browser.close()
             return False
 
-        # Click "New group"
+        # Step 2: Click "New group"
+        print("Selecting 'New group'...")
         try:
-            new_group_btn = page.locator('[data-testid="new-group-btn"], [aria-label="مجموعة جديدة"], [aria-label="New group"]')
-            new_group_btn.first.click()
-            time.sleep(1)
+            new_group = page.locator(
+                '[data-testid="btn-new-group"], '
+                'div[role="button"]:has-text("مجموعة جديدة"), '
+                'div[role="button"]:has-text("New group"), '
+                'span:has-text("مجموعة جديدة"), '
+                'span:has-text("New group")'
+            )
+            new_group.first.click(timeout=10000)
+            time.sleep(2)
         except Exception as e:
             print(f"Could not find new group button: {e}")
             browser.close()
             return False
 
-        # Add contacts by searching phone numbers
+        # Step 3: Add contacts by searching phone numbers
         added_count = 0
         for phone in phones:
             try:
-                # Type phone number in search box
-                search_input = page.locator('[data-testid="search-input"], [title="ابحث عن اسم أو رقم"], [title="Type contact name or number"]')
-                search_input.first.fill('')
-                time.sleep(0.3)
-                search_input.first.fill(phone)
-                time.sleep(2)
+                # Find the search/input box for adding contacts
+                search = page.locator(
+                    'input[data-testid="search-input"], '
+                    'input[title*="ابحث"], input[title*="search"], '
+                    'input[title*="Type"], input[type="text"]'
+                ).first
 
-                # Try to click the contact result
-                # Look for contact items in the search results
-                contact = page.locator('[data-testid="cell-frame-container"], [data-testid="contact-list-item"]').first
-                if contact.is_visible(timeout=3000):
-                    contact.click()
+                # Clear and type the phone number
+                search.click()
+                time.sleep(0.3)
+                search.fill('')
+                time.sleep(0.3)
+                search.type(phone, delay=50)
+                time.sleep(2.5)
+
+                # Try to find and click a contact result
+                contact = page.locator(
+                    '[data-testid="cell-frame-container"], '
+                    '[data-testid="contact-list-item"], '
+                    'div[role="listitem"], '
+                    'div[role="option"]'
+                ).first
+
+                try:
+                    contact.click(timeout=4000)
                     added_count += 1
-                    print(f"  Added: {phone}")
-                else:
-                    print(f"  Not found: {phone}")
+                    print(f"  + Added: {phone}")
+                except PwTimeout:
+                    print(f"  - Not found: {phone} (not in contacts)")
             except Exception as e:
-                print(f"  Could not add {phone}: {e}")
+                print(f"  ! Error adding {phone}: {e}")
 
             time.sleep(0.5)
-            # Clear search
+            # Clear search for next number
             try:
-                search_input.first.fill('')
+                s = page.locator(
+                    'input[data-testid="search-input"], '
+                    'input[title*="ابحث"], input[title*="search"], '
+                    'input[type="text"]'
+                ).first
+                s.fill('')
             except Exception:
                 pass
-            time.sleep(0.3)
+            time.sleep(0.5)
 
         if added_count == 0:
-            print("No contacts could be added. Make sure the numbers are saved in your phone contacts.")
+            print("No contacts could be added. Numbers must be saved in your phone contacts.")
             browser.close()
             return False
 
-        print(f"Added {added_count}/{len(phones)} contacts. Proceeding to create group...")
+        print(f"Added {added_count}/{len(phones)} contacts. Creating group...")
 
-        # Click the forward/next arrow to proceed
+        # Step 4: Click next/forward arrow
         try:
-            next_btn = page.locator('[data-testid="arrow-forward"], [data-icon="arrow-forward"], [aria-label="التالي"], [aria-label="Next"]')
-            next_btn.first.click()
-            time.sleep(2)
+            next_btn = page.locator(
+                '[data-testid="arrow-forward"], '
+                'span[data-icon="arrow-forward"], '
+                '[aria-label="التالي"], [aria-label="Next"]'
+            )
+            next_btn.first.click(timeout=5000)
+            time.sleep(3)
         except Exception as e:
             print(f"Could not click next: {e}")
             browser.close()
             return False
 
-        # Set group name
+        # Step 5: Set group name
+        print(f"Setting group name: {group_name}")
         try:
-            group_name_input = page.locator('[data-testid="group-name-input"], [title="اسم الموضوع"], [title="Group subject"]')
-            group_name_input.first.fill(group_name)
+            name_input = page.locator(
+                'div[data-testid="group-name-input"], '
+                'div[contenteditable="true"][title*="اسم"], '
+                'div[contenteditable="true"][title*="subject"], '
+                'div[contenteditable="true"][role="textbox"]'
+            ).first
+            name_input.click()
+            time.sleep(0.5)
+            name_input.type(group_name, delay=30)
             time.sleep(1)
         except Exception as e:
             print(f"Could not set group name: {e}")
 
-        # Click create group (the green checkmark)
+        # Step 6: Click create group (green checkmark)
         try:
-            create_btn = page.locator('[data-testid="create-group-btn"], [data-icon="checkmark-large"], [aria-label="إنشاء مجموعة"], [aria-label="Create group"]')
-            create_btn.first.click()
-            time.sleep(3)
+            create_btn = page.locator(
+                '[data-testid="create-group-btn"], '
+                'span[data-icon="checkmark-large"], '
+                '[aria-label="Create group"], '
+                '[aria-label="إنشاء مجموعة"]'
+            )
+            create_btn.first.click(timeout=5000)
+            time.sleep(4)
         except Exception as e:
             print(f"Could not click create: {e}")
             browser.close()
@@ -159,8 +220,8 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
 
         print(f"Group '{group_name}' created successfully with {added_count} members!")
 
-        # Keep browser open briefly to confirm
-        time.sleep(3)
+        # Keep browser open for a moment so user can verify
+        time.sleep(5)
         browser.close()
         return True
 
@@ -169,7 +230,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create WhatsApp group via automation')
     parser.add_argument('--name', required=True, help='Group name')
     parser.add_argument('--phones', required=True, help='Comma-separated phone numbers')
-    parser.add_argument('--headless', action='store_true', help='Run in headless mode (not recommended for first run)')
+    parser.add_argument('--headless', action='store_true', help='Run headless (not for first run)')
     args = parser.parse_args()
 
     phones = [p.strip() for p in args.phones.split(',') if p.strip()]

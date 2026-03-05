@@ -217,6 +217,7 @@ DIGITAL_EVIDENCE_TYPES = [
     ('news_report', 'تقرير إخباري'),
     ('ngo_report', 'تقرير منظمة'),
     ('civil_registry', 'سجل مدني'),
+    ('official_document', 'وثيقة رسمية'),
     ('other', 'أخرى')
 ]
 
@@ -548,6 +549,46 @@ def migrate_db():
                 cursor.execute(f"ALTER TABLE custom_list_manual_items ADD COLUMN {col} {typedef}")
             except sqlite3.OperationalError:
                 pass
+
+    # -- Volunteer attendance table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS volunteer_attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            volunteer_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            check_in TEXT DEFAULT '',
+            check_out TEXT DEFAULT '',
+            hours REAL DEFAULT 0,
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (volunteer_id) REFERENCES volunteers(id) ON DELETE CASCADE
+        )
+    """)
+
+    # -- Volunteer activities table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS volunteer_activities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            date TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
+
+    # -- Volunteer activity participation (many-to-many) --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS volunteer_activity_participants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            activity_id INTEGER NOT NULL,
+            volunteer_id INTEGER NOT NULL,
+            role TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            FOREIGN KEY (activity_id) REFERENCES volunteer_activities(id) ON DELETE CASCADE,
+            FOREIGN KEY (volunteer_id) REFERENCES volunteers(id) ON DELETE CASCADE,
+            UNIQUE(activity_id, volunteer_id)
+        )
+    """)
 
     conn.commit()
     conn.close()
@@ -2492,7 +2533,21 @@ def admin_volunteers():
 
     where_clause = " AND ".join(where) if where else "1=1"
     volunteers = db.execute(
-        f"SELECT * FROM volunteers WHERE {where_clause} ORDER BY created_at DESC", params
+        f"""SELECT v.*,
+            COALESCE(att.days, 0) as attendance_days,
+            COALESCE(att.total_hours, 0) as attendance_hours,
+            COALESCE(act.activity_count, 0) as activity_count
+        FROM volunteers v
+        LEFT JOIN (
+            SELECT volunteer_id, COUNT(*) as days, SUM(hours) as total_hours
+            FROM volunteer_attendance GROUP BY volunteer_id
+        ) att ON v.id = att.volunteer_id
+        LEFT JOIN (
+            SELECT volunteer_id, COUNT(*) as activity_count
+            FROM volunteer_activity_participants GROUP BY volunteer_id
+        ) act ON v.id = act.volunteer_id
+        WHERE {where_clause}
+        ORDER BY v.created_at DESC""", params
     ).fetchall()
 
     total = db.execute("SELECT COUNT(*) FROM volunteers").fetchone()[0]
@@ -2587,6 +2642,198 @@ def api_volunteers_list():
         "SELECT id, full_name, role FROM volunteers WHERE status='active' ORDER BY full_name"
     ).fetchall()
     return jsonify([{'id': v['id'], 'name': v['full_name'], 'role': v['role']} for v in vols])
+
+
+# ---------------------------------------------------------------------------
+# Volunteer Evaluation System
+# ---------------------------------------------------------------------------
+
+@app.route('/admin/volunteer/<int:vid>/evaluation')
+@admin_required
+def admin_volunteer_evaluation(vid):
+    db = get_db()
+    volunteer = db.execute("SELECT * FROM volunteers WHERE id=?", (vid,)).fetchone()
+    if not volunteer:
+        flash('المتطوع غير موجود', 'error')
+        return redirect(url_for('admin_volunteers'))
+
+    # Attendance records
+    attendance = db.execute(
+        "SELECT * FROM volunteer_attendance WHERE volunteer_id=? ORDER BY date DESC", (vid,)
+    ).fetchall()
+
+    # Activities participated in
+    activities = db.execute("""
+        SELECT va.*, vap.role as participant_role, vap.notes as participant_notes
+        FROM volunteer_activities va
+        JOIN volunteer_activity_participants vap ON va.id = vap.activity_id
+        WHERE vap.volunteer_id = ?
+        ORDER BY va.date DESC
+    """, (vid,)).fetchall()
+
+    # Stats
+    total_days = len(attendance)
+    total_hours = sum(a['hours'] for a in attendance if a['hours'])
+    total_activities = len(activities)
+
+    # Monthly breakdown
+    monthly = {}
+    for a in attendance:
+        month = a['date'][:7] if a['date'] else 'غير محدد'
+        monthly.setdefault(month, {'days': 0, 'hours': 0})
+        monthly[month]['days'] += 1
+        monthly[month]['hours'] += a['hours'] or 0
+
+    return render_template('admin_volunteer_evaluation.html',
+                           volunteer=volunteer,
+                           attendance=attendance,
+                           activities=activities,
+                           total_days=total_days,
+                           total_hours=total_hours,
+                           total_activities=total_activities,
+                           monthly=monthly,
+                           today=datetime.now().strftime('%Y-%m-%d'))
+
+
+@app.route('/admin/volunteer/<int:vid>/attendance/add', methods=['POST'])
+@admin_required
+def admin_volunteer_attendance_add(vid):
+    db = get_db()
+    date = request.form.get('date', '').strip()
+    check_in = request.form.get('check_in', '').strip()
+    check_out = request.form.get('check_out', '').strip()
+    notes = request.form.get('notes', '').strip()
+
+    hours = 0
+    if check_in and check_out:
+        try:
+            from datetime import datetime as dt
+            t1 = dt.strptime(check_in, '%H:%M')
+            t2 = dt.strptime(check_out, '%H:%M')
+            diff = (t2 - t1).total_seconds() / 3600
+            hours = round(diff, 1) if diff > 0 else 0
+        except ValueError:
+            pass
+
+    db.execute("""
+        INSERT INTO volunteer_attendance (volunteer_id, date, check_in, check_out, hours, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (vid, date, check_in, check_out, hours, notes))
+    db.commit()
+    flash('تم تسجيل الحضور', 'success')
+    return redirect(url_for('admin_volunteer_evaluation', vid=vid))
+
+
+@app.route('/admin/volunteer/attendance/<int:aid>/delete', methods=['POST'])
+@admin_required
+def admin_volunteer_attendance_delete(aid):
+    db = get_db()
+    att = db.execute("SELECT volunteer_id FROM volunteer_attendance WHERE id=?", (aid,)).fetchone()
+    if att:
+        db.execute("DELETE FROM volunteer_attendance WHERE id=?", (aid,))
+        db.commit()
+        flash('تم حذف سجل الحضور', 'success')
+        return redirect(url_for('admin_volunteer_evaluation', vid=att['volunteer_id']))
+    return redirect(url_for('admin_volunteers'))
+
+
+@app.route('/admin/activities')
+@admin_required
+def admin_activities():
+    db = get_db()
+    activities = db.execute("""
+        SELECT va.*, COUNT(vap.id) as participant_count
+        FROM volunteer_activities va
+        LEFT JOIN volunteer_activity_participants vap ON va.id = vap.activity_id
+        GROUP BY va.id
+        ORDER BY va.date DESC
+    """).fetchall()
+    return render_template('admin_activities.html', activities=activities)
+
+
+@app.route('/admin/activity/add', methods=['GET', 'POST'])
+@admin_required
+def admin_activity_add():
+    db = get_db()
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        date = request.form.get('date', '').strip()
+        description = request.form.get('description', '').strip()
+        volunteer_ids = request.form.getlist('volunteer_ids')
+
+        if not name:
+            flash('اسم النشاط مطلوب', 'error')
+            volunteers = db.execute("SELECT id, full_name FROM volunteers WHERE status='active' ORDER BY full_name").fetchall()
+            return render_template('admin_activity_form.html', activity=None, volunteers=volunteers, selected_ids=[])
+
+        cursor = db.execute("""
+            INSERT INTO volunteer_activities (name, date, description) VALUES (?, ?, ?)
+        """, (name, date, description))
+        activity_id = cursor.lastrowid
+
+        for v_id in volunteer_ids:
+            try:
+                db.execute("""
+                    INSERT INTO volunteer_activity_participants (activity_id, volunteer_id)
+                    VALUES (?, ?)
+                """, (activity_id, int(v_id)))
+            except Exception:
+                pass
+
+        db.commit()
+        flash('تم إضافة النشاط بنجاح', 'success')
+        return redirect(url_for('admin_activities'))
+
+    volunteers = db.execute("SELECT id, full_name FROM volunteers WHERE status='active' ORDER BY full_name").fetchall()
+    return render_template('admin_activity_form.html', activity=None, volunteers=volunteers, selected_ids=[])
+
+
+@app.route('/admin/activity/<int:aid>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_activity_edit(aid):
+    db = get_db()
+    activity = db.execute("SELECT * FROM volunteer_activities WHERE id=?", (aid,)).fetchone()
+    if not activity:
+        flash('النشاط غير موجود', 'error')
+        return redirect(url_for('admin_activities'))
+
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        date = request.form.get('date', '').strip()
+        description = request.form.get('description', '').strip()
+        volunteer_ids = request.form.getlist('volunteer_ids')
+
+        db.execute("UPDATE volunteer_activities SET name=?, date=?, description=? WHERE id=?",
+                   (name, date, description, aid))
+
+        db.execute("DELETE FROM volunteer_activity_participants WHERE activity_id=?", (aid,))
+        for v_id in volunteer_ids:
+            try:
+                db.execute("""
+                    INSERT INTO volunteer_activity_participants (activity_id, volunteer_id)
+                    VALUES (?, ?)
+                """, (aid, int(v_id)))
+            except Exception:
+                pass
+
+        db.commit()
+        flash('تم تعديل النشاط بنجاح', 'success')
+        return redirect(url_for('admin_activities'))
+
+    volunteers = db.execute("SELECT id, full_name FROM volunteers WHERE status='active' ORDER BY full_name").fetchall()
+    selected_ids = [p['volunteer_id'] for p in
+                    db.execute("SELECT volunteer_id FROM volunteer_activity_participants WHERE activity_id=?", (aid,)).fetchall()]
+    return render_template('admin_activity_form.html', activity=activity, volunteers=volunteers, selected_ids=selected_ids)
+
+
+@app.route('/admin/activity/<int:aid>/delete', methods=['POST'])
+@admin_required
+def admin_activity_delete(aid):
+    db = get_db()
+    db.execute("DELETE FROM volunteer_activities WHERE id=?", (aid,))
+    db.commit()
+    flash('تم حذف النشاط', 'success')
+    return redirect(url_for('admin_activities'))
 
 
 # ---------------------------------------------------------------------------

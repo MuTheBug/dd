@@ -51,10 +51,11 @@
                     <th>#</th>
                     <th>الاسم الكامل</th>
                     <th>الهاتف</th>
-                    <th>المحافظة</th>
                     <th>الدور</th>
-                    <th>التخصص</th>
                     <th>تاريخ الانضمام</th>
+                    <th>أيام الحضور</th>
+                    <th>الساعات</th>
+                    <th>النشاطات</th>
                     <th>الحالة</th>
                     <th>إجراءات</th>
                 </tr>
@@ -65,10 +66,23 @@
                     <td>{{ v.id }}</td>
                     <td style="font-weight: 600;">{{ v.full_name }}</td>
                     <td dir="ltr" style="text-align: right;">{{ v.phone or '-' }}</td>
-                    <td>{{ v.province or '-' }}</td>
                     <td>{{ v.role or '-' }}</td>
-                    <td>{{ v.specialization or '-' }}</td>
                     <td>{{ v.join_date or '-' }}</td>
+                    <td style="text-align: center;">
+                        {% if v.attendance_days %}
+                        <span style="background: var(--primary); color: white; padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.8rem; font-weight: 700;">{{ v.attendance_days }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        {% if v.attendance_hours %}
+                        <span style="font-weight: 600; color: #38a169;">{{ "%.0f"|format(v.attendance_hours) }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        {% if v.activity_count %}
+                        <span style="background: #dd6b20; color: white; padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.8rem; font-weight: 700;">{{ v.activity_count }}</span>
+                        {% else %}-{% endif %}
+                    </td>
                     <td>
                         {% if v.status == 'active' %}
                         <span class="status-badge status-survivor">نشط</span>
@@ -80,6 +94,7 @@
                     </td>
                     <td>
                         <div class="btn-group" style="flex-wrap: nowrap;">
+                            <a href="{{ url_for('admin_volunteer_evaluation', vid=v.id) }}" class="btn btn-sm" style="background: #805ad5; color: white; padding: 0.2rem 0.45rem; font-size: 0.75rem;" title="تقييم">تقييم</a>
                             <a href="{{ url_for('admin_volunteer_edit', vid=v.id) }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
                             <form method="POST" action="{{ url_for('admin_volunteer_delete', vid=v.id) }}" style="display:inline;" onsubmit="return confirm('هل تريد حذف هذا المتطوع؟')">
                                 <button type="submit" class="btn btn-danger btn-sm" title="حذف">&#x1F5D1;</button>
@@ -89,7 +104,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    <td colspan="10" style="text-align: center; padding: 2rem; color: var(--text-light);">
                         لا يوجد متطوعون مسجلون
                     </td>
                 </tr>

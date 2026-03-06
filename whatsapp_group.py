@@ -63,7 +63,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
 
         # Wait for login
         logged_in = False
-        for attempt in range(6):  # 6 attempts x 30s = 3 minutes total
+        for attempt in range(6):
             try:
                 page.wait_for_selector(
                     '#side, [data-testid="chat-list"], [aria-label="Chat list"], '
@@ -85,82 +85,66 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         time.sleep(3)
 
         # ---------------------------------------------------------------
-        # Step 0: Save contacts by initiating chats with each number.
-        # WhatsApp Web allows chatting with unsaved numbers via direct URL.
-        # This makes the numbers appear in search when creating a group.
-        # We also save a label name for each contact based on the group name.
+        # Step 1: Initiate chats with all numbers first so they appear
+        # as recent contacts. Use the /send?phone= URL approach.
         # ---------------------------------------------------------------
-        contact_labels = {}
-        print("Saving contacts by initiating chats...")
+        valid_phones = []
+        print("Initiating chats with contacts...")
         for idx, phone in enumerate(phones, 1):
-            label = f"{group_name} {idx}"
-            contact_labels[phone] = label
             phone_clean = phone.replace('+', '')
             url = f'https://web.whatsapp.com/send?phone={phone_clean}'
             try:
-                print(f"  Initiating chat with {phone} ({label})...")
+                print(f"  [{idx}/{len(phones)}] Opening chat with {phone}...")
                 page.goto(url, wait_until='domcontentloaded')
-                time.sleep(4)
+                time.sleep(3)
 
-                # Check if "Phone number shared via url is invalid" or similar error
-                invalid = page.locator('div:has-text("invalid"), div:has-text("غير صالح")')
+                # Check for invalid number popup
                 try:
-                    if invalid.first.is_visible(timeout=2000):
+                    invalid = page.locator('[data-testid="popup-controls-ok"]')
+                    if invalid.is_visible(timeout=2000):
                         print(f"    - Invalid number: {phone}")
-                        # Click OK to dismiss
-                        ok_btn = page.locator('div[role="button"]:has-text("OK"), div[role="button"]:has-text("موافق")')
-                        try:
-                            ok_btn.first.click(timeout=3000)
-                        except Exception:
-                            pass
+                        invalid.click()
                         time.sleep(1)
                         continue
                 except Exception:
                     pass
 
-                # Wait for chat to load (the message input area appears)
+                # Wait for the chat compose box to appear
                 try:
                     page.wait_for_selector(
                         '[data-testid="conversation-compose-box-input"], '
-                        'div[contenteditable="true"][data-tab="10"], '
                         'footer div[contenteditable="true"]',
                         timeout=10000
                     )
-                    print(f"    + Chat opened for {phone}")
+                    valid_phones.append(phone)
+                    print(f"    + Chat ready for {phone}")
                 except PwTimeout:
-                    # Try clicking "Continue to chat" button if it appears
-                    try:
-                        cont_btn = page.locator(
-                            'a:has-text("Continue to chat"), '
-                            'a:has-text("متابعة الدردشة"), '
-                            'a:has-text("continue to chat")'
-                        )
-                        cont_btn.first.click(timeout=3000)
-                        time.sleep(3)
-                        print(f"    + Chat initiated for {phone}")
-                    except Exception:
-                        print(f"    - Could not open chat for {phone}")
+                    print(f"    - Could not open chat for {phone}")
 
                 time.sleep(1)
             except Exception as e:
                 print(f"    ! Error with {phone}: {e}")
 
-        # Return to main WhatsApp page
-        page.goto('https://web.whatsapp.com/', wait_until='domcontentloaded')
-        time.sleep(4)
-
-        # Wait for side panel again
-        try:
-            page.wait_for_selector('#side', timeout=15000)
-        except PwTimeout:
-            print("Could not return to main WhatsApp page")
+        if not valid_phones:
+            print("No valid WhatsApp numbers found.")
             browser.close()
             return False
 
+        # ---------------------------------------------------------------
+        # Step 2: Go back to main page and create group
+        # ---------------------------------------------------------------
+        page.goto('https://web.whatsapp.com/', wait_until='domcontentloaded')
+        time.sleep(4)
+        try:
+            page.wait_for_selector('#side', timeout=15000)
+        except PwTimeout:
+            print("Could not return to main page")
+            browser.close()
+            return False
         time.sleep(2)
 
         # ---------------------------------------------------------------
-        # Step 1: Click new chat button
+        # Step 3: Open new chat -> New group
         # ---------------------------------------------------------------
         print("Opening new chat menu...")
         try:
@@ -176,9 +160,6 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             browser.close()
             return False
 
-        # ---------------------------------------------------------------
-        # Step 2: Click "New group"
-        # ---------------------------------------------------------------
         print("Selecting 'New group'...")
         try:
             new_group = page.locator(
@@ -196,84 +177,97 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             return False
 
         # ---------------------------------------------------------------
-        # Step 3: Add contacts by searching phone numbers
-        # Since we initiated chats, numbers should now be searchable
+        # Step 4: Search and add each contact
+        # Try multiple search formats for each number
         # ---------------------------------------------------------------
         added_count = 0
-        for phone in phones:
-            try:
-                search = page.locator(
-                    'input[data-testid="search-input"], '
-                    'input[title*="ابحث"], input[title*="search"], '
-                    'input[title*="Type"], input[type="text"]'
-                ).first
+        for phone in valid_phones:
+            phone_clean = phone.replace('+', '')
+            # Try different search formats
+            search_variants = [
+                phone,                      # +963992129149
+                phone_clean,                # 963992129149
+                '0' + phone_clean[3:],      # 0992129149 (local format)
+                phone_clean[3:],            # 992129149 (without country code)
+            ]
 
-                # Clear and type the phone number
-                search.click()
-                time.sleep(0.3)
-                search.fill('')
-                time.sleep(0.3)
-                # Try searching with phone number (without +)
-                search_term = phone.replace('+', '')
-                search.type(search_term, delay=50)
-                time.sleep(2.5)
-
-                # Try to find and click a contact result
-                contact = page.locator(
-                    '[data-testid="cell-frame-container"], '
-                    '[data-testid="contact-list-item"], '
-                    'div[role="listitem"], '
-                    'div[role="option"]'
-                ).first
-
+            found = False
+            for variant in search_variants:
                 try:
-                    contact.click(timeout=4000)
-                    added_count += 1
-                    print(f"  + Added: {phone} ({contact_labels.get(phone, '')})")
-                except PwTimeout:
-                    # Try again with the full number including +
+                    search = page.locator(
+                        'input[data-testid="search-input"], '
+                        'input[title*="ابحث"], input[title*="search"], '
+                        'input[title*="Type"], input[type="text"]'
+                    ).first
+
+                    search.click()
+                    time.sleep(0.2)
+                    search.fill('')
+                    time.sleep(0.3)
+                    search.type(variant, delay=40)
+                    time.sleep(2)
+
+                    # Look for any clickable contact result
+                    # Take screenshot for debugging on first attempt
+                    if added_count == 0 and variant == search_variants[0]:
+                        try:
+                            page.screenshot(path=os.path.join(os.path.dirname(__file__), 'wa_debug.png'))
+                            print("  (Debug screenshot saved as wa_debug.png)")
+                        except Exception:
+                            pass
+
+                    contact = page.locator(
+                        '[data-testid="cell-frame-container"], '
+                        '[data-testid="contact-list-item"], '
+                        'div[role="listitem"], '
+                        'div[role="option"], '
+                        'div._ajv6, '
+                        'div.matched-text'
+                    ).first
+
                     try:
-                        search.fill('')
-                        time.sleep(0.3)
-                        search.type(phone, delay=50)
-                        time.sleep(2.5)
-                        contact2 = page.locator(
-                            '[data-testid="cell-frame-container"], '
-                            '[data-testid="contact-list-item"], '
-                            'div[role="listitem"], '
-                            'div[role="option"]'
-                        ).first
-                        contact2.click(timeout=4000)
+                        contact.click(timeout=3000)
                         added_count += 1
-                        print(f"  + Added: {phone} ({contact_labels.get(phone, '')})")
-                    except Exception:
-                        print(f"  - Not found: {phone}")
-            except Exception as e:
-                print(f"  ! Error adding {phone}: {e}")
+                        print(f"  + Added: {phone} (searched: {variant})")
+                        found = True
+                        break
+                    except PwTimeout:
+                        pass
+
+                    # Clear search
+                    search.fill('')
+                    time.sleep(0.3)
+                except Exception:
+                    pass
+
+            if not found:
+                print(f"  - Not found: {phone} (tried all formats)")
 
             time.sleep(0.5)
-            # Clear search for next number
+            # Always clear search
             try:
-                s = page.locator(
+                page.locator(
                     'input[data-testid="search-input"], '
-                    'input[title*="ابحث"], input[title*="search"], '
                     'input[type="text"]'
-                ).first
-                s.fill('')
+                ).first.fill('')
             except Exception:
                 pass
-            time.sleep(0.5)
+            time.sleep(0.3)
 
         if added_count == 0:
-            print("No contacts could be added.")
-            print("Tip: Make sure numbers have WhatsApp accounts.")
+            print("\nNo contacts could be added to the group.")
+            print("This usually means the numbers are not saved in your phone contacts.")
+            print("WhatsApp requires contacts to be saved in your phone to add to groups.")
+            print(f"\nPlease save these numbers in your phone contacts and try again:")
+            for i, phone in enumerate(valid_phones, 1):
+                print(f"  Save as '{group_name} {i}': {phone}")
             browser.close()
             return False
 
-        print(f"Added {added_count}/{len(phones)} contacts. Creating group...")
+        print(f"\nAdded {added_count}/{len(valid_phones)} contacts. Proceeding...")
 
         # ---------------------------------------------------------------
-        # Step 4: Click next/forward arrow
+        # Step 5: Click next/forward arrow
         # ---------------------------------------------------------------
         try:
             next_btn = page.locator(
@@ -289,7 +283,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             return False
 
         # ---------------------------------------------------------------
-        # Step 5: Set group name
+        # Step 6: Set group name
         # ---------------------------------------------------------------
         print(f"Setting group name: {group_name}")
         try:
@@ -307,7 +301,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             print(f"Could not set group name: {e}")
 
         # ---------------------------------------------------------------
-        # Step 6: Click create group (green checkmark)
+        # Step 7: Click create group
         # ---------------------------------------------------------------
         try:
             create_btn = page.locator(
@@ -323,9 +317,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             browser.close()
             return False
 
-        print(f"Group '{group_name}' created successfully with {added_count} members!")
-
-        # Keep browser open for a moment so user can verify
+        print(f"\nGroup '{group_name}' created successfully with {added_count} members!")
         time.sleep(5)
         browser.close()
         return True

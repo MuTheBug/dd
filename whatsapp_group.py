@@ -246,14 +246,44 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         # Step 4: Click forward arrow -> Set name -> Create
         # ---------------------------------------------------------------
         print("\nStep 4: Creating group...")
+
+        # Debug: show all data-icon values on page
         try:
-            page.locator(
-                'span[data-icon="arrow-forward"], '
-                '[data-testid="arrow-forward"]'
-            ).first.click(timeout=5000)
-            time.sleep(3)
-        except Exception as e:
-            print(f"Could not click next: {e}")
+            icons = page.evaluate("""
+                () => Array.from(document.querySelectorAll('span[data-icon]'))
+                    .map(el => el.getAttribute('data-icon'))
+            """)
+            print(f"  Available icons: {icons}")
+        except Exception:
+            pass
+
+        # Try multiple possible icon names for the forward/next button
+        next_selectors = [
+            'span[data-icon="arrow-forward"]',
+            'span[data-icon="forward"]',
+            'span[data-icon="arrow-forward-outline"]',
+            'span[data-icon="checkmark-medium"]',
+            'span[data-icon="checkmark"]',
+            'span[data-icon="next"]',
+            '[data-testid="arrow-forward"]',
+            '[data-testid="next-btn"]',
+            # The green circle button at bottom-right
+            'button[aria-label="Next"]',
+            'button[aria-label="التالي"]',
+        ]
+        clicked_next = False
+        for sel in next_selectors:
+            loc = page.locator(sel)
+            if loc.count() > 0:
+                print(f"  Clicking next via: {sel}")
+                loc.first.click(timeout=5000)
+                clicked_next = True
+                time.sleep(3)
+                break
+
+        if not clicked_next:
+            print("  Could not find next button. Taking screenshot...")
+            debug_screenshot(page, '06b_no_next_btn')
             browser.close()
             return False
 
@@ -267,11 +297,40 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         except Exception as e:
             print(f"  Could not set name: {e}")
 
+        # Debug icons on name screen
         try:
-            page.locator(
-                'span[data-icon="checkmark-large"], '
-                '[data-testid="create-group-btn"]'
-            ).first.click(timeout=5000)
+            icons2 = page.evaluate("""
+                () => Array.from(document.querySelectorAll('span[data-icon]'))
+                    .map(el => el.getAttribute('data-icon'))
+            """)
+            print(f"  Icons on name screen: {icons2}")
+        except Exception:
+            pass
+
+        create_selectors = [
+            'span[data-icon="checkmark-large"]',
+            'span[data-icon="checkmark-medium"]',
+            'span[data-icon="checkmark"]',
+            '[data-testid="create-group-btn"]',
+            'button[aria-label="Create group"]',
+            'button[aria-label="إنشاء مجموعة"]',
+        ]
+        clicked_create = False
+        for sel in create_selectors:
+            loc = page.locator(sel)
+            if loc.count() > 0:
+                print(f"  Creating via: {sel}")
+                loc.first.click(timeout=5000)
+                clicked_create = True
+                break
+
+        try:
+            if not clicked_create:
+                # Last resort fallback
+                page.locator(
+                    'span[data-icon="checkmark-large"], '
+                    '[data-testid="create-group-btn"]'
+                ).first.click(timeout=5000)
             time.sleep(4)
         except Exception as e:
             print(f"  Could not create: {e}")

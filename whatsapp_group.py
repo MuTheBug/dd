@@ -189,22 +189,25 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                 return loc.first
             return None
 
-        def clear_search(search_el):
-            """Clear the search input reliably."""
-            try:
-                search_el.click()
-                time.sleep(0.2)
-                # Triple-click to select all text in the field
-                search_el.click(click_count=3)
-                time.sleep(0.1)
-                page.keyboard.press('Backspace')
-                time.sleep(0.2)
-                # Also try Ctrl+A as backup
-                page.keyboard.press('Control+a')
-                page.keyboard.press('Backspace')
-                time.sleep(0.3)
-            except Exception:
-                pass
+        # Figure out the correct selector for contact list items
+        # From debug dump: contacts are div[role="button"] with contact names
+        contact_selector = 'div[role="listitem"], div[role="option"]'
+        # Check cell-frame-container first
+        if page.locator('[data-testid="cell-frame-container"]').count() > 0:
+            contact_selector = '[data-testid="cell-frame-container"]'
+        else:
+            # The contacts panel is the left side panel with "Add group members"
+            # Contact items are div[role="button"] but we need to exclude
+            # nav buttons. Contact divs contain name text and are in the
+            # scrollable list area.
+            # Use a broader approach: count visible role=button divs that
+            # look like contacts (contain status text or contact info)
+            contact_selector = (
+                'div[role="button"]:not([aria-label])'
+            )
+
+        initial_count = page.locator(contact_selector).count()
+        print(f"  Contact selector: {contact_selector} (count: {initial_count})")
 
         for phone in valid_phones:
             phone_clean = phone.replace('+', '')
@@ -219,74 +222,95 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                         print(f"  ! Could not find search input for {phone}")
                         break
 
-                    search.click()
-                    time.sleep(0.3)
+                    # Use fill() for reliable text input (works for both
+                    # regular inputs and contenteditable divs)
+                    try:
+                        search.fill(variant)
+                    except Exception:
+                        # Fallback: click and type
+                        search.click()
+                        time.sleep(0.3)
+                        page.keyboard.press('Control+a')
+                        page.keyboard.press('Backspace')
+                        time.sleep(0.2)
+                        page.keyboard.type(variant, delay=50)
 
-                    # Clear existing text
-                    search.click(click_count=3)
-                    time.sleep(0.1)
-                    page.keyboard.press('Backspace')
-                    time.sleep(0.2)
-                    page.keyboard.press('Control+a')
-                    page.keyboard.press('Backspace')
-                    time.sleep(0.2)
-
-                    # Count contacts before search to detect filtering
-                    before_count = page.locator(
-                        '[data-testid="cell-frame-container"]'
-                    ).count()
-
-                    page.keyboard.type(variant, delay=50)
                     time.sleep(3)
 
                     if added_count == 0 and vi == 0:
                         debug_screenshot(page, '05_search')
 
                     # Count contacts after search
-                    after_count = page.locator(
-                        '[data-testid="cell-frame-container"]'
-                    ).count()
+                    after_count = page.locator(contact_selector).count()
+                    print(f"    [{variant}] results: {after_count} (was {initial_count})")
 
-                    print(f"    [{variant}] contacts: {before_count} -> {after_count}")
-
-                    # If the list was filtered (fewer results) or there's just one,
-                    # the search matched something
-                    if after_count > 0 and after_count < before_count:
-                        result = page.locator(
-                            '[data-testid="cell-frame-container"]'
-                        ).first
-                        try:
-                            result.click(timeout=3000)
-                            added_count += 1
-                            print(f"  + Added: {phone} (variant: {variant})")
-                            found = True
-                            time.sleep(1)
-                            s = find_search_input()
-                            if s:
-                                clear_search(s)
-                            break
-                        except PwTimeout:
-                            pass
+                    # If the list was filtered down, click the first result
+                    if after_count > 0 and after_count < initial_count:
+                        page.locator(contact_selector).first.click(timeout=3000)
+                        added_count += 1
+                        print(f"  + Added: {phone}")
+                        found = True
+                        time.sleep(1)
+                        # Clear search for next contact
+                        s = find_search_input()
+                        if s:
+                            try:
+                                s.fill('')
+                            except Exception:
+                                s.click()
+                                page.keyboard.press('Control+a')
+                                page.keyboard.press('Backspace')
+                        time.sleep(1)
+                        break
+                    elif after_count == 1:
+                        # Only one result - probably our match even if
+                        # initial_count was also small
+                        page.locator(contact_selector).first.click(timeout=3000)
+                        added_count += 1
+                        print(f"  + Added (single result): {phone}")
+                        found = True
+                        time.sleep(1)
+                        s = find_search_input()
+                        if s:
+                            try:
+                                s.fill('')
+                            except Exception:
+                                s.click()
+                                page.keyboard.press('Control+a')
+                                page.keyboard.press('Backspace')
+                        time.sleep(1)
+                        break
                     elif after_count == 0:
-                        # No results - try "Not in your contacts" option
-                        not_contact = page.get_by_text("Not in your contacts")
-                        if not_contact.count() == 0:
-                            not_contact = page.get_by_text("ليس في جهات اتصالك")
-                        if not_contact.count() > 0:
-                            not_contact.first.click(timeout=3000)
-                            added_count += 1
-                            print(f"  + Added (not in contacts): {phone}")
-                            found = True
-                            time.sleep(1)
+                        # Try "Not in your contacts" link
+                        for txt in ["Not in your contacts", "ليس في جهات اتصالك"]:
+                            nc = page.get_by_text(txt)
+                            if nc.count() > 0:
+                                nc.first.click(timeout=3000)
+                                added_count += 1
+                                print(f"  + Added (not in contacts): {phone}")
+                                found = True
+                                time.sleep(1)
+                                break
+                        if found:
                             s = find_search_input()
                             if s:
-                                clear_search(s)
+                                try:
+                                    s.fill('')
+                                except Exception:
+                                    pass
+                            time.sleep(1)
                             break
 
-                    # Clear for next variant
+                    # Clear search for next variant
                     s = find_search_input()
                     if s:
-                        clear_search(s)
+                        try:
+                            s.fill('')
+                        except Exception:
+                            s.click()
+                            page.keyboard.press('Control+a')
+                            page.keyboard.press('Backspace')
+                    time.sleep(0.5)
                 except Exception as e:
                     if vi == 0:
                         print(f"  ! Search error for {phone}: {e}")
@@ -295,7 +319,10 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                 print(f"  - Not found: {phone}")
                 s = find_search_input()
                 if s:
-                    clear_search(s)
+                    try:
+                        s.fill('')
+                    except Exception:
+                        pass
             time.sleep(0.5)
 
         debug_screenshot(page, '06_after_adding')

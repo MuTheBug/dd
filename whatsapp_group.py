@@ -189,29 +189,77 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                 return loc.first
             return None
 
-        # Figure out the correct selector for contact list items
-        # From debug dump: contacts are div[role="button"] with contact names
-        contact_selector = 'div[role="listitem"], div[role="option"]'
-        # Check cell-frame-container first
-        if page.locator('[data-testid="cell-frame-container"]').count() > 0:
-            contact_selector = '[data-testid="cell-frame-container"]'
-        else:
-            # The contacts panel is the left side panel with "Add group members"
-            # Contact items are div[role="button"] but we need to exclude
-            # nav buttons. Contact divs contain name text and are in the
-            # scrollable list area.
-            # Use a broader approach: count visible role=button divs that
-            # look like contacts (contain status text or contact info)
-            contact_selector = (
-                'div[role="button"]:not([aria-label])'
-            )
+        def click_search_result():
+            """Click the first contact in the search results list.
 
-        initial_count = page.locator(contact_selector).count()
-        print(f"  Contact selector: {contact_selector} (count: {initial_count})")
+            After typing in the search box, the contact list filters.
+            We need to click a result from the scrollable list, NOT the
+            chips of already-added contacts above the search input.
+
+            Strategy: use JS to find div[role="button"] elements that are
+            positioned below the search input (in the results area).
+            """
+            clicked = page.evaluate("""
+                () => {
+                    // Find the search input to get its position
+                    const searchInput = document.querySelector(
+                        'input[placeholder*="Search"], input[placeholder*="ابحث"], ' +
+                        'div[contenteditable="true"][role="textbox"]'
+                    );
+                    if (!searchInput) return 'no_search_input';
+
+                    const searchRect = searchInput.getBoundingClientRect();
+
+                    // Find all div[role="button"] below the search input
+                    // These are contact results, not chips
+                    const buttons = document.querySelectorAll('div[role="button"]');
+                    for (const btn of buttons) {
+                        const rect = btn.getBoundingClientRect();
+                        // Must be below search input and in the left panel (x < 600)
+                        // and have reasonable height (contact items are ~60-72px)
+                        if (rect.top > searchRect.bottom + 10 &&
+                            rect.left < 600 &&
+                            rect.height > 40 && rect.height < 100 &&
+                            rect.width > 200) {
+                            btn.click();
+                            return 'clicked: ' + btn.textContent.substring(0, 30);
+                        }
+                    }
+                    return 'no_result_found';
+                }
+            """)
+            return clicked
+
+        def count_contact_results():
+            """Count contact items in the results list (below search input)."""
+            return page.evaluate("""
+                () => {
+                    const searchInput = document.querySelector(
+                        'input[placeholder*="Search"], input[placeholder*="ابحث"], ' +
+                        'div[contenteditable="true"][role="textbox"]'
+                    );
+                    if (!searchInput) return 0;
+                    const searchRect = searchInput.getBoundingClientRect();
+                    let count = 0;
+                    const buttons = document.querySelectorAll('div[role="button"]');
+                    for (const btn of buttons) {
+                        const rect = btn.getBoundingClientRect();
+                        if (rect.top > searchRect.bottom + 10 &&
+                            rect.left < 600 &&
+                            rect.height > 40 && rect.height < 100 &&
+                            rect.width > 200) {
+                            count++;
+                        }
+                    }
+                    return count;
+                }
+            """)
+
+        initial_count = count_contact_results()
+        print(f"  Contact results in list: {initial_count}")
 
         for phone in valid_phones:
             phone_clean = phone.replace('+', '')
-            # Try different formats
             variants = [phone, phone_clean, '0' + phone_clean[3:], phone_clean[3:]]
 
             found = False
@@ -222,12 +270,10 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                         print(f"  ! Could not find search input for {phone}")
                         break
 
-                    # Use fill() for reliable text input (works for both
-                    # regular inputs and contenteditable divs)
+                    # Use fill() for reliable text input
                     try:
                         search.fill(variant)
                     except Exception:
-                        # Fallback: click and type
                         search.click()
                         time.sleep(0.3)
                         page.keyboard.press('Control+a')
@@ -240,46 +286,28 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                     if added_count == 0 and vi == 0:
                         debug_screenshot(page, '05_search')
 
-                    # Count contacts after search
-                    after_count = page.locator(contact_selector).count()
+                    after_count = count_contact_results()
                     print(f"    [{variant}] results: {after_count} (was {initial_count})")
 
-                    # If the list was filtered down, click the first result
-                    if after_count > 0 and after_count < initial_count:
-                        page.locator(contact_selector).first.click(timeout=3000)
-                        added_count += 1
-                        print(f"  + Added: {phone}")
-                        found = True
-                        time.sleep(1)
-                        # Clear search for next contact
-                        s = find_search_input()
-                        if s:
-                            try:
-                                s.fill('')
-                            except Exception:
-                                s.click()
-                                page.keyboard.press('Control+a')
-                                page.keyboard.press('Backspace')
-                        time.sleep(1)
-                        break
-                    elif after_count == 1:
-                        # Only one result - probably our match even if
-                        # initial_count was also small
-                        page.locator(contact_selector).first.click(timeout=3000)
-                        added_count += 1
-                        print(f"  + Added (single result): {phone}")
-                        found = True
-                        time.sleep(1)
-                        s = find_search_input()
-                        if s:
-                            try:
-                                s.fill('')
-                            except Exception:
-                                s.click()
-                                page.keyboard.press('Control+a')
-                                page.keyboard.press('Backspace')
-                        time.sleep(1)
-                        break
+                    if after_count > 0 and (after_count < initial_count or after_count <= 3):
+                        result = click_search_result()
+                        print(f"    click result: {result}")
+                        if result.startswith('clicked'):
+                            added_count += 1
+                            print(f"  + Added: {phone}")
+                            found = True
+                            time.sleep(1)
+                            # Clear search
+                            s = find_search_input()
+                            if s:
+                                try:
+                                    s.fill('')
+                                except Exception:
+                                    s.click()
+                                    page.keyboard.press('Control+a')
+                                    page.keyboard.press('Backspace')
+                            time.sleep(1)
+                            break
                     elif after_count == 0:
                         # Try "Not in your contacts" link
                         for txt in ["Not in your contacts", "ليس في جهات اتصالك"]:
@@ -301,7 +329,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                             time.sleep(1)
                             break
 
-                    # Clear search for next variant
+                    # Clear for next variant
                     s = find_search_input()
                     if s:
                         try:

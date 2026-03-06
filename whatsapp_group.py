@@ -14,6 +14,17 @@ import sys
 import time
 
 WA_SESSION_DIR = os.path.join(os.path.dirname(__file__), '.wa_session')
+DEBUG_DIR = os.path.dirname(__file__)
+
+
+def debug_screenshot(page, name):
+    """Save a debug screenshot."""
+    try:
+        path = os.path.join(DEBUG_DIR, f'wa_debug_{name}.png')
+        page.screenshot(path=path)
+        print(f"  [screenshot: wa_debug_{name}.png]")
+    except Exception:
+        pass
 
 
 def create_whatsapp_group(group_name, phone_numbers, headless=False):
@@ -50,7 +61,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                 '--disable-blink-features=AutomationControlled',
                 '--no-sandbox',
             ],
-            locale='ar',
+            locale='en-US',
             viewport={'width': 1280, 'height': 900},
         )
         page = browser.pages[0] if browser.pages else browser.new_page()
@@ -66,8 +77,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         for attempt in range(6):
             try:
                 page.wait_for_selector(
-                    '#side, [data-testid="chat-list"], [aria-label="Chat list"], '
-                    '[aria-label="قائمة المحادثات"]',
+                    '#side, [data-testid="chat-list"]',
                     timeout=30000
                 )
                 logged_in = True
@@ -82,59 +92,61 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             return False
 
         print("WhatsApp loaded successfully!")
-        time.sleep(3)
+        time.sleep(4)
+        debug_screenshot(page, '01_loaded')
 
         # ---------------------------------------------------------------
-        # Step 1: Initiate chats with all numbers first so they appear
-        # as recent contacts. Use the /send?phone= URL approach.
+        # Step 1: Initiate chats with all numbers first via direct URL
+        # This ensures the numbers appear as "recent" in contact search
         # ---------------------------------------------------------------
         valid_phones = []
-        print("Initiating chats with contacts...")
+        print("\nStep 1: Initiating chats with each number...")
         for idx, phone in enumerate(phones, 1):
             phone_clean = phone.replace('+', '')
             url = f'https://web.whatsapp.com/send?phone={phone_clean}'
             try:
-                print(f"  [{idx}/{len(phones)}] Opening chat with {phone}...")
+                print(f"  [{idx}/{len(phones)}] {phone}...")
                 page.goto(url, wait_until='domcontentloaded')
-                time.sleep(3)
+                time.sleep(4)
 
                 # Check for invalid number popup
                 try:
-                    invalid = page.locator('[data-testid="popup-controls-ok"]')
-                    if invalid.is_visible(timeout=2000):
-                        print(f"    - Invalid number: {phone}")
-                        invalid.click()
+                    popup_ok = page.locator('[data-testid="popup-controls-ok"]')
+                    if popup_ok.is_visible(timeout=2000):
+                        print(f"    - Invalid number")
+                        popup_ok.click()
                         time.sleep(1)
                         continue
                 except Exception:
                     pass
 
-                # Wait for the chat compose box to appear
+                # Wait for chat to load
                 try:
                     page.wait_for_selector(
                         '[data-testid="conversation-compose-box-input"], '
                         'footer div[contenteditable="true"]',
-                        timeout=10000
+                        timeout=8000
                     )
                     valid_phones.append(phone)
-                    print(f"    + Chat ready for {phone}")
+                    print(f"    + OK")
                 except PwTimeout:
-                    print(f"    - Could not open chat for {phone}")
-
+                    print(f"    - Chat did not open")
                 time.sleep(1)
             except Exception as e:
-                print(f"    ! Error with {phone}: {e}")
+                print(f"    ! Error: {e}")
 
         if not valid_phones:
             print("No valid WhatsApp numbers found.")
             browser.close()
             return False
 
+        print(f"\n{len(valid_phones)} valid numbers confirmed.")
+
         # ---------------------------------------------------------------
-        # Step 2: Go back to main page and create group
+        # Step 2: Return to main page
         # ---------------------------------------------------------------
         page.goto('https://web.whatsapp.com/', wait_until='domcontentloaded')
-        time.sleep(4)
+        time.sleep(5)
         try:
             page.wait_for_selector('#side', timeout=15000)
         except PwTimeout:
@@ -144,136 +156,199 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         time.sleep(2)
 
         # ---------------------------------------------------------------
-        # Step 3: Open new chat -> New group
+        # Step 3: Open "New group" via the three-dot menu (⋮)
+        # The current WhatsApp Web uses a menu button at top of chat list
         # ---------------------------------------------------------------
-        print("Opening new chat menu...")
+        print("\nStep 2: Opening New Group...")
+        debug_screenshot(page, '02_main_page')
+
+        # Try approach A: three-dot menu -> New group
+        group_screen_opened = False
+
+        # Method 1: Click the three-dot menu button
+        print("  Trying menu button (⋮)...")
         try:
-            new_chat = page.locator(
-                '[data-testid="menu-bar-new-chat"], '
-                '[aria-label="محادثة جديدة"], [aria-label="New chat"], '
-                'div[title="محادثة جديدة"], div[title="New chat"]'
+            menu_btn = page.locator(
+                '[data-testid="menu"], '
+                '[aria-label="Menu"], '
+                'header button[aria-label="Menu"], '
+                'div#side header span[data-icon="menu"]'
             )
-            new_chat.first.click(timeout=10000)
+            # Also try the more general three-dot / kebab menu
+            if menu_btn.count() == 0:
+                menu_btn = page.locator('header span[data-icon]').last
+            menu_btn.first.click(timeout=5000)
+            time.sleep(1.5)
+            debug_screenshot(page, '03_menu_open')
+
+            # Look for "New group" in the dropdown menu
+            new_group_item = page.locator(
+                'li:has-text("New group"), '
+                'li:has-text("مجموعة جديدة"), '
+                'div[role="menuitem"]:has-text("New group"), '
+                'div[role="menuitem"]:has-text("مجموعة جديدة"), '
+                'div[aria-label="New group"], '
+                'div[aria-label="مجموعة جديدة")'
+            )
+            new_group_item.first.click(timeout=5000)
             time.sleep(2)
+            group_screen_opened = True
+            print("    + Opened via menu")
         except Exception as e:
-            print(f"Could not find new chat button: {e}")
+            print(f"    - Menu method failed: {e}")
+
+        # Method 2: Click the + (new chat) button, then "New group"
+        if not group_screen_opened:
+            print("  Trying new chat button (+)...")
+            try:
+                # Try multiple selectors for the new chat / compose button
+                new_chat_btn = page.locator(
+                    '[data-testid="menu-bar-new-chat"], '
+                    '[aria-label="New chat"], '
+                    '[aria-label="محادثة جديدة"], '
+                    'div[title="New chat"], '
+                    'div[title="محادثة جديدة"], '
+                    'header button >> nth=0'
+                )
+                new_chat_btn.first.click(timeout=5000)
+                time.sleep(2)
+                debug_screenshot(page, '03b_new_chat')
+
+                new_group_opt = page.locator(
+                    '[data-testid="btn-new-group"], '
+                    ':text("New group"), '
+                    ':text("مجموعة جديدة")'
+                )
+                new_group_opt.first.click(timeout=5000)
+                time.sleep(2)
+                group_screen_opened = True
+                print("    + Opened via new chat button")
+            except Exception as e:
+                print(f"    - New chat method failed: {e}")
+
+        # Method 3: Try keyboard shortcut or direct click using JS
+        if not group_screen_opened:
+            print("  Trying via JavaScript click...")
+            try:
+                # Find all buttons/clickable elements with relevant text
+                page.evaluate("""
+                    () => {
+                        const allElements = document.querySelectorAll('span, div, button');
+                        for (const el of allElements) {
+                            const text = el.textContent.trim();
+                            if (text === 'New group' || text === 'مجموعة جديدة') {
+                                el.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                """)
+                time.sleep(2)
+                debug_screenshot(page, '03c_js_click')
+                group_screen_opened = True
+                print("    + Opened via JS")
+            except Exception as e:
+                print(f"    - JS method failed: {e}")
+
+        if not group_screen_opened:
+            debug_screenshot(page, '03_FAILED')
+            print("\nCould not open group creation screen.")
+            print("Check wa_debug_03_FAILED.png for current state.")
             browser.close()
             return False
 
-        print("Selecting 'New group'...")
-        try:
-            new_group = page.locator(
-                '[data-testid="btn-new-group"], '
-                'div[role="button"]:has-text("مجموعة جديدة"), '
-                'div[role="button"]:has-text("New group"), '
-                'span:has-text("مجموعة جديدة"), '
-                'span:has-text("New group")'
-            )
-            new_group.first.click(timeout=10000)
-            time.sleep(2)
-        except Exception as e:
-            print(f"Could not find new group button: {e}")
-            browser.close()
-            return False
+        debug_screenshot(page, '04_group_screen')
+        time.sleep(1)
 
         # ---------------------------------------------------------------
         # Step 4: Search and add each contact
-        # Try multiple search formats for each number
         # ---------------------------------------------------------------
+        print("\nStep 3: Adding contacts to group...")
         added_count = 0
+
         for phone in valid_phones:
             phone_clean = phone.replace('+', '')
-            # Try different search formats
+            # Try multiple search formats
             search_variants = [
-                phone,                      # +963992129149
                 phone_clean,                # 963992129149
-                '0' + phone_clean[3:],      # 0992129149 (local format)
-                phone_clean[3:],            # 992129149 (without country code)
+                phone,                      # +963992129149
+                '0' + phone_clean[3:],      # 0992129149
+                phone_clean[3:],            # 992129149
             ]
 
             found = False
-            for variant in search_variants:
+            for vi, variant in enumerate(search_variants):
                 try:
-                    search = page.locator(
-                        'input[data-testid="search-input"], '
-                        'input[title*="ابحث"], input[title*="search"], '
-                        'input[title*="Type"], input[type="text"]'
-                    ).first
-
+                    # Find any text input on the page (the participant search box)
+                    search = page.locator('input[type="text"], input[role="searchbox"]').first
                     search.click()
                     time.sleep(0.2)
                     search.fill('')
-                    time.sleep(0.3)
+                    time.sleep(0.2)
                     search.type(variant, delay=40)
-                    time.sleep(2)
+                    time.sleep(2.5)
 
-                    # Look for any clickable contact result
-                    # Take screenshot for debugging on first attempt
-                    if added_count == 0 and variant == search_variants[0]:
-                        try:
-                            page.screenshot(path=os.path.join(os.path.dirname(__file__), 'wa_debug.png'))
-                            print("  (Debug screenshot saved as wa_debug.png)")
-                        except Exception:
-                            pass
+                    if added_count == 0 and vi == 0:
+                        debug_screenshot(page, '05_first_search')
 
-                    contact = page.locator(
+                    # Try clicking any result that appears (excluding "no results" type messages)
+                    result = page.locator(
                         '[data-testid="cell-frame-container"], '
                         '[data-testid="contact-list-item"], '
                         'div[role="listitem"], '
                         'div[role="option"], '
-                        'div._ajv6, '
-                        'div.matched-text'
+                        'div[tabindex="-1"][class*="matched"]'
                     ).first
 
                     try:
-                        contact.click(timeout=3000)
+                        result.click(timeout=3000)
                         added_count += 1
-                        print(f"  + Added: {phone} (searched: {variant})")
+                        print(f"  + Added: {phone}")
                         found = True
                         break
                     except PwTimeout:
                         pass
 
-                    # Clear search
                     search.fill('')
                     time.sleep(0.3)
                 except Exception:
                     pass
 
             if not found:
-                print(f"  - Not found: {phone} (tried all formats)")
+                print(f"  - Not found: {phone}")
 
-            time.sleep(0.5)
-            # Always clear search
+            time.sleep(0.3)
+            # Clear search
             try:
-                page.locator(
-                    'input[data-testid="search-input"], '
-                    'input[type="text"]'
-                ).first.fill('')
+                page.locator('input[type="text"], input[role="searchbox"]').first.fill('')
             except Exception:
                 pass
             time.sleep(0.3)
 
+        debug_screenshot(page, '06_after_adding')
+
         if added_count == 0:
-            print("\nNo contacts could be added to the group.")
-            print("This usually means the numbers are not saved in your phone contacts.")
-            print("WhatsApp requires contacts to be saved in your phone to add to groups.")
-            print(f"\nPlease save these numbers in your phone contacts and try again:")
+            print("\nNo contacts could be added.")
+            print("The numbers are not in your phone contacts.")
+            print(f"\nPlease save these numbers in your phone:")
             for i, phone in enumerate(valid_phones, 1):
-                print(f"  Save as '{group_name} {i}': {phone}")
+                print(f"  Name: '{group_name} {i}'  Phone: {phone}")
+            print("\nAfter saving, try again.")
             browser.close()
             return False
 
-        print(f"\nAdded {added_count}/{len(valid_phones)} contacts. Proceeding...")
+        print(f"\n{added_count}/{len(valid_phones)} contacts added.")
 
         # ---------------------------------------------------------------
         # Step 5: Click next/forward arrow
         # ---------------------------------------------------------------
+        print("\nStep 4: Proceeding to group info...")
         try:
             next_btn = page.locator(
                 '[data-testid="arrow-forward"], '
                 'span[data-icon="arrow-forward"], '
-                '[aria-label="التالي"], [aria-label="Next"]'
+                '[aria-label="Next"], [aria-label="التالي"]'
             )
             next_btn.first.click(timeout=5000)
             time.sleep(3)
@@ -289,8 +364,6 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         try:
             name_input = page.locator(
                 'div[data-testid="group-name-input"], '
-                'div[contenteditable="true"][title*="اسم"], '
-                'div[contenteditable="true"][title*="subject"], '
                 'div[contenteditable="true"][role="textbox"]'
             ).first
             name_input.click()
@@ -317,7 +390,8 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             browser.close()
             return False
 
-        print(f"\nGroup '{group_name}' created successfully with {added_count} members!")
+        print(f"\nGroup '{group_name}' created with {added_count} members!")
+        debug_screenshot(page, '07_done')
         time.sleep(5)
         browser.close()
         return True

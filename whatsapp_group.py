@@ -247,17 +247,33 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         # ---------------------------------------------------------------
         print("\nStep 4: Creating group...")
 
-        # Debug: show all data-icon values on page
+        # Debug: dump all clickable elements info
         try:
-            icons = page.evaluate("""
-                () => Array.from(document.querySelectorAll('span[data-icon]'))
-                    .map(el => el.getAttribute('data-icon'))
+            btn_info = page.evaluate("""
+                () => {
+                    const results = [];
+                    // Check all span[data-icon], button, div[role=button]
+                    document.querySelectorAll('span[data-icon], button, div[role="button"]').forEach(el => {
+                        if (el.offsetParent !== null) {
+                            results.push({
+                                tag: el.tagName,
+                                icon: el.getAttribute('data-icon'),
+                                testid: el.getAttribute('data-testid'),
+                                ariaLabel: el.getAttribute('aria-label'),
+                                role: el.getAttribute('role'),
+                                classes: el.className.substring(0, 80),
+                                text: el.textContent.substring(0, 30),
+                            });
+                        }
+                    });
+                    return results;
+                }
             """)
-            print(f"  Available icons: {icons}")
-        except Exception:
-            pass
+            print(f"  Visible buttons/icons: {btn_info}")
+        except Exception as e:
+            print(f"  Debug failed: {e}")
 
-        # Try multiple possible icon names for the forward/next button
+        # Try multiple possible selectors for the forward/next button
         next_selectors = [
             'span[data-icon="arrow-forward"]',
             'span[data-icon="forward"]',
@@ -267,19 +283,62 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             'span[data-icon="next"]',
             '[data-testid="arrow-forward"]',
             '[data-testid="next-btn"]',
-            # The green circle button at bottom-right
             'button[aria-label="Next"]',
             'button[aria-label="التالي"]',
+            # Green circle button - try role=button with arrow
+            'div[role="button"][aria-label="Next"]',
+            'div[role="button"][aria-label="التالي"]',
+            # Generic: any green button at the bottom (the visible round button)
+            'button:has(span[data-icon*="arrow"])',
+            'div[role="button"]:has(span[data-icon*="arrow"])',
         ]
         clicked_next = False
         for sel in next_selectors:
-            loc = page.locator(sel)
-            if loc.count() > 0:
-                print(f"  Clicking next via: {sel}")
-                loc.first.click(timeout=5000)
-                clicked_next = True
-                time.sleep(3)
-                break
+            try:
+                loc = page.locator(sel)
+                if loc.count() > 0:
+                    print(f"  Clicking next via: {sel}")
+                    loc.first.click(timeout=5000)
+                    clicked_next = True
+                    time.sleep(3)
+                    break
+            except Exception:
+                continue
+
+        # Last resort: find green circle button by evaluating DOM
+        if not clicked_next:
+            try:
+                clicked_next = page.evaluate("""
+                    () => {
+                        // Look for the round green button - it typically has
+                        // a specific background color and contains an SVG arrow
+                        const btns = document.querySelectorAll('button, div[role="button"], span[role="button"]');
+                        for (const btn of btns) {
+                            const style = window.getComputedStyle(btn);
+                            const bg = style.backgroundColor;
+                            // Green button: rgb(0, 168, 132) or similar green
+                            if (bg && (bg.includes('0, 168') || bg.includes('0, 175') ||
+                                       bg.includes('00a884') || bg.includes('25, 211'))) {
+                                btn.click();
+                                return true;
+                            }
+                        }
+                        // Also try: any element with border-radius 50% that's green-ish
+                        const circles = document.querySelectorAll('[style*="border-radius"]');
+                        for (const el of circles) {
+                            if (el.offsetParent && el.offsetWidth > 40 && el.offsetWidth < 80) {
+                                el.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                """)
+                if clicked_next:
+                    print("  Clicked next via green button detection")
+                    time.sleep(3)
+            except Exception:
+                pass
 
         if not clicked_next:
             print("  Could not find next button. Taking screenshot...")

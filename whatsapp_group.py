@@ -61,8 +61,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         print("If this is your first time, scan the QR code with your phone.")
         print("You have up to 3 minutes to scan...")
 
-        # Wait for login - use a broad selector and long timeout for QR scanning
-        # The side panel appears after successful login
+        # Wait for login
         logged_in = False
         for attempt in range(6):  # 6 attempts x 30s = 3 minutes total
             try:
@@ -83,9 +82,86 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             return False
 
         print("WhatsApp loaded successfully!")
-        time.sleep(3)  # Let everything settle
+        time.sleep(3)
 
+        # ---------------------------------------------------------------
+        # Step 0: Save contacts by initiating chats with each number.
+        # WhatsApp Web allows chatting with unsaved numbers via direct URL.
+        # This makes the numbers appear in search when creating a group.
+        # We also save a label name for each contact based on the group name.
+        # ---------------------------------------------------------------
+        contact_labels = {}
+        print("Saving contacts by initiating chats...")
+        for idx, phone in enumerate(phones, 1):
+            label = f"{group_name} {idx}"
+            contact_labels[phone] = label
+            phone_clean = phone.replace('+', '')
+            url = f'https://web.whatsapp.com/send?phone={phone_clean}'
+            try:
+                print(f"  Initiating chat with {phone} ({label})...")
+                page.goto(url, wait_until='domcontentloaded')
+                time.sleep(4)
+
+                # Check if "Phone number shared via url is invalid" or similar error
+                invalid = page.locator('div:has-text("invalid"), div:has-text("غير صالح")')
+                try:
+                    if invalid.first.is_visible(timeout=2000):
+                        print(f"    - Invalid number: {phone}")
+                        # Click OK to dismiss
+                        ok_btn = page.locator('div[role="button"]:has-text("OK"), div[role="button"]:has-text("موافق")')
+                        try:
+                            ok_btn.first.click(timeout=3000)
+                        except Exception:
+                            pass
+                        time.sleep(1)
+                        continue
+                except Exception:
+                    pass
+
+                # Wait for chat to load (the message input area appears)
+                try:
+                    page.wait_for_selector(
+                        '[data-testid="conversation-compose-box-input"], '
+                        'div[contenteditable="true"][data-tab="10"], '
+                        'footer div[contenteditable="true"]',
+                        timeout=10000
+                    )
+                    print(f"    + Chat opened for {phone}")
+                except PwTimeout:
+                    # Try clicking "Continue to chat" button if it appears
+                    try:
+                        cont_btn = page.locator(
+                            'a:has-text("Continue to chat"), '
+                            'a:has-text("متابعة الدردشة"), '
+                            'a:has-text("continue to chat")'
+                        )
+                        cont_btn.first.click(timeout=3000)
+                        time.sleep(3)
+                        print(f"    + Chat initiated for {phone}")
+                    except Exception:
+                        print(f"    - Could not open chat for {phone}")
+
+                time.sleep(1)
+            except Exception as e:
+                print(f"    ! Error with {phone}: {e}")
+
+        # Return to main WhatsApp page
+        page.goto('https://web.whatsapp.com/', wait_until='domcontentloaded')
+        time.sleep(4)
+
+        # Wait for side panel again
+        try:
+            page.wait_for_selector('#side', timeout=15000)
+        except PwTimeout:
+            print("Could not return to main WhatsApp page")
+            browser.close()
+            return False
+
+        time.sleep(2)
+
+        # ---------------------------------------------------------------
         # Step 1: Click new chat button
+        # ---------------------------------------------------------------
         print("Opening new chat menu...")
         try:
             new_chat = page.locator(
@@ -100,7 +176,9 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             browser.close()
             return False
 
+        # ---------------------------------------------------------------
         # Step 2: Click "New group"
+        # ---------------------------------------------------------------
         print("Selecting 'New group'...")
         try:
             new_group = page.locator(
@@ -117,11 +195,13 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             browser.close()
             return False
 
+        # ---------------------------------------------------------------
         # Step 3: Add contacts by searching phone numbers
+        # Since we initiated chats, numbers should now be searchable
+        # ---------------------------------------------------------------
         added_count = 0
         for phone in phones:
             try:
-                # Find the search/input box for adding contacts
                 search = page.locator(
                     'input[data-testid="search-input"], '
                     'input[title*="ابحث"], input[title*="search"], '
@@ -133,7 +213,9 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                 time.sleep(0.3)
                 search.fill('')
                 time.sleep(0.3)
-                search.type(phone, delay=50)
+                # Try searching with phone number (without +)
+                search_term = phone.replace('+', '')
+                search.type(search_term, delay=50)
                 time.sleep(2.5)
 
                 # Try to find and click a contact result
@@ -147,9 +229,25 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                 try:
                     contact.click(timeout=4000)
                     added_count += 1
-                    print(f"  + Added: {phone}")
+                    print(f"  + Added: {phone} ({contact_labels.get(phone, '')})")
                 except PwTimeout:
-                    print(f"  - Not found: {phone} (not in contacts)")
+                    # Try again with the full number including +
+                    try:
+                        search.fill('')
+                        time.sleep(0.3)
+                        search.type(phone, delay=50)
+                        time.sleep(2.5)
+                        contact2 = page.locator(
+                            '[data-testid="cell-frame-container"], '
+                            '[data-testid="contact-list-item"], '
+                            'div[role="listitem"], '
+                            'div[role="option"]'
+                        ).first
+                        contact2.click(timeout=4000)
+                        added_count += 1
+                        print(f"  + Added: {phone} ({contact_labels.get(phone, '')})")
+                    except Exception:
+                        print(f"  - Not found: {phone}")
             except Exception as e:
                 print(f"  ! Error adding {phone}: {e}")
 
@@ -167,13 +265,16 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             time.sleep(0.5)
 
         if added_count == 0:
-            print("No contacts could be added. Numbers must be saved in your phone contacts.")
+            print("No contacts could be added.")
+            print("Tip: Make sure numbers have WhatsApp accounts.")
             browser.close()
             return False
 
         print(f"Added {added_count}/{len(phones)} contacts. Creating group...")
 
+        # ---------------------------------------------------------------
         # Step 4: Click next/forward arrow
+        # ---------------------------------------------------------------
         try:
             next_btn = page.locator(
                 '[data-testid="arrow-forward"], '
@@ -187,7 +288,9 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             browser.close()
             return False
 
+        # ---------------------------------------------------------------
         # Step 5: Set group name
+        # ---------------------------------------------------------------
         print(f"Setting group name: {group_name}")
         try:
             name_input = page.locator(
@@ -203,7 +306,9 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         except Exception as e:
             print(f"Could not set group name: {e}")
 
+        # ---------------------------------------------------------------
         # Step 6: Click create group (green checkmark)
+        # ---------------------------------------------------------------
         try:
             create_btn = page.locator(
                 '[data-testid="create-group-btn"], '

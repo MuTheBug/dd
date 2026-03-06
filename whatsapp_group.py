@@ -169,90 +169,31 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
 
         added_count = 0
 
-        # Debug: inspect the actual search input element
-        search_info = page.evaluate("""
-            () => {
-                // Check all input-like elements in the left panel
-                const results = [];
-                // Regular inputs
-                document.querySelectorAll('input').forEach(el => {
-                    if (el.offsetParent !== null) {
-                        results.push({
-                            tag: 'INPUT', type: el.type,
-                            placeholder: el.placeholder,
-                            name: el.name, id: el.id,
-                            rect: el.getBoundingClientRect()
-                        });
-                    }
-                });
-                // Contenteditable divs (WhatsApp often uses these)
-                document.querySelectorAll('[contenteditable="true"]').forEach(el => {
-                    if (el.offsetParent !== null) {
-                        const p = el.closest('[data-tab]');
-                        results.push({
-                            tag: 'DIV-CE', role: el.getAttribute('role'),
-                            title: el.getAttribute('title'),
-                            dataTab: el.getAttribute('data-tab'),
-                            parentDataTab: p ? p.getAttribute('data-tab') : null,
-                            ariaLabel: el.getAttribute('aria-label'),
-                            placeholder: el.getAttribute('data-placeholder'),
-                            text: el.textContent.substring(0, 20),
-                            rect: el.getBoundingClientRect()
-                        });
-                    }
-                });
-                // Also check for the "Search name or number" text
-                const walker = document.createTreeWalker(
-                    document.body, NodeFilter.SHOW_TEXT,
-                    { acceptNode: n => n.textContent.includes('Search name') ?
-                        NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
-                );
-                while (walker.nextNode()) {
-                    const parent = walker.currentNode.parentElement;
-                    results.push({
-                        tag: 'TEXT-PARENT',
-                        parentTag: parent.tagName,
-                        parentClass: parent.className.substring(0, 50),
-                        text: walker.currentNode.textContent.substring(0, 40),
-                        parentRole: parent.getAttribute('role')
-                    });
-                }
-                return results;
-            }
-        """)
-        print(f"  Search input elements: {search_info}")
+        # Search input is: <input type="text" placeholder="Search name or number">
 
         def find_and_focus_search():
             """Find and focus the search input, return True if focused."""
-            # Method 1: Click on the placeholder text area directly via JS
             focused = page.evaluate("""
                 () => {
-                    // Try to find the "Add group members" panel's search area
-                    // Look for the text "Search name or number" and click near it
-                    const spans = document.querySelectorAll('span, div, p');
-                    for (const el of spans) {
-                        if (el.children.length === 0 &&
-                            (el.textContent.includes('Search name or number') ||
-                             el.textContent.includes('ابحث عن اسم أو رقم'))) {
-                            // This is the placeholder - find the sibling/parent input
-                            let container = el.parentElement;
-                            for (let i = 0; i < 5; i++) {
-                                if (!container) break;
-                                const input = container.querySelector(
-                                    'input, [contenteditable="true"], [role="textbox"]'
-                                );
-                                if (input) {
-                                    input.focus();
-                                    input.click();
-                                    return {found: true, tag: input.tagName,
-                                            ce: input.contentEditable};
-                                }
-                                container = container.parentElement;
-                            }
-                            // Fallback: click the placeholder's parent
-                            el.parentElement.click();
-                            return {found: true, tag: 'placeholder-parent'};
-                        }
+                    // Direct: find input by placeholder attribute
+                    const input = document.querySelector(
+                        'input[placeholder*="Search name"], ' +
+                        'input[placeholder*="ابحث عن اسم"]'
+                    );
+                    if (input) {
+                        input.focus();
+                        input.click();
+                        return {found: true, tag: 'INPUT',
+                                placeholder: input.placeholder};
+                    }
+                    // Fallback: any visible contenteditable in left panel
+                    const ce = document.querySelector(
+                        '[contenteditable="true"][role="textbox"]'
+                    );
+                    if (ce && ce.offsetParent) {
+                        ce.focus();
+                        ce.click();
+                        return {found: true, tag: 'CE'};
                     }
                     return {found: false};
                 }

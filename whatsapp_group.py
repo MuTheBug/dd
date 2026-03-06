@@ -27,6 +27,61 @@ def debug_screenshot(page, name):
         pass
 
 
+def find_group_search_input(page):
+    """Find the search input on the group participant screen.
+    WhatsApp uses various input types depending on version."""
+
+    # Inspect what inputs exist
+    try:
+        inputs_info = page.evaluate("""
+            () => {
+                const results = [];
+                document.querySelectorAll('input, div[contenteditable="true"]').forEach(el => {
+                    if (el.offsetParent !== null) {
+                        results.push({
+                            tag: el.tagName,
+                            type: el.getAttribute('type'),
+                            testId: el.getAttribute('data-testid'),
+                            placeholder: el.getAttribute('placeholder') || el.getAttribute('title') || '',
+                            role: el.getAttribute('role'),
+                            ariaLabel: el.getAttribute('aria-label'),
+                            tab: el.getAttribute('data-tab'),
+                            ce: el.getAttribute('contenteditable'),
+                        });
+                    }
+                });
+                return results;
+            }
+        """)
+        print(f"  Available inputs: {inputs_info}")
+    except Exception:
+        pass
+
+    # Try multiple selectors in priority order
+    selectors = [
+        # WhatsApp group participant search specific selectors
+        'input[data-testid="search-input"]',
+        'input[title*="contact"], input[title*="participant"]',
+        'input[title*="ابحث"], input[title*="Search"], input[title*="search"]',
+        'input[placeholder*="contact"], input[placeholder*="search"]',
+        # Contenteditable divs used as search boxes
+        'div[contenteditable="true"][data-tab="2"]',
+        'div[contenteditable="true"][role="textbox"][title*="search"]',
+        'div[contenteditable="true"][role="textbox"][title*="ابحث"]',
+        # Generic fallbacks
+        'input[type="text"]',
+        'div[contenteditable="true"][role="textbox"]',
+    ]
+
+    for sel in selectors:
+        loc = page.locator(sel)
+        if loc.count() > 0:
+            print(f"  Using input: {sel} (count={loc.count()})")
+            return loc.last if loc.count() > 1 else loc.first
+
+    return None
+
+
 def create_whatsapp_group(group_name, phone_numbers, headless=False):
     """Create a WhatsApp group and add members."""
     try:
@@ -101,7 +156,6 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                 page.goto(url, wait_until='domcontentloaded')
                 time.sleep(4)
 
-                # Check for invalid number popup
                 try:
                     popup_ok = page.locator('[data-testid="popup-controls-ok"]')
                     if popup_ok.is_visible(timeout=2000):
@@ -145,210 +199,62 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             browser.close()
             return False
         time.sleep(3)
-
-        # Press Escape to close any open panels
         page.keyboard.press('Escape')
         time.sleep(1)
 
         print("\nStep 2: Opening group creation screen...")
 
-        # Inspect available header icons for debugging
-        try:
-            icons = page.evaluate("""
-                () => {
-                    const results = [];
-                    document.querySelectorAll('header span[data-icon], header [data-testid], #side header span[data-icon]').forEach(el => {
-                        results.push({
-                            tag: el.tagName,
-                            dataIcon: el.getAttribute('data-icon'),
-                            testId: el.getAttribute('data-testid'),
-                            ariaLabel: el.getAttribute('aria-label'),
-                            title: el.getAttribute('title'),
-                        });
-                    });
-                    return results;
-                }
-            """)
-            print(f"  Found header icons: {icons}")
-        except Exception:
-            pass
-
-        debug_screenshot(page, '02_before_menu')
-
-        # ------- Try to open "New group" -------
+        # The new-chat-outline icon was confirmed working
         group_screen = False
 
-        # APPROACH 1: Click the ⋮ (three-dot) menu via data-icon
-        print("  Approach 1: Three-dot menu...")
+        # Click the new-chat-outline icon (confirmed from previous run)
+        print("  Clicking new-chat-outline icon...")
         try:
-            # Find the menu/more icon in the header area
-            menu_icon = page.locator(
-                'span[data-icon="menu"], '
-                'span[data-icon="more"], '
-                '[data-testid="menu"], '
-                '[data-testid="menu-bar-menu"]'
-            )
-            if menu_icon.count() > 0:
-                menu_icon.first.click()
-                time.sleep(1.5)
-                debug_screenshot(page, '03a_menu_dropdown')
+            compose = page.locator('span[data-icon="new-chat-outline"]')
+            if compose.count() > 0:
+                compose.first.click()
+                time.sleep(2)
+                debug_screenshot(page, '03_new_chat_panel')
 
-                # Find "New group" in the dropdown
+                # Find "New group" text
                 ng = page.get_by_text("New group")
                 if ng.count() == 0:
                     ng = page.get_by_text("مجموعة جديدة")
-                ng.first.click(timeout=3000)
-                time.sleep(2)
-                group_screen = True
-                print("    + Success!")
-            else:
-                print("    - Menu icon not found")
-        except Exception as e:
-            print(f"    - Failed: {e}")
-            page.keyboard.press('Escape')
-            time.sleep(0.5)
-
-        # APPROACH 2: Click the ⊞ (new chat/compose) button
-        if not group_screen:
-            print("  Approach 2: New chat button...")
-            try:
-                compose = page.locator(
-                    'span[data-icon="new-chat-outline"], '
-                    'span[data-icon="chat"], '
-                    'span[data-icon="new-chat"], '
-                    '[data-testid="menu-bar-new-chat"]'
-                )
-                if compose.count() > 0:
-                    compose.first.click()
-                    time.sleep(2)
-                    debug_screenshot(page, '03b_new_chat_panel')
-
-                    ng = page.get_by_text("New group")
-                    if ng.count() == 0:
-                        ng = page.get_by_text("مجموعة جديدة")
+                if ng.count() > 0:
                     ng.first.click(timeout=3000)
                     time.sleep(2)
                     group_screen = True
-                    print("    + Success!")
+                    print("  + Group screen opened!")
                 else:
-                    print("    - Compose button not found")
-            except Exception as e:
-                print(f"    - Failed: {e}")
-                page.keyboard.press('Escape')
-                time.sleep(0.5)
-
-        # APPROACH 3: Click ALL span[data-icon] in the header until we find the right one
-        if not group_screen:
-            print("  Approach 3: Trying all header icons...")
-            try:
-                all_icons = page.locator('#side span[data-icon]')
-                count = all_icons.count()
-                print(f"    Found {count} icons in #side")
-                for i in range(count):
-                    icon = all_icons.nth(i)
-                    icon_name = icon.get_attribute('data-icon')
-                    print(f"    Trying icon [{i}]: {icon_name}")
-                    try:
-                        icon.click()
-                        time.sleep(1.5)
-
-                        # Check if "New group" text appeared anywhere
-                        ng = page.get_by_text("New group")
-                        if ng.count() == 0:
-                            ng = page.get_by_text("مجموعة جديدة")
-                        if ng.count() > 0:
-                            debug_screenshot(page, f'03c_found_at_icon_{i}')
-                            ng.first.click(timeout=3000)
-                            time.sleep(2)
-                            group_screen = True
-                            print(f"    + Success via icon [{i}]: {icon_name}!")
-                            break
-                        else:
-                            page.keyboard.press('Escape')
-                            time.sleep(0.5)
-                    except Exception:
-                        page.keyboard.press('Escape')
-                        time.sleep(0.5)
-            except Exception as e:
-                print(f"    - Failed: {e}")
-
-        # APPROACH 4: Use JavaScript to find and click "New group" wherever it is
-        if not group_screen:
-            print("  Approach 4: JavaScript brute force...")
-            try:
-                # First, try clicking the + icon at approximate position
-                # From screenshot, + icon is at roughly x=478, y=31
-                page.mouse.click(478, 31)
-                time.sleep(2)
-                debug_screenshot(page, '03d_after_plus_click')
-
-                found = page.evaluate("""
-                    () => {
-                        const els = document.querySelectorAll('span, div, button, li');
-                        for (const el of els) {
-                            const text = (el.textContent || '').trim();
-                            if (text === 'New group' || text === 'مجموعة جديدة') {
-                                if (el.offsetParent !== null) {  // is visible
-                                    el.click();
-                                    return text;
-                                }
-                            }
-                        }
-                        return null;
-                    }
-                """)
-                if found:
-                    time.sleep(2)
-                    group_screen = True
-                    print(f"    + Success! Clicked: {found}")
-                else:
-                    print("    - 'New group' text not found on page")
-            except Exception as e:
-                print(f"    - Failed: {e}")
+                    print("  - 'New group' text not found in panel")
+            else:
+                print("  - new-chat-outline icon not found")
+        except Exception as e:
+            print(f"  - Failed: {e}")
+            page.keyboard.press('Escape')
+            time.sleep(0.5)
 
         if not group_screen:
-            debug_screenshot(page, '03_ALL_FAILED')
-            print("\nERROR: Could not open group creation screen.")
-            print("Check wa_debug screenshots for diagnosis.")
-
-            # Dump all visible text for debugging
-            try:
-                texts = page.evaluate("""
-                    () => {
-                        const results = [];
-                        document.querySelectorAll('[data-icon], [data-testid]').forEach(el => {
-                            if (el.offsetParent !== null) {
-                                results.push({
-                                    icon: el.getAttribute('data-icon'),
-                                    testId: el.getAttribute('data-testid'),
-                                    text: (el.textContent || '').trim().substring(0, 50)
-                                });
-                            }
-                        });
-                        return results;
-                    }
-                """)
-                print("\nVisible elements with data-icon/data-testid:")
-                for t in texts[:30]:
-                    print(f"  {t}")
-            except Exception:
-                pass
-
+            debug_screenshot(page, '03_FAILED')
+            print("\nCould not open group creation screen.")
             browser.close()
             return False
 
-        # ---------------------------------------------------------------
-        # Step 3: Verify we're on the group creation screen
-        # The group screen should have "Add participants" or similar heading
-        # ---------------------------------------------------------------
         debug_screenshot(page, '04_group_screen')
-        print("\nStep 3: On group creation screen. Adding contacts...")
 
-        # Wait a moment for the participant search to be ready
-        time.sleep(1)
+        # ---------------------------------------------------------------
+        # Step 3: Find the participant search input and add contacts
+        # ---------------------------------------------------------------
+        print("\nStep 3: Adding contacts to group...")
+        time.sleep(2)
 
-        # Find the search input specifically in the group creation panel
-        # This should NOT be the main search bar
+        search_input = find_group_search_input(page)
+        if not search_input:
+            print("ERROR: Could not find search input on group screen!")
+            debug_screenshot(page, '04_no_input')
+            browser.close()
+            return False
+
         added_count = 0
         for phone in valid_phones:
             phone_clean = phone.replace('+', '')
@@ -362,57 +268,67 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             found = False
             for vi, variant in enumerate(search_variants):
                 try:
-                    # Target the search input - prefer the one inside the panel, not the main search
-                    # The group creation panel typically uses a different input
-                    search_inputs = page.locator('input[type="text"]')
-                    search_count = search_inputs.count()
+                    # Re-find the search input each time (DOM may have changed)
+                    si = find_group_search_input(page)
+                    if not si:
+                        print(f"  ! Search input lost")
+                        break
 
-                    # Use the LAST input (most likely the group participant search)
-                    # or any input that's not the main search bar
-                    search = search_inputs.last if search_count > 1 else search_inputs.first
+                    si.click()
+                    time.sleep(0.3)
 
-                    search.click()
-                    time.sleep(0.2)
-                    search.fill('')
-                    time.sleep(0.2)
-                    search.type(variant, delay=40)
-                    time.sleep(2.5)
+                    # Clear using keyboard (more reliable than fill for contenteditable)
+                    page.keyboard.press('Control+a')
+                    time.sleep(0.1)
+                    page.keyboard.press('Backspace')
+                    time.sleep(0.3)
+
+                    # Type using keyboard (more reliable for both input and contenteditable)
+                    page.keyboard.type(variant, delay=40)
+                    time.sleep(3)
 
                     if added_count == 0 and vi == 0:
-                        debug_screenshot(page, '05_search')
+                        debug_screenshot(page, '05_first_search')
 
-                    # Try to find any clickable result
+                    # Try to find any clickable contact result
                     result = page.locator(
                         '[data-testid="cell-frame-container"], '
                         'div[role="listitem"], '
-                        'div[role="option"]'
+                        'div[role="option"], '
+                        'div[data-testid="contact-list-item"]'
                     ).first
 
                     try:
                         result.click(timeout=3000)
                         added_count += 1
-                        print(f"  + Added: {phone}")
+                        print(f"  + Added: {phone} (format: {variant})")
                         found = True
+                        time.sleep(1)
                         break
                     except PwTimeout:
-                        pass
+                        # Clear for next variant
+                        page.keyboard.press('Control+a')
+                        time.sleep(0.1)
+                        page.keyboard.press('Backspace')
+                        time.sleep(0.3)
 
-                    search.fill('')
+                except Exception as e:
+                    print(f"  ! Error searching {variant}: {e}")
+
+            if not found:
+                print(f"  - Not found: {phone}")
+                # Clear search
+                try:
+                    page.keyboard.press('Control+a')
+                    time.sleep(0.1)
+                    page.keyboard.press('Backspace')
                     time.sleep(0.3)
                 except Exception:
                     pass
 
-            if not found:
-                print(f"  - Not found: {phone}")
+            time.sleep(0.5)
 
-            time.sleep(0.3)
-            try:
-                page.locator('input[type="text"]').last.fill('')
-            except Exception:
-                pass
-            time.sleep(0.3)
-
-        debug_screenshot(page, '06_after_search')
+        debug_screenshot(page, '06_after_adding')
 
         if added_count == 0:
             print("\nNo contacts could be added (not in phone contacts).")
@@ -450,7 +366,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             ).first
             name_input.click()
             time.sleep(0.5)
-            name_input.type(group_name, delay=30)
+            page.keyboard.type(group_name, delay=30)
             time.sleep(1)
         except Exception as e:
             print(f"Could not set group name: {e}")

@@ -168,6 +168,44 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         time.sleep(1)
 
         added_count = 0
+
+        def find_search_input():
+            """Find the search input - it can be input or contenteditable div."""
+            # Try placeholder-based first
+            for placeholder in ["Search name or number", "ابحث عن اسم أو رقم",
+                                "Type a contact name", "اكتب اسم جهة اتصال"]:
+                loc = page.get_by_placeholder(placeholder)
+                if loc.count() > 0:
+                    return loc.first
+            # Fallback: input[type=text] in the panel
+            loc = page.locator('input[type="text"]:visible')
+            if loc.count() > 0:
+                return loc.first
+            # Fallback: contenteditable div used as search
+            loc = page.locator(
+                'div[contenteditable="true"][role="textbox"]:visible'
+            )
+            if loc.count() > 0:
+                return loc.first
+            return None
+
+        def clear_search(search_el):
+            """Clear the search input reliably."""
+            try:
+                search_el.click()
+                time.sleep(0.2)
+                # Triple-click to select all text in the field
+                search_el.click(click_count=3)
+                time.sleep(0.1)
+                page.keyboard.press('Backspace')
+                time.sleep(0.2)
+                # Also try Ctrl+A as backup
+                page.keyboard.press('Control+a')
+                page.keyboard.press('Backspace')
+                time.sleep(0.3)
+            except Exception:
+                pass
+
         for phone in valid_phones:
             phone_clean = phone.replace('+', '')
             # Try different formats
@@ -176,21 +214,23 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             found = False
             for vi, variant in enumerate(variants):
                 try:
-                    # Click on the search input using placeholder text
-                    search = page.get_by_placeholder("Search name or number")
-                    if search.count() == 0:
-                        search = page.get_by_placeholder("ابحث عن اسم أو رقم")
-                    if search.count() == 0:
-                        # Fallback: any visible input
-                        search = page.locator('input[type="text"]:visible').first
+                    search = find_search_input()
+                    if not search:
+                        print(f"  ! Could not find search input for {phone}")
+                        break
 
                     search.click()
                     time.sleep(0.3)
 
-                    # Clear and type
+                    # Clear existing text
+                    search.click(click_count=3)
+                    time.sleep(0.1)
+                    page.keyboard.press('Backspace')
+                    time.sleep(0.2)
                     page.keyboard.press('Control+a')
                     page.keyboard.press('Backspace')
                     time.sleep(0.2)
+
                     page.keyboard.type(variant, delay=50)
                     time.sleep(3)
 
@@ -207,27 +247,30 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                     try:
                         result.click(timeout=3000)
                         added_count += 1
-                        print(f"  + Added: {phone}")
+                        print(f"  + Added: {phone} (variant: {variant})")
                         found = True
                         time.sleep(1)
+
+                        # Clear the search after successful add
+                        s = find_search_input()
+                        if s:
+                            clear_search(s)
+
                         break
                     except PwTimeout:
                         # Clear for next variant
-                        page.keyboard.press('Control+a')
-                        page.keyboard.press('Backspace')
-                        time.sleep(0.3)
+                        s = find_search_input()
+                        if s:
+                            clear_search(s)
                 except Exception as e:
                     if vi == 0:
                         print(f"  ! Search error for {phone}: {e}")
 
             if not found:
                 print(f"  - Not found: {phone}")
-                try:
-                    page.keyboard.press('Control+a')
-                    page.keyboard.press('Backspace')
-                    time.sleep(0.3)
-                except Exception:
-                    pass
+                s = find_search_input()
+                if s:
+                    clear_search(s)
             time.sleep(0.5)
 
         debug_screenshot(page, '06_after_adding')

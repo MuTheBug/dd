@@ -231,37 +231,62 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                     page.keyboard.press('Backspace')
                     time.sleep(0.2)
 
+                    # Count contacts before search to detect filtering
+                    before_count = page.locator(
+                        '[data-testid="cell-frame-container"]'
+                    ).count()
+
                     page.keyboard.type(variant, delay=50)
                     time.sleep(3)
 
                     if added_count == 0 and vi == 0:
                         debug_screenshot(page, '05_search')
 
-                    # Look for a contact result to click
-                    result = page.locator(
-                        '[data-testid="cell-frame-container"], '
-                        'div[role="listitem"], '
-                        'div[role="option"]'
-                    ).first
+                    # Count contacts after search
+                    after_count = page.locator(
+                        '[data-testid="cell-frame-container"]'
+                    ).count()
 
-                    try:
-                        result.click(timeout=3000)
-                        added_count += 1
-                        print(f"  + Added: {phone} (variant: {variant})")
-                        found = True
-                        time.sleep(1)
+                    print(f"    [{variant}] contacts: {before_count} -> {after_count}")
 
-                        # Clear the search after successful add
-                        s = find_search_input()
-                        if s:
-                            clear_search(s)
+                    # If the list was filtered (fewer results) or there's just one,
+                    # the search matched something
+                    if after_count > 0 and after_count < before_count:
+                        result = page.locator(
+                            '[data-testid="cell-frame-container"]'
+                        ).first
+                        try:
+                            result.click(timeout=3000)
+                            added_count += 1
+                            print(f"  + Added: {phone} (variant: {variant})")
+                            found = True
+                            time.sleep(1)
+                            s = find_search_input()
+                            if s:
+                                clear_search(s)
+                            break
+                        except PwTimeout:
+                            pass
+                    elif after_count == 0:
+                        # No results - try "Not in your contacts" option
+                        not_contact = page.get_by_text("Not in your contacts")
+                        if not_contact.count() == 0:
+                            not_contact = page.get_by_text("ليس في جهات اتصالك")
+                        if not_contact.count() > 0:
+                            not_contact.first.click(timeout=3000)
+                            added_count += 1
+                            print(f"  + Added (not in contacts): {phone}")
+                            found = True
+                            time.sleep(1)
+                            s = find_search_input()
+                            if s:
+                                clear_search(s)
+                            break
 
-                        break
-                    except PwTimeout:
-                        # Clear for next variant
-                        s = find_search_input()
-                        if s:
-                            clear_search(s)
+                    # Clear for next variant
+                    s = find_search_input()
+                    if s:
+                        clear_search(s)
                 except Exception as e:
                     if vi == 0:
                         print(f"  ! Search error for {phone}: {e}")

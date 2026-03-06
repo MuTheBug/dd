@@ -169,25 +169,115 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
 
         added_count = 0
 
-        def find_search_input():
-            """Find the search input - it can be input or contenteditable div."""
-            # Try placeholder-based first
-            for placeholder in ["Search name or number", "ابحث عن اسم أو رقم",
-                                "Type a contact name", "اكتب اسم جهة اتصال"]:
-                loc = page.get_by_placeholder(placeholder)
-                if loc.count() > 0:
-                    return loc.first
-            # Fallback: input[type=text] in the panel
-            loc = page.locator('input[type="text"]:visible')
-            if loc.count() > 0:
-                return loc.first
-            # Fallback: contenteditable div used as search
-            loc = page.locator(
-                'div[contenteditable="true"][role="textbox"]:visible'
-            )
-            if loc.count() > 0:
-                return loc.first
-            return None
+        # Debug: inspect the actual search input element
+        search_info = page.evaluate("""
+            () => {
+                // Check all input-like elements in the left panel
+                const results = [];
+                // Regular inputs
+                document.querySelectorAll('input').forEach(el => {
+                    if (el.offsetParent !== null) {
+                        results.push({
+                            tag: 'INPUT', type: el.type,
+                            placeholder: el.placeholder,
+                            name: el.name, id: el.id,
+                            rect: el.getBoundingClientRect()
+                        });
+                    }
+                });
+                // Contenteditable divs (WhatsApp often uses these)
+                document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+                    if (el.offsetParent !== null) {
+                        const p = el.closest('[data-tab]');
+                        results.push({
+                            tag: 'DIV-CE', role: el.getAttribute('role'),
+                            title: el.getAttribute('title'),
+                            dataTab: el.getAttribute('data-tab'),
+                            parentDataTab: p ? p.getAttribute('data-tab') : null,
+                            ariaLabel: el.getAttribute('aria-label'),
+                            placeholder: el.getAttribute('data-placeholder'),
+                            text: el.textContent.substring(0, 20),
+                            rect: el.getBoundingClientRect()
+                        });
+                    }
+                });
+                // Also check for the "Search name or number" text
+                const walker = document.createTreeWalker(
+                    document.body, NodeFilter.SHOW_TEXT,
+                    { acceptNode: n => n.textContent.includes('Search name') ?
+                        NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
+                );
+                while (walker.nextNode()) {
+                    const parent = walker.currentNode.parentElement;
+                    results.push({
+                        tag: 'TEXT-PARENT',
+                        parentTag: parent.tagName,
+                        parentClass: parent.className.substring(0, 50),
+                        text: walker.currentNode.textContent.substring(0, 40),
+                        parentRole: parent.getAttribute('role')
+                    });
+                }
+                return results;
+            }
+        """)
+        print(f"  Search input elements: {search_info}")
+
+        def find_and_focus_search():
+            """Find and focus the search input, return True if focused."""
+            # Method 1: Click on the placeholder text area directly via JS
+            focused = page.evaluate("""
+                () => {
+                    // Try to find the "Add group members" panel's search area
+                    // Look for the text "Search name or number" and click near it
+                    const spans = document.querySelectorAll('span, div, p');
+                    for (const el of spans) {
+                        if (el.children.length === 0 &&
+                            (el.textContent.includes('Search name or number') ||
+                             el.textContent.includes('ابحث عن اسم أو رقم'))) {
+                            // This is the placeholder - find the sibling/parent input
+                            let container = el.parentElement;
+                            for (let i = 0; i < 5; i++) {
+                                if (!container) break;
+                                const input = container.querySelector(
+                                    'input, [contenteditable="true"], [role="textbox"]'
+                                );
+                                if (input) {
+                                    input.focus();
+                                    input.click();
+                                    return {found: true, tag: input.tagName,
+                                            ce: input.contentEditable};
+                                }
+                                container = container.parentElement;
+                            }
+                            // Fallback: click the placeholder's parent
+                            el.parentElement.click();
+                            return {found: true, tag: 'placeholder-parent'};
+                        }
+                    }
+                    return {found: false};
+                }
+            """)
+            print(f"    focus result: {focused}")
+            return focused.get('found', False)
+
+        def type_in_search(text):
+            """Type text into the currently focused search input."""
+            # Clear first
+            page.keyboard.press('Control+a')
+            time.sleep(0.1)
+            page.keyboard.press('Backspace')
+            time.sleep(0.2)
+            # Type the search text
+            page.keyboard.type(text, delay=50)
+
+        def clear_search():
+            """Clear the search input."""
+            find_and_focus_search()
+            time.sleep(0.2)
+            page.keyboard.press('Control+a')
+            time.sleep(0.1)
+            page.keyboard.press('Backspace')
+            time.sleep(0.3)
 
         def click_search_result():
             """Click the first contact in the search results list.
@@ -265,22 +355,13 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             found = False
             for vi, variant in enumerate(variants):
                 try:
-                    search = find_search_input()
-                    if not search:
-                        print(f"  ! Could not find search input for {phone}")
+                    # Focus the search input
+                    if not find_and_focus_search():
+                        print(f"  ! Could not focus search input for {phone}")
                         break
 
-                    # Use fill() for reliable text input
-                    try:
-                        search.fill(variant)
-                    except Exception:
-                        search.click()
-                        time.sleep(0.3)
-                        page.keyboard.press('Control+a')
-                        page.keyboard.press('Backspace')
-                        time.sleep(0.2)
-                        page.keyboard.type(variant, delay=50)
-
+                    time.sleep(0.3)
+                    type_in_search(variant)
                     time.sleep(3)
 
                     if added_count == 0 and vi == 0:
@@ -297,15 +378,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                             print(f"  + Added: {phone}")
                             found = True
                             time.sleep(1)
-                            # Clear search
-                            s = find_search_input()
-                            if s:
-                                try:
-                                    s.fill('')
-                                except Exception:
-                                    s.click()
-                                    page.keyboard.press('Control+a')
-                                    page.keyboard.press('Backspace')
+                            clear_search()
                             time.sleep(1)
                             break
                     elif after_count == 0:
@@ -320,24 +393,12 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                                 time.sleep(1)
                                 break
                         if found:
-                            s = find_search_input()
-                            if s:
-                                try:
-                                    s.fill('')
-                                except Exception:
-                                    pass
+                            clear_search()
                             time.sleep(1)
                             break
 
                     # Clear for next variant
-                    s = find_search_input()
-                    if s:
-                        try:
-                            s.fill('')
-                        except Exception:
-                            s.click()
-                            page.keyboard.press('Control+a')
-                            page.keyboard.press('Backspace')
+                    clear_search()
                     time.sleep(0.5)
                 except Exception as e:
                     if vi == 0:
@@ -345,12 +406,10 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
 
             if not found:
                 print(f"  - Not found: {phone}")
-                s = find_search_input()
-                if s:
-                    try:
-                        s.fill('')
-                    except Exception:
-                        pass
+                try:
+                    clear_search()
+                except Exception:
+                    pass
             time.sleep(0.5)
 
         debug_screenshot(page, '06_after_adding')

@@ -9,6 +9,7 @@ import os
 import sys
 import socket
 import sqlite3
+import subprocess
 import hashlib
 import json
 import base64
@@ -3677,6 +3678,82 @@ def api_search_for_list():
 # ---------------------------------------------------------------------------
 # Uploaded files serving
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# KDE Connect SMS Integration
+# ---------------------------------------------------------------------------
+@app.route('/api/kdeconnect/devices')
+@admin_required
+def api_kdeconnect_devices():
+    """List available KDE Connect devices that are reachable."""
+    try:
+        result = subprocess.run(
+            ['kdeconnect-cli', '--list-available', '--id-name-only'],
+            capture_output=True, text=True, timeout=5
+        )
+        devices = []
+        for line in result.stdout.strip().split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            # Format: "device_id name" or "device_id - name"
+            parts = line.split(' ', 1)
+            if len(parts) == 2:
+                dev_id = parts[0].strip()
+                dev_name = parts[1].strip().lstrip('- ').strip()
+                devices.append({'id': dev_id, 'name': dev_name})
+        # If --id-name-only is not supported, fallback
+        if not devices and result.stdout.strip():
+            for line in result.stdout.strip().split('\n'):
+                line = line.strip()
+                if line and ':' in line:
+                    # "- DeviceName: deviceId"
+                    name_part, _, id_part = line.rpartition(':')
+                    dev_name = name_part.strip().lstrip('- ').strip()
+                    dev_id = id_part.strip()
+                    if dev_id and dev_name:
+                        devices.append({'id': dev_id, 'name': dev_name})
+        return jsonify(devices)
+    except FileNotFoundError:
+        return jsonify({'error': 'kdeconnect-cli غير مثبت. يرجى تثبيته: sudo apt install kdeconnect'}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'انتهت مهلة الاتصال بـ KDE Connect'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/kdeconnect/send_sms', methods=['POST'])
+@admin_required
+def api_kdeconnect_send_sms():
+    """Send an SMS via KDE Connect."""
+    data = request.get_json()
+    device_id = data.get('device_id', '').strip()
+    phone = data.get('phone', '').strip()
+    message = data.get('message', '').strip()
+
+    if not device_id:
+        return jsonify({'error': 'يرجى اختيار جهاز'}), 400
+    if not phone:
+        return jsonify({'error': 'يرجى إدخال رقم الهاتف'}), 400
+    if not message:
+        return jsonify({'error': 'يرجى إدخال نص الرسالة'}), 400
+
+    try:
+        result = subprocess.run(
+            ['kdeconnect-cli', '--send-sms', message, '--destination', phone, '-d', device_id],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            err = result.stderr.strip() or result.stdout.strip() or 'فشل إرسال الرسالة'
+            return jsonify({'error': err}), 500
+        return jsonify({'ok': True, 'message': 'تم إرسال الرسالة بنجاح'})
+    except FileNotFoundError:
+        return jsonify({'error': 'kdeconnect-cli غير مثبت'}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'انتهت مهلة الإرسال'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)

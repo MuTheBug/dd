@@ -5,6 +5,9 @@
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
     <a href="{{ url_for('admin_records') }}" class="btn btn-outline btn-sm">&#x2192; العودة للسجلات</a>
     <div class="btn-group">
+        {% if record.phone or record.reporter_phone %}
+        <button type="button" class="btn btn-outline btn-sm" onclick="openSmsModal()" style="border-color: #22c55e; color: #22c55e;">&#x1F4F1; إرسال SMS</button>
+        {% endif %}
         <a href="{{ url_for('record_pdf', record_id=record.id) }}" class="btn btn-primary btn-sm" target="_blank">&#x1F4C4; تصدير PDF</a>
         <a href="{{ url_for('admin_record_edit', record_id=record.id) }}" class="btn btn-outline btn-sm">&#x270F;&#xFE0F; تعديل</a>
         <form method="POST" action="{{ url_for('admin_record_delete', record_id=record.id) }}" style="display:inline" onsubmit="return confirm('هل أنت متأكد من حذف هذا السجل؟')">
@@ -511,5 +514,124 @@
         </table>
     </div>
 </div>
+{% endif %}
+
+<!-- SMS via KDE Connect Modal -->
+{% if record.phone or record.reporter_phone %}
+<div id="smsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background: var(--card-bg, #1e1e2e); border-radius: 12px; padding: 1.5rem; width: 90%; max-width: 480px; direction: rtl; position: relative;">
+        <button onclick="closeSmsModal()" style="position:absolute; left:12px; top:12px; background:none; border:none; color:var(--text-light, #888); font-size:1.4rem; cursor:pointer;">&#x2715;</button>
+        <h3 style="margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.3rem;">&#x1F4F1;</span> إرسال SMS عبر KDE Connect
+        </h3>
+
+        <!-- Device selector -->
+        <label style="font-size: 0.85rem; color: var(--text-light, #aaa);">الجهاز:</label>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.8rem;">
+            <select id="smsDevice" style="flex:1; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border, #333); background: var(--bg, #111); color: var(--text, #eee);">
+                <option value="">جاري البحث عن الأجهزة...</option>
+            </select>
+            <button onclick="loadSmsDevices()" class="btn btn-outline btn-sm" title="تحديث">&#x1F504;</button>
+        </div>
+
+        <!-- Phone selector -->
+        <label style="font-size: 0.85rem; color: var(--text-light, #aaa);">رقم الهاتف:</label>
+        <select id="smsPhoneSelect" onchange="document.getElementById('smsPhone').value=this.value" style="width:100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border, #333); background: var(--bg, #111); color: var(--text, #eee); margin-bottom: 0.4rem;">
+            {% if record.phone %}
+            <option value="{{ record.phone }}">{{ record.first_name }} - {{ record.phone }}</option>
+            {% endif %}
+            {% if record.reporter_phone and record.reporter_phone != record.phone %}
+            <option value="{{ record.reporter_phone }}">المُبلِّغ {{ record.reporter_name or '' }} - {{ record.reporter_phone }}</option>
+            {% endif %}
+            <option value="__custom__">رقم آخر...</option>
+        </select>
+        <input type="text" id="smsPhone" value="{{ record.phone or record.reporter_phone or '' }}" placeholder="رقم الهاتف..." style="width:100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border, #333); background: var(--bg, #111); color: var(--text, #eee); margin-bottom: 0.8rem; box-sizing: border-box;">
+
+        <!-- Message -->
+        <label style="font-size: 0.85rem; color: var(--text-light, #aaa);">نص الرسالة:</label>
+        <textarea id="smsMessage" rows="4" placeholder="اكتب الرسالة هنا..." style="width:100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border, #333); background: var(--bg, #111); color: var(--text, #eee); resize: vertical; margin-bottom: 0.8rem; box-sizing: border-box; font-family: inherit;"></textarea>
+
+        <!-- Result -->
+        <div id="smsResult" style="display:none; padding: 0.5rem; border-radius: 6px; margin-bottom: 0.8rem; font-size: 0.9rem;"></div>
+
+        <button onclick="doSendSms()" class="btn btn-primary" style="width:100%; background: #22c55e; border-color: #22c55e;">&#x1F4E8; إرسال</button>
+    </div>
+</div>
+
+<script>
+function openSmsModal() {
+    document.getElementById('smsModal').style.display = 'flex';
+    document.getElementById('smsResult').style.display = 'none';
+    loadSmsDevices();
+}
+function closeSmsModal() {
+    document.getElementById('smsModal').style.display = 'none';
+}
+function loadSmsDevices() {
+    var sel = document.getElementById('smsDevice');
+    sel.innerHTML = '<option value="">جاري البحث...</option>';
+    fetch('{{ url_for("api_kdeconnect_devices") }}')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                sel.innerHTML = '<option value="">&#x26A0; ' + data.error + '</option>';
+                return;
+            }
+            if (data.length === 0) {
+                sel.innerHTML = '<option value="">لا توجد أجهزة متصلة</option>';
+                return;
+            }
+            sel.innerHTML = '';
+            for (var i = 0; i < data.length; i++) {
+                sel.innerHTML += '<option value="' + data[i].id + '">' + data[i].name + '</option>';
+            }
+        })
+        .catch(function() {
+            sel.innerHTML = '<option value="">فشل الاتصال</option>';
+        });
+}
+function doSendSms() {
+    var deviceId = document.getElementById('smsDevice').value;
+    var phone = document.getElementById('smsPhone').value.trim();
+    var message = document.getElementById('smsMessage').value.trim();
+    var resultEl = document.getElementById('smsResult');
+
+    if (!deviceId) { alert('يرجى اختيار جهاز'); return; }
+    if (!phone) { alert('يرجى إدخال رقم الهاتف'); return; }
+    if (!message) { alert('يرجى كتابة نص الرسالة'); return; }
+
+    resultEl.style.display = 'block';
+    resultEl.style.background = '#fef3c7';
+    resultEl.style.color = '#92400e';
+    resultEl.textContent = 'جاري الإرسال...';
+
+    fetch('{{ url_for("api_kdeconnect_send_sms") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: deviceId, phone: phone, message: message })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) {
+            resultEl.style.background = '#fee2e2';
+            resultEl.style.color = '#991b1b';
+            resultEl.textContent = data.error;
+        } else {
+            resultEl.style.background = '#d1fae5';
+            resultEl.style.color = '#065f46';
+            resultEl.textContent = data.message;
+        }
+    })
+    .catch(function() {
+        resultEl.style.background = '#fee2e2';
+        resultEl.style.color = '#991b1b';
+        resultEl.textContent = 'فشل الاتصال بالخادم';
+    });
+}
+// Close modal on outside click
+document.getElementById('smsModal').addEventListener('click', function(e) {
+    if (e.target === this) closeSmsModal();
+});
+</script>
 {% endif %}
 {% endblock %}

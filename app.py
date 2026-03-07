@@ -3754,6 +3754,54 @@ def api_kdeconnect_send_sms():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/kdeconnect/send_sms_bulk', methods=['POST'])
+@admin_required
+def api_kdeconnect_send_sms_bulk():
+    """Send the same SMS to multiple phone numbers via KDE Connect."""
+    data = request.get_json()
+    device_id = data.get('device_id', '').strip()
+    phones = data.get('phones', [])
+    message = data.get('message', '').strip()
+
+    if not device_id:
+        return jsonify({'error': 'يرجى اختيار جهاز'}), 400
+    if not phones:
+        return jsonify({'error': 'لا توجد أرقام هواتف'}), 400
+    if not message:
+        return jsonify({'error': 'يرجى إدخال نص الرسالة'}), 400
+
+    sent = 0
+    failed = 0
+    errors = []
+    for phone in phones:
+        phone = phone.strip()
+        if not phone:
+            continue
+        try:
+            result = subprocess.run(
+                ['kdeconnect-cli', '--send-sms', message, '--destination', phone, '-d', device_id],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode != 0:
+                failed += 1
+                errors.append(phone)
+            else:
+                sent += 1
+        except Exception:
+            failed += 1
+            errors.append(phone)
+        # Small delay between messages to avoid overwhelming
+        time.sleep(0.5)
+
+    return jsonify({
+        'ok': True,
+        'sent': sent,
+        'failed': failed,
+        'errors': errors,
+        'message': f'تم إرسال {sent} رسالة بنجاح' + (f'، فشل {failed}' if failed else '')
+    })
+
+
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)

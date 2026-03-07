@@ -202,108 +202,106 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             return focused.get('found', False)
 
         def type_in_search(text):
-            """Type text into the currently focused search input."""
-            # Clear the input value via JS first to avoid touching chips
-            page.evaluate("""
-                () => {
-                    const input = document.querySelector(
-                        'input[placeholder*="Search name"], ' +
-                        'input[placeholder*="ابحث عن اسم"]'
-                    );
-                    if (input) {
-                        input.value = '';
-                        input.dispatchEvent(new Event('input', {bubbles: true}));
-                    }
-                }
-            """)
-            time.sleep(0.2)
+            """Type text into the search input using Playwright click + type."""
+            # Click directly on the search input to focus it
+            search_input = page.locator(
+                'input[placeholder*="Search name"], '
+                'input[placeholder*="ابحث عن اسم"]'
+            )
+            if search_input.count() > 0:
+                search_input.first.click()
+                time.sleep(0.2)
+                # Triple-click to select all text in the input only
+                search_input.first.click(click_count=3)
+                time.sleep(0.1)
+                page.keyboard.press('Backspace')
+                time.sleep(0.2)
             # Type the search text
             page.keyboard.type(text, delay=50)
 
         def clear_search():
             """Clear the search input without removing contact chips."""
-            # Use JS to clear only the input value, not the chips
-            page.evaluate("""
-                () => {
-                    const input = document.querySelector(
-                        'input[placeholder*="Search name"], ' +
-                        'input[placeholder*="ابحث عن اسم"]'
-                    );
-                    if (input) {
-                        input.focus();
-                        input.value = '';
-                        input.dispatchEvent(new Event('input', {bubbles: true}));
-                    }
-                }
-            """)
-            time.sleep(0.3)
+            search_input = page.locator(
+                'input[placeholder*="Search name"], '
+                'input[placeholder*="ابحث عن اسم"]'
+            )
+            if search_input.count() > 0:
+                search_input.first.click()
+                time.sleep(0.1)
+                # Triple-click selects all text within the input element only
+                search_input.first.click(click_count=3)
+                time.sleep(0.1)
+                page.keyboard.press('Backspace')
+                time.sleep(0.3)
 
         def click_search_result(phone_query=''):
             """Click the first contact in the search results list.
 
-            After typing in the search box, the contact list filters.
-            We need to click a result from the scrollable list, NOT the
-            chips of already-added contacts above the search input.
-
-            Strategy: use JS to find contact list items (div[role="listitem"]
-            or div[role="button"]) positioned below the search input.
-            If phone_query is provided, prefer results whose text contains
-            part of the phone number.
+            Uses JS to find the contact position, then Playwright's native
+            page.mouse.click() for a real click that WhatsApp responds to.
             """
-            clicked = page.evaluate("""
+            # Get position of the best candidate via JS
+            pos = page.evaluate("""
                 (phoneQuery) => {
-                    // Find the search input to get its position
                     const searchInput = document.querySelector(
                         'input[placeholder*="Search"], input[placeholder*="ابحث"], ' +
                         'div[contenteditable="true"][role="textbox"]'
                     );
-                    if (!searchInput) return 'no_search_input';
+                    if (!searchInput) return {error: 'no_search_input'};
 
                     const searchRect = searchInput.getBoundingClientRect();
 
                     // Collect all candidate contact items below the search
                     const candidates = [];
-                    const selectors = 'div[role="listitem"], div[role="button"], div[role="option"]';
-                    document.querySelectorAll(selectors).forEach(btn => {
-                        const rect = btn.getBoundingClientRect();
-                        // Must be below search input and in the left panel
+                    const selectors = 'div[role="listitem"], div[role="button"], div[role="option"], div[tabindex="-1"], div[tabindex="0"]';
+                    document.querySelectorAll(selectors).forEach(el => {
+                        const rect = el.getBoundingClientRect();
                         if (rect.top > searchRect.bottom + 5 &&
                             rect.left < 600 &&
                             rect.height > 40 && rect.height < 120 &&
                             rect.width > 200) {
                             candidates.push({
-                                el: btn,
-                                text: btn.textContent.substring(0, 80),
-                                y: rect.top
+                                text: el.textContent.substring(0, 80),
+                                x: Math.round(rect.x + rect.width / 2),
+                                y: Math.round(rect.y + rect.height / 2),
+                                w: Math.round(rect.width),
+                                h: Math.round(rect.height),
+                                top: rect.top
                             });
                         }
                     });
 
-                    if (candidates.length === 0) return 'no_result_found';
+                    if (candidates.length === 0) return {error: 'no_result_found'};
 
                     // Sort by vertical position (topmost first)
-                    candidates.sort((a, b) => a.y - b.y);
+                    candidates.sort((a, b) => a.top - b.top);
 
-                    // If we have a phone query, prefer matching results
+                    // If phone query provided, prefer matching results
                     if (phoneQuery) {
-                        // Strip common prefixes for matching
                         const digits = phoneQuery.replace(/[^0-9]/g, '');
                         const lastDigits = digits.slice(-7);
                         for (const c of candidates) {
                             const cDigits = c.text.replace(/[^0-9]/g, '');
                             if (cDigits.includes(lastDigits) || cDigits.includes(digits)) {
-                                c.el.click();
-                                return 'clicked_match: ' + c.text;
+                                return {x: c.x, y: c.y, text: c.text, matched: true};
                             }
                         }
                     }
 
-                    // Otherwise click the first result
-                    candidates[0].el.click();
-                    return 'clicked_first: ' + candidates[0].text;
+                    // Return the first result
+                    return {x: candidates[0].x, y: candidates[0].y,
+                            text: candidates[0].text, matched: false,
+                            total: candidates.length};
                 }
             """, phone_query)
-            return clicked
+
+            if 'error' in pos:
+                return pos['error']
+
+            # Use Playwright's real mouse click at the element's center
+            page.mouse.click(pos['x'], pos['y'])
+            matched = 'match' if pos.get('matched') else 'first'
+            return f'clicked_{matched}: {pos.get("text", "?")}'
 
         def count_contact_results():
             """Count contact items in the results list (below search input)."""
@@ -531,98 +529,69 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             except Exception:
                 continue
 
-        # Green button: must be within group creation panel (x < 600, below search)
+        # Green button: find position via JS, click via Playwright mouse
         if not clicked_next:
             try:
                 result = page.evaluate("""
                     () => {
-                        // Find the search input to anchor our search
                         const searchInput = document.querySelector(
                             'input[placeholder*="Search name"], input[placeholder*="ابحث عن اسم"]'
                         );
-                        if (!searchInput) return {clicked: false, reason: 'no_search'};
+                        if (!searchInput) return {found: false, reason: 'no_search'};
 
-                        const searchRect = searchInput.getBoundingClientRect();
-                        // The panel containing the search
-                        let panel = searchInput;
-                        for (let i = 0; i < 10; i++) {
-                            if (!panel.parentElement) break;
-                            panel = panel.parentElement;
-                            const pr = panel.getBoundingClientRect();
-                            // Stop when we find the full-height panel
-                            if (pr.height > 500) break;
-                        }
-                        const panelRect = panel.getBoundingClientRect();
-
-                        // Look for the green circular button WITHIN this panel
+                        // Look for ANY circular/round button in left panel
                         const candidates = [];
-                        panel.querySelectorAll('button, div[role="button"], span[role="button"], div').forEach(el => {
+                        document.querySelectorAll('button, div[role="button"], span[role="button"]').forEach(el => {
                             const rect = el.getBoundingClientRect();
+                            if (rect.left > 600) return;
                             const w = rect.width;
                             const h = rect.height;
-                            if (w < 40 || w > 80 || h < 40 || h > 80) return;
-                            if (Math.abs(w - h) > 8) return;
+                            if (w < 35 || w > 80 || h < 35 || h > 80) return;
+                            if (Math.abs(w - h) > 10) return;
                             const style = window.getComputedStyle(el);
                             const br = style.borderRadius;
-                            if (!br) return;
-                            const isCircle = br.includes('50%') || parseInt(br) >= 20;
-                            if (!isCircle) return;
-                            // Must be near the bottom of the panel
-                            if (rect.top < panelRect.bottom - 200) return;
                             const bg = style.backgroundColor;
                             const hasSvg = !!el.querySelector('svg');
+                            const hasIcon = !!el.querySelector('span[data-icon]');
                             candidates.push({
-                                el: el, bg: bg, hasSvg: hasSvg,
-                                x: rect.x, y: rect.y, w: w, h: h
+                                bg: bg, br: br, hasSvg: hasSvg, hasIcon: hasIcon,
+                                cx: Math.round(rect.x + w/2),
+                                cy: Math.round(rect.y + h/2),
+                                w: Math.round(w), h: Math.round(h),
+                                y: rect.y,
+                                icon: el.querySelector('span[data-icon]')?.getAttribute('data-icon') || ''
                             });
                         });
 
-                        if (candidates.length > 0) {
-                            // Prefer one with SVG, then one near bottom-right
-                            candidates.sort((a, b) => {
-                                if (a.hasSvg !== b.hasSvg) return b.hasSvg - a.hasSvg;
-                                return b.y - a.y; // prefer lower
-                            });
-                            const best = candidates[0];
-                            best.el.click();
-                            return {clicked: true,
-                                    pos: [Math.round(best.x), Math.round(best.y)],
-                                    size: [Math.round(best.w), Math.round(best.h)],
-                                    bg: best.bg};
-                        }
+                        if (candidates.length === 0) return {found: false, candidates: 0};
 
-                        // Fallback: search globally but exclude known non-targets
-                        const allBtns = document.querySelectorAll('button, div[role="button"]');
-                        for (const btn of allBtns) {
-                            const rect = btn.getBoundingClientRect();
-                            // Must be in left panel, near bottom
-                            if (rect.left > 600 || rect.top < 400) continue;
-                            const w = rect.width;
-                            const h = rect.height;
-                            if (w < 40 || w > 80 || h < 40 || h > 80) continue;
-                            const style = window.getComputedStyle(btn);
-                            const bg = style.backgroundColor;
-                            // Must have green-ish background
-                            if (!bg) continue;
-                            const m = bg.match(/rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
-                            if (!m) continue;
-                            const r = parseInt(m[1]), g = parseInt(m[2]), b = parseInt(m[3]);
-                            // Green: low red, high green
-                            if (g > 100 && g > r * 2 && g > b) {
-                                btn.click();
-                                return {clicked: true, fallback: true,
-                                        pos: [Math.round(rect.x), Math.round(rect.y)],
-                                        bg: bg};
+                        // Prefer green circular buttons near bottom
+                        candidates.sort((a, b) => b.y - a.y);
+                        // Check for green bg
+                        for (const c of candidates) {
+                            const m = c.bg.match(/rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+                            if (m) {
+                                const r = parseInt(m[1]), g = parseInt(m[2]), bl = parseInt(m[3]);
+                                if (g > 100 && g > r * 1.5) {
+                                    return {found: true, cx: c.cx, cy: c.cy, bg: c.bg, icon: c.icon};
+                                }
                             }
                         }
-
-                        return {clicked: false, candidates: candidates.length,
-                                panelH: Math.round(panelRect.height)};
+                        // Fallback: any circular button with SVG/icon near bottom
+                        for (const c of candidates) {
+                            if (c.hasSvg || c.hasIcon) {
+                                return {found: true, cx: c.cx, cy: c.cy, bg: c.bg,
+                                        icon: c.icon, fallback: true};
+                            }
+                        }
+                        return {found: false, candidates: candidates.length,
+                                all: candidates.map(c => ({bg:c.bg, icon:c.icon, cy:c.cy}))};
                     }
                 """)
                 print(f"  Green button result: {result}")
-                clicked_next = result.get('clicked', False)
-                if clicked_next:
+                if result.get('found'):
+                    page.mouse.click(result['cx'], result['cy'])
+                    clicked_next = True
                     time.sleep(3)
             except Exception as e:
                 print(f"  Green button error: {e}")

@@ -3399,11 +3399,55 @@ def admin_delete_list(lid):
 @app.route('/api/export_to_list', methods=['POST'])
 @admin_required
 def api_export_to_list():
-    """Bulk-add filtered records to an existing or new custom list."""
+    """Bulk-add filtered records to an existing or new custom list.
+
+    Accepts either:
+      - record_ids: explicit list of IDs (legacy, from visible table)
+      - filters + limit: re-query the DB to get ALL matching IDs
+    """
     data = request.get_json()
     list_id = data.get('list_id')
     list_name = data.get('list_name', '').strip()
     record_ids = data.get('record_ids', [])
+    filters = data.get('filters')
+    limit = data.get('limit', 0)
+
+    # If filters provided, query the DB for all matching record IDs
+    if filters and not record_ids:
+        db = get_db()
+        where_clauses = ["1=1"]
+        params = []
+        if filters.get('status'):
+            statuses = filters['status'] if isinstance(filters['status'], list) else [filters['status']]
+            placeholders = ','.join(['?'] * len(statuses))
+            where_clauses.append(f"r.status IN ({placeholders})")
+            params.extend(statuses)
+        if filters.get('province'):
+            where_clauses.append("r.province = ?")
+            params.append(filters['province'])
+        if filters.get('gender'):
+            where_clauses.append("r.gender = ?")
+            params.append(filters['gender'])
+        if filters.get('search'):
+            s = f"%{filters['search']}%"
+            where_clauses.append("(r.first_name LIKE ? OR r.last_name LIKE ? OR r.father_name LIKE ? OR r.national_id LIKE ? OR r.phone LIKE ?)")
+            params.extend([s, s, s, s, s])
+        if filters.get('arrest_authority'):
+            where_clauses.append("r.arrest_authority = ?")
+            params.append(filters['arrest_authority'])
+        if filters.get('has_special_needs'):
+            where_clauses.append("r.has_special_needs = 1")
+        if filters.get('widows_filter'):
+            where_clauses.append("r.marital = 'married' AND r.gender = 'male' AND r.status IN ('deceased', 'enforced')")
+        if filters.get('education_max'):
+            where_clauses.append("r.education IN ('none','primary','middle')")
+
+        sql = f"SELECT r.id FROM records r WHERE {' AND '.join(where_clauses)} ORDER BY r.id DESC"
+        if limit and int(limit) > 0:
+            sql += f" LIMIT {int(limit)}"
+        rows = db.execute(sql, params).fetchall()
+        record_ids = [row['id'] for row in rows]
+
     if not record_ids:
         return jsonify({'error': 'لا توجد سجلات'}), 400
 

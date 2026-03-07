@@ -1316,14 +1316,8 @@ function openExportToList() {
     document.getElementById('etlResult').style.display = 'none';
     document.getElementById('etlNewName').value = '';
 
-    // Determine record count from visible table rows
-    var rows = document.querySelectorAll('#recordsTable tbody tr');
-    var count = 0;
-    rows.forEach(function(tr) {
-        var firstTd = tr.querySelector('td:first-child');
-        if (firstTd && firstTd.textContent.trim().match(/^\d+$/)) count++;
-    });
-    countEl.textContent = count + ' سجل متاح حسب الفلاتر الحالية';
+    var totalFiltered = {{ total_count }};
+    countEl.textContent = totalFiltered + ' سجل متاح حسب الفلاتر الحالية';
     // Reset limit selector
     document.getElementById('etlLimitSelect').value = '0';
     document.getElementById('etlLimitCustom').style.display = 'none';
@@ -1378,28 +1372,22 @@ function doExportToList() {
         return;
     }
 
-    // Collect record IDs from first column of each table row
-    var ids = [];
-    document.querySelectorAll('#recordsTable tbody tr').forEach(function(tr) {
-        var firstTd = tr.querySelector('td:first-child');
-        if (firstTd) {
-            var id = parseInt(firstTd.textContent.trim());
-            if (!isNaN(id) && id > 0) ids.push(id);
-        }
-    });
-
-    if (ids.length === 0) {
-        alert('لا توجد سجلات للتصدير');
-        return;
-    }
-
-    // Apply limit
     var limit = getEtlLimit();
-    if (limit > 0 && limit < ids.length) {
-        ids = ids.slice(0, limit);
+
+    // Build filter object from current page filters
+    var filters = {};
+    // Status checkboxes
+    var statuses = [];
+    document.querySelectorAll('input[name="status"]:checked').forEach(function(cb) {
+        statuses.push(cb.value);
+    });
+    if (statuses.length > 0) filters.status = statuses;
+    // Other filter params from the page
+    for (var key in filterParams) {
+        if (filterParams[key]) filters[key] = filterParams[key];
     }
 
-    var body = { record_ids: ids };
+    var body = { filters: filters, limit: limit };
     if (listId) body.list_id = parseInt(listId);
     if (newName && !listId) body.list_name = newName;
 

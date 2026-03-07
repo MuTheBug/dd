@@ -235,48 +235,83 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                 time.sleep(0.3)
 
         def click_search_result(phone_query=''):
-            """Click the first contact in the search results list.
+            """Click the first contact in the group-add search results.
 
-            Uses JS to find the contact position, then Playwright's native
-            page.mouse.click() for a real click that WhatsApp responds to.
+            CRITICAL: Only click contacts within the group creation panel,
+            not chat list items. Scope search to the scrollable container
+            that is a parent of the search input.
             """
-            # Get position of the best candidate via JS
             pos = page.evaluate("""
                 (phoneQuery) => {
                     const searchInput = document.querySelector(
-                        'input[placeholder*="Search"], input[placeholder*="ابحث"], ' +
-                        'div[contenteditable="true"][role="textbox"]'
+                        'input[placeholder*="Search name"], input[placeholder*="ابحث عن اسم"]'
                     );
                     if (!searchInput) return {error: 'no_search_input'};
 
-                    const searchRect = searchInput.getBoundingClientRect();
-
-                    // Collect all candidate contact items below the search
-                    const candidates = [];
-                    const selectors = 'div[role="listitem"], div[role="button"], div[role="option"], div[tabindex="-1"], div[tabindex="0"]';
-                    document.querySelectorAll(selectors).forEach(el => {
-                        const rect = el.getBoundingClientRect();
-                        if (rect.top > searchRect.bottom + 5 &&
-                            rect.left < 600 &&
-                            rect.height > 40 && rect.height < 120 &&
-                            rect.width > 200) {
-                            candidates.push({
-                                text: el.textContent.substring(0, 80),
-                                x: Math.round(rect.x + rect.width / 2),
-                                y: Math.round(rect.y + rect.height / 2),
-                                w: Math.round(rect.width),
-                                h: Math.round(rect.height),
-                                top: rect.top
-                            });
+                    // Walk up from search input to find the group panel container
+                    let panel = searchInput.parentElement;
+                    for (let i = 0; i < 15; i++) {
+                        if (!panel || !panel.parentElement) break;
+                        panel = panel.parentElement;
+                        const style = window.getComputedStyle(panel);
+                        // The group panel is a large container with overflow
+                        if (panel.getBoundingClientRect().height > 400 &&
+                            (style.overflow === 'auto' || style.overflowY === 'auto' ||
+                             style.overflow === 'hidden' || style.overflowY === 'hidden' ||
+                             panel.getAttribute('data-tab'))) {
+                            break;
                         }
+                    }
+
+                    const searchRect = searchInput.getBoundingClientRect();
+                    const panelRect = panel.getBoundingClientRect();
+
+                    // Find contact items WITHIN the panel only
+                    const candidates = [];
+                    panel.querySelectorAll('div[role="listitem"], div[role="button"], div[role="option"], div[tabindex="-1"], div[tabindex="0"]').forEach(el => {
+                        const rect = el.getBoundingClientRect();
+                        // Must be below the search input
+                        if (rect.top < searchRect.bottom + 5) return;
+                        // Must be within the panel horizontally
+                        if (rect.left < panelRect.left - 10 || rect.right > panelRect.right + 10) return;
+                        // Reasonable contact item size
+                        if (rect.height < 40 || rect.height > 120) return;
+                        if (rect.width < 150) return;
+
+                        candidates.push({
+                            text: el.textContent.substring(0, 80),
+                            x: Math.round(rect.x + rect.width / 2),
+                            y: Math.round(rect.y + rect.height / 2),
+                            w: Math.round(rect.width),
+                            h: Math.round(rect.height),
+                            top: rect.top
+                        });
                     });
 
-                    if (candidates.length === 0) return {error: 'no_result_found'};
+                    if (candidates.length === 0) {
+                        // Debug: what's in the panel below search?
+                        const debug = [];
+                        panel.querySelectorAll('*').forEach(el => {
+                            const rect = el.getBoundingClientRect();
+                            if (rect.top > searchRect.bottom && rect.height > 40 &&
+                                rect.height < 120 && rect.width > 150 &&
+                                el.textContent.length > 2) {
+                                debug.push({
+                                    tag: el.tagName,
+                                    role: el.getAttribute('role'),
+                                    text: el.textContent.substring(0, 40),
+                                    h: Math.round(rect.height)
+                                });
+                            }
+                        });
+                        return {error: 'no_result_in_panel', debug: debug.slice(0, 5),
+                                panelTag: panel.tagName, panelH: Math.round(panelRect.height)};
+                    }
 
                     // Sort by vertical position (topmost first)
                     candidates.sort((a, b) => a.top - b.top);
 
-                    // If phone query provided, prefer matching results
+                    // If phone query, prefer matching results
                     if (phoneQuery) {
                         const digits = phoneQuery.replace(/[^0-9]/g, '');
                         const lastDigits = digits.slice(-7);
@@ -288,7 +323,7 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                         }
                     }
 
-                    // Return the first result
+                    // Click the first result (filtered list should show only matching contacts)
                     return {x: candidates[0].x, y: candidates[0].y,
                             text: candidates[0].text, matched: false,
                             total: candidates.length};
@@ -296,34 +331,46 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             """, phone_query)
 
             if 'error' in pos:
-                return pos['error']
+                return f"error: {pos}"
 
-            # Use Playwright's real mouse click at the element's center
+            # Use Playwright's real mouse click
             page.mouse.click(pos['x'], pos['y'])
             matched = 'match' if pos.get('matched') else 'first'
             return f'clicked_{matched}: {pos.get("text", "?")}'
 
         def count_contact_results():
-            """Count contact items in the results list (below search input)."""
+            """Count contact items within the group panel (below search input)."""
             return page.evaluate("""
                 () => {
                     const searchInput = document.querySelector(
-                        'input[placeholder*="Search"], input[placeholder*="ابحث"], ' +
-                        'div[contenteditable="true"][role="textbox"]'
+                        'input[placeholder*="Search name"], input[placeholder*="ابحث عن اسم"]'
                     );
                     if (!searchInput) return 0;
-                    const searchRect = searchInput.getBoundingClientRect();
-                    let count = 0;
-                    const buttons = document.querySelectorAll('div[role="button"]');
-                    for (const btn of buttons) {
-                        const rect = btn.getBoundingClientRect();
-                        if (rect.top > searchRect.bottom + 10 &&
-                            rect.left < 600 &&
-                            rect.height > 40 && rect.height < 100 &&
-                            rect.width > 200) {
-                            count++;
+
+                    // Walk up to panel
+                    let panel = searchInput.parentElement;
+                    for (let i = 0; i < 15; i++) {
+                        if (!panel || !panel.parentElement) break;
+                        panel = panel.parentElement;
+                        const style = window.getComputedStyle(panel);
+                        if (panel.getBoundingClientRect().height > 400 &&
+                            (style.overflow === 'auto' || style.overflowY === 'auto' ||
+                             style.overflow === 'hidden' || style.overflowY === 'hidden' ||
+                             panel.getAttribute('data-tab'))) {
+                            break;
                         }
                     }
+
+                    const searchRect = searchInput.getBoundingClientRect();
+                    let count = 0;
+                    panel.querySelectorAll('div[role="listitem"], div[role="button"], div[role="option"], div[tabindex="-1"]').forEach(el => {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.top > searchRect.bottom + 5 &&
+                            rect.height > 40 && rect.height < 120 &&
+                            rect.width > 150) {
+                            count++;
+                        }
+                    });
                     return count;
                 }
             """)
@@ -357,32 +404,25 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                         result = click_search_result(phone)
                         print(f"    click result: {result}")
                         if result.startswith('clicked'):
-                            time.sleep(1)
-                            # Verify a chip was added (count chips above search)
-                            chip_count = page.evaluate("""
-                                () => {
-                                    const input = document.querySelector(
-                                        'input[placeholder*="Search"], input[placeholder*="ابحث"]'
-                                    );
-                                    if (!input) return -1;
-                                    const inputRect = input.getBoundingClientRect();
-                                    // Chips are small elements above or before the input
-                                    const chips = document.querySelectorAll(
-                                        'button[aria-label], span[data-icon="x"], ' +
-                                        'span[data-icon="x-refreshed"]'
-                                    );
-                                    let count = 0;
-                                    chips.forEach(c => {
-                                        const r = c.getBoundingClientRect();
-                                        if (r.left < 600 && r.top <= inputRect.bottom + 5
-                                            && r.width > 0) {
-                                            count++;
-                                        }
-                                    });
-                                    return count;
-                                }
+                            time.sleep(1.5)
+                            # Verify we're still on group screen (not navigated away)
+                            still_on_group = page.evaluate("""
+                                () => !!document.querySelector(
+                                    'input[placeholder*="Search name"], ' +
+                                    'input[placeholder*="ابحث عن اسم"]'
+                                )
                             """)
-                            print(f"    chips visible: {chip_count}")
+                            if not still_on_group:
+                                print(f"    ! Click navigated away from group screen!")
+                                # Try to go back
+                                page.keyboard.press('Escape')
+                                time.sleep(1)
+                                break
+                            # Check if the contact was actually added
+                            # After adding, the search text should be cleared
+                            # and the contact count should have changed
+                            new_count = count_contact_results()
+                            print(f"    results after click: {new_count}")
                             added_count += 1
                             print(f"  + Added: {phone}")
                             found = True

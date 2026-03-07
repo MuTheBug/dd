@@ -3,7 +3,7 @@
 
 {% block content %}
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
-    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+    <h1 style="font-size: 1.4rem; color: var(--text);">
         القوائم المخصصة
         <span style="font-size: 0.95rem; color: var(--text-light);">({{ lists|length }} قائمة)</span>
     </h1>
@@ -11,7 +11,7 @@
 
 <!-- Create New List -->
 <div class="card" style="padding: 0.75rem 1rem; margin-bottom: 1rem;">
-    <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.5rem;">+ إنشاء قائمة جديدة</div>
+    <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-light); margin-bottom: 0.5rem;">+ إنشاء قائمة جديدة</div>
     <form method="POST" action="{{ url_for('admin_create_list') }}" style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: end;">
         <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 200px;">
             <label style="font-size: 0.82rem;">اسم القائمة <span style="color: var(--deceased);">*</span></label>
@@ -32,7 +32,7 @@
     <div class="card" style="padding: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
             <div>
-                <a href="{{ url_for('admin_custom_list_detail', lid=l.id) }}" style="font-weight: 700; font-size: 1.05rem; color: var(--primary-dark); text-decoration: none;">
+                <a href="{{ url_for('admin_custom_list_detail', lid=l.id) }}" style="font-weight: 700; font-size: 1.05rem; color: var(--text); text-decoration: none;">
                     {{ l.name }}
                 </a>
                 {% if l.description %}

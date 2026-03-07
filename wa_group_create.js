@@ -11,6 +11,44 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const path = require('path');
+const fs = require('fs');
+const { execSync } = require('child_process');
+
+// Auto-detect Chrome/Chromium executable
+function findChrome() {
+    // Common binary names
+    const names = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser', 'chrome'];
+    for (const name of names) {
+        try {
+            const p = execSync(`which ${name} 2>/dev/null`).toString().trim();
+            if (p && fs.existsSync(p)) return p;
+        } catch {}
+    }
+    // Common paths
+    const paths = [
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/snap/bin/chromium',
+    ];
+    // Playwright cache
+    try {
+        const home = process.env.HOME || '/root';
+        const pwDir = path.join(home, '.cache', 'ms-playwright');
+        if (fs.existsSync(pwDir)) {
+            const dirs = fs.readdirSync(pwDir).filter(d => d.startsWith('chromium'));
+            for (const d of dirs) {
+                const p = path.join(pwDir, d, 'chrome-linux', 'chrome');
+                if (fs.existsSync(p)) paths.unshift(p);
+            }
+        }
+    } catch {}
+    for (const p of paths) {
+        if (fs.existsSync(p)) return p;
+    }
+    return null;
+}
 
 // Parse args
 const args = process.argv.slice(2);
@@ -43,19 +81,29 @@ if (phones.length === 0) {
 
 console.log(`Creating group "${groupName}" with ${phones.length} contacts...`);
 
+const chromePath = findChrome();
+if (chromePath) {
+    console.log(`Using browser: ${chromePath}`);
+} else {
+    console.error('Error: No Chrome/Chromium found. Install google-chrome or chromium.');
+    process.exit(1);
+}
+
+const puppeteerOpts = {
+    headless: false,
+    executablePath: chromePath,
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-blink-features=AutomationControlled',
+    ],
+};
+
 const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(__dirname, '.wa_session_wjs')
     }),
-    puppeteer: {
-        executablePath: '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
-        headless: false,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-blink-features=AutomationControlled',
-        ],
-    },
+    puppeteer: puppeteerOpts,
 });
 
 client.on('qr', (qr) => {

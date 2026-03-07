@@ -370,14 +370,40 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
         # ---------------------------------------------------------------
         print("\nStep 4: Creating group...")
 
-        # Debug: dump clickable elements + potential green buttons
+        # First verify we're still on the "Add group participants" screen
+        on_add_screen = page.evaluate("""
+            () => {
+                const inp = document.querySelector(
+                    'input[placeholder*="Search name"], input[placeholder*="ابحث عن اسم"]'
+                );
+                return !!inp;
+            }
+        """)
+        print(f"  On add-participants screen: {on_add_screen}")
+
+        if not on_add_screen:
+            print("  ERROR: Not on the add-participants screen anymore.")
+            debug_screenshot(page, '06b_wrong_screen')
+            browser.close()
+            return False
+
+        # Debug: dump clickable elements within the left panel
         try:
             btn_info = page.evaluate("""
                 () => {
                     const results = [];
+                    // Find the group creation panel (contains the search input)
+                    const searchInput = document.querySelector(
+                        'input[placeholder*="Search name"], input[placeholder*="ابحث عن اسم"]'
+                    );
+                    const panel = searchInput ? searchInput.closest(
+                        'div[style*="height"], div[class]'
+                    ) : null;
+
                     document.querySelectorAll('span[data-icon], button, div[role="button"]').forEach(el => {
                         if (el.offsetParent !== null) {
                             const rect = el.getBoundingClientRect();
+                            if (rect.left > 600) return; // skip right panel
                             const style = window.getComputedStyle(el);
                             results.push({
                                 tag: el.tagName,
@@ -385,56 +411,43 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
                                 ariaLabel: el.getAttribute('aria-label'),
                                 bg: style.backgroundColor,
                                 br: style.borderRadius,
-                                rect: [Math.round(rect.x), Math.round(rect.y),
-                                       Math.round(rect.width), Math.round(rect.height)],
+                                w: Math.round(rect.width),
+                                h: Math.round(rect.height),
+                                pos: [Math.round(rect.x), Math.round(rect.y)],
                                 text: el.textContent.substring(0, 20),
-                            });
-                        }
-                    });
-                    // Also find any circular elements with SVG (potential fab)
-                    document.querySelectorAll('svg').forEach(svg => {
-                        const p = svg.parentElement;
-                        if (!p || !p.offsetParent) return;
-                        const r = p.getBoundingClientRect();
-                        if (r.width >= 40 && r.width <= 80 &&
-                            r.height >= 40 && r.height <= 80 &&
-                            r.left < 600) {
-                            const s = window.getComputedStyle(p);
-                            results.push({
-                                tag: 'SVG-PARENT:' + p.tagName,
-                                bg: s.backgroundColor,
-                                br: s.borderRadius,
-                                rect: [Math.round(r.x), Math.round(r.y),
-                                       Math.round(r.width), Math.round(r.height)],
-                                role: p.getAttribute('role'),
                             });
                         }
                     });
                     return results;
                 }
             """)
-            print(f"  Visible elements: {btn_info}")
+            print(f"  Left panel elements: {btn_info}")
         except Exception as e:
             print(f"  Debug failed: {e}")
 
-        # Try multiple possible selectors for the forward/next button
+        # Try selectors including "-refreshed" variants (WhatsApp's current naming)
         next_selectors = [
             'span[data-icon="arrow-forward"]',
+            'span[data-icon="arrow-forward-refreshed"]',
             'span[data-icon="forward"]',
+            'span[data-icon="forward-refreshed"]',
             'span[data-icon="arrow-forward-outline"]',
             'span[data-icon="checkmark-medium"]',
+            'span[data-icon="checkmark-medium-refreshed"]',
             'span[data-icon="checkmark"]',
+            'span[data-icon="checkmark-refreshed"]',
             'span[data-icon="next"]',
+            'span[data-icon="next-refreshed"]',
             '[data-testid="arrow-forward"]',
             '[data-testid="next-btn"]',
             'button[aria-label="Next"]',
             'button[aria-label="التالي"]',
-            # Green circle button - try role=button with arrow
             'div[role="button"][aria-label="Next"]',
             'div[role="button"][aria-label="التالي"]',
-            # Generic: any green button at the bottom (the visible round button)
             'button:has(span[data-icon*="arrow"])',
             'div[role="button"]:has(span[data-icon*="arrow"])',
+            'button:has(span[data-icon*="forward"])',
+            'div[role="button"]:has(span[data-icon*="forward"])',
         ]
         clicked_next = False
         for sel in next_selectors:
@@ -449,99 +462,101 @@ def create_whatsapp_group(group_name, phone_numbers, headless=False):
             except Exception:
                 continue
 
-        # Last resort: find green circle button by scanning ALL elements
+        # Green button: must be within group creation panel (x < 600, below search)
         if not clicked_next:
             try:
-                clicked_next = page.evaluate("""
+                result = page.evaluate("""
                     () => {
-                        // Scan all elements for the green circular button
-                        // It's typically at the bottom of the left panel
-                        const all = document.querySelectorAll('*');
-                        let best = null;
-                        let bestScore = 0;
-                        for (const el of all) {
-                            if (!el.offsetParent && el !== document.body) continue;
-                            const w = el.offsetWidth;
-                            const h = el.offsetHeight;
-                            // Green button is roughly circular, 48-64px
-                            if (w < 40 || w > 80 || h < 40 || h > 80) continue;
-                            if (Math.abs(w - h) > 8) continue;
-                            const style = window.getComputedStyle(el);
-                            const bg = style.backgroundColor;
-                            const br = style.borderRadius;
-                            // Check for circular shape
-                            const isCircle = br && (br.includes('50%') ||
-                                parseInt(br) >= 20);
-                            if (!isCircle) continue;
-                            // Check for green-ish background
-                            const rect = el.getBoundingClientRect();
-                            // Must be in the left panel area
-                            if (rect.left > 600) continue;
-                            let score = 0;
-                            if (bg && (bg.includes('0, 168') ||
-                                       bg.includes('0, 175') ||
-                                       bg.includes('25, 211') ||
-                                       bg.includes('0, 128') ||
-                                       bg.includes('0, 150'))) {
-                                score += 10;
-                            }
-                            // Prefer elements near the bottom
-                            if (rect.top > 400) score += 5;
-                            // Has SVG child (arrow icon)?
-                            if (el.querySelector('svg')) score += 3;
-                            if (score > bestScore) {
-                                bestScore = score;
-                                best = el;
-                            }
-                        }
-                        if (best && bestScore >= 5) {
-                            best.click();
-                            return true;
-                        }
-                        return false;
-                    }
-                """)
-                if clicked_next:
-                    print("  Clicked next via green button detection")
-                    time.sleep(3)
-            except Exception:
-                pass
+                        // Find the search input to anchor our search
+                        const searchInput = document.querySelector(
+                            'input[placeholder*="Search name"], input[placeholder*="ابحث عن اسم"]'
+                        );
+                        if (!searchInput) return {clicked: false, reason: 'no_search'};
 
-        # Coordinate-based fallback: the green button is typically at the
-        # bottom-right of the left panel (~540, ~700 or similar)
-        if not clicked_next:
-            try:
-                # Find the panel boundaries and the green button position
-                pos = page.evaluate("""
-                    () => {
-                        // Find all elements with SVG children that are
-                        // small circular elements in the left panel
-                        const svgs = document.querySelectorAll('svg');
-                        for (const svg of svgs) {
-                            const parent = svg.closest('button, div[role="button"], span[role="button"], div');
-                            if (!parent) continue;
-                            const rect = parent.getBoundingClientRect();
+                        const searchRect = searchInput.getBoundingClientRect();
+                        // The panel containing the search
+                        let panel = searchInput;
+                        for (let i = 0; i < 10; i++) {
+                            if (!panel.parentElement) break;
+                            panel = panel.parentElement;
+                            const pr = panel.getBoundingClientRect();
+                            // Stop when we find the full-height panel
+                            if (pr.height > 500) break;
+                        }
+                        const panelRect = panel.getBoundingClientRect();
+
+                        // Look for the green circular button WITHIN this panel
+                        const candidates = [];
+                        panel.querySelectorAll('button, div[role="button"], span[role="button"], div').forEach(el => {
+                            const rect = el.getBoundingClientRect();
                             const w = rect.width;
                             const h = rect.height;
-                            // Circular-ish, in left panel, near bottom
-                            if (w >= 40 && w <= 80 && h >= 40 && h <= 80 &&
-                                Math.abs(w - h) < 10 &&
-                                rect.left < 600 && rect.top > 300) {
-                                return {x: rect.x + w/2, y: rect.y + h/2,
-                                        w: w, h: h, tag: parent.tagName};
+                            if (w < 40 || w > 80 || h < 40 || h > 80) return;
+                            if (Math.abs(w - h) > 8) return;
+                            const style = window.getComputedStyle(el);
+                            const br = style.borderRadius;
+                            if (!br) return;
+                            const isCircle = br.includes('50%') || parseInt(br) >= 20;
+                            if (!isCircle) return;
+                            // Must be near the bottom of the panel
+                            if (rect.top < panelRect.bottom - 200) return;
+                            const bg = style.backgroundColor;
+                            const hasSvg = !!el.querySelector('svg');
+                            candidates.push({
+                                el: el, bg: bg, hasSvg: hasSvg,
+                                x: rect.x, y: rect.y, w: w, h: h
+                            });
+                        });
+
+                        if (candidates.length > 0) {
+                            // Prefer one with SVG, then one near bottom-right
+                            candidates.sort((a, b) => {
+                                if (a.hasSvg !== b.hasSvg) return b.hasSvg - a.hasSvg;
+                                return b.y - a.y; // prefer lower
+                            });
+                            const best = candidates[0];
+                            best.el.click();
+                            return {clicked: true,
+                                    pos: [Math.round(best.x), Math.round(best.y)],
+                                    size: [Math.round(best.w), Math.round(best.h)],
+                                    bg: best.bg};
+                        }
+
+                        // Fallback: search globally but exclude known non-targets
+                        const allBtns = document.querySelectorAll('button, div[role="button"]');
+                        for (const btn of allBtns) {
+                            const rect = btn.getBoundingClientRect();
+                            // Must be in left panel, near bottom
+                            if (rect.left > 600 || rect.top < 400) continue;
+                            const w = rect.width;
+                            const h = rect.height;
+                            if (w < 40 || w > 80 || h < 40 || h > 80) continue;
+                            const style = window.getComputedStyle(btn);
+                            const bg = style.backgroundColor;
+                            // Must have green-ish background
+                            if (!bg) continue;
+                            const m = bg.match(/rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+                            if (!m) continue;
+                            const r = parseInt(m[1]), g = parseInt(m[2]), b = parseInt(m[3]);
+                            // Green: low red, high green
+                            if (g > 100 && g > r * 2 && g > b) {
+                                btn.click();
+                                return {clicked: true, fallback: true,
+                                        pos: [Math.round(rect.x), Math.round(rect.y)],
+                                        bg: bg};
                             }
                         }
-                        return null;
+
+                        return {clicked: false, candidates: candidates.length,
+                                panelH: Math.round(panelRect.height)};
                     }
                 """)
-                if pos:
-                    print(f"  Clicking SVG button at ({pos['x']}, {pos['y']}) "
-                          f"size {pos['w']}x{pos['h']} tag={pos['tag']}")
-                    page.mouse.click(pos['x'], pos['y'])
-                    clicked_next = True
+                print(f"  Green button result: {result}")
+                clicked_next = result.get('clicked', False)
+                if clicked_next:
                     time.sleep(3)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  Green button error: {e}")
 
         if not clicked_next:
             print("  Could not find next button. Taking screenshot...")

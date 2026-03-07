@@ -4,7 +4,7 @@
 {% block content %}
 {% set total = items|length + manual_items|length %}
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
-    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+    <h1 style="font-size: 1.4rem; color: var(--text);">
         {{ clist.name }}
         <span style="font-size: 0.95rem; color: var(--text-light);">({{ total }} اسم)</span>
     </h1>
@@ -22,21 +22,37 @@
 {% endif %}
 
 <!-- Search and add from records / volunteers / members -->
-<div class="card" style="padding: 1rem; margin-bottom: 1rem;">
-    <div style="font-size: 0.95rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 0.8rem;">+ بحث وإضافة من قاعدة البيانات</div>
+<div class="card" style="padding: 1rem; margin-bottom: 1rem; background: var(--card); color: var(--text);">
+    <div style="font-size: 0.95rem; font-weight: 700; color: var(--primary-light); margin-bottom: 0.8rem;">+ بحث وإضافة من قاعدة البيانات</div>
     <style>
         .src-tab-bar { display: flex; gap: 0; margin-bottom: 0.7rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
-        .src-tab { flex: 1; padding: 0.5rem 0.3rem; border: none; cursor: pointer; font-size: 0.82rem; font-weight: 600; font-family: inherit; background: var(--card-bg, #fff); color: var(--text-light); transition: all 0.2s; border-left: 1px solid var(--border); }
+        .src-tab { flex: 1; padding: 0.5rem 0.3rem; border: none; cursor: pointer; font-size: 0.82rem; font-weight: 600; font-family: inherit; background: var(--card); color: var(--text-light); transition: all 0.2s; border-left: 1px solid var(--border); }
         .src-tab:first-child { border-left: none; }
         .src-tab.active { background: var(--primary); color: white; }
-        .src-tab:hover:not(.active) { background: var(--filter-preset-bg, #f0f4f8); }
+        .src-tab:hover:not(.active) { background: var(--filter-preset-bg); }
         .search-result-item { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); transition: background 0.15s; font-size: 0.88rem; }
-        .search-result-item:hover { background: var(--filter-preset-bg, #f0f4f8); }
+        .search-result-item:hover { background: var(--filter-preset-bg); }
         .search-result-item:last-child { border-bottom: none; }
         .src-badge { display: inline-block; font-size: 0.65rem; padding: 2px 7px; border-radius: 4px; font-weight: 700; margin-left: 5px; vertical-align: middle; }
         .src-badge-record { background: #dbeafe; color: #1e40af; }
         .src-badge-volunteer { background: #d1fae5; color: #065f46; }
         .src-badge-member { background: #fef3c7; color: #92400e; }
+        #listSearchInput {
+            font-size: 0.92rem; width: 100%; padding: 0.6rem 0.8rem;
+            background: var(--input-bg); color: var(--text);
+            border: 1px solid var(--input-border); border-radius: var(--radius-sm);
+            font-family: inherit;
+        }
+        #listSearchInput::placeholder { color: var(--text-muted); }
+        #listSearchResults {
+            display: none; position: absolute; top: 100%; right: 0; left: 0; z-index: 100;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 0 0 8px 8px; box-shadow: var(--shadow-lg);
+            max-height: 350px; overflow-y: auto;
+        }
+        [data-theme="dark"] .src-badge-record { background: rgba(37,99,235,0.2); color: #93c5fd; }
+        [data-theme="dark"] .src-badge-volunteer { background: rgba(5,150,105,0.2); color: #6ee7b7; }
+        [data-theme="dark"] .src-badge-member { background: rgba(245,158,11,0.2); color: #fcd34d; }
     </style>
     <div class="src-tab-bar">
         <button type="button" class="src-tab active" data-source="all" onclick="switchSource(this)">الكل</button>
@@ -45,15 +61,15 @@
         <button type="button" class="src-tab" data-source="members" onclick="switchSource(this)">المنتسبين</button>
     </div>
     <div style="position: relative;">
-        <input type="text" id="listSearchInput" placeholder="ابحث بالاسم، الرقم الوطني، الهاتف، رقم العضوية..." style="font-size: 0.92rem; width: 100%; padding: 0.6rem 0.8rem;" oninput="searchForList(this.value)">
-        <div id="listSearchResults" style="display:none; position:absolute; top:100%; right:0; left:0; z-index:100; background: var(--card-bg); border: 1px solid var(--border); border-radius: 0 0 8px 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); max-height: 350px; overflow-y: auto;"></div>
+        <input type="text" id="listSearchInput" placeholder="ابحث بالاسم، الرقم الوطني، الهاتف، رقم العضوية..." oninput="searchForList(this.value)">
+        <div id="listSearchResults"></div>
     </div>
 </div>
 
 <!-- Add manual entry -->
-<div class="card" style="padding: 1rem; margin-bottom: 1rem;">
+<div class="card" style="padding: 1rem; margin-bottom: 1rem; background: var(--card); color: var(--text);">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; cursor: pointer;" onclick="var p=document.getElementById('manualFormPanel'); p.style.display=p.style.display==='none'?'block':'none'; this.querySelector('.toggle-arrow').textContent=p.style.display==='none'?'\u25BC':'\u25B2';">
-        <span style="font-size: 0.95rem; font-weight: 700; color: var(--primary-dark);">+ إضافة يدوية</span>
+        <span style="font-size: 0.95rem; font-weight: 700; color: var(--primary-light);">+ إضافة يدوية</span>
         <span class="toggle-arrow" style="font-size: 0.75rem; color: var(--text-light);">&#x25BC;</span>
     </div>
     <div id="manualFormPanel" style="display: none;">

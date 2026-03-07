@@ -169,7 +169,7 @@
                     </td>
                     <td dir="ltr" style="text-align: right; white-space: nowrap;">
                         {% if m.phone %}
-                        <a href="tel:{{ m.phone }}" style="color: var(--primary-light); text-decoration: none; font-size: 0.85rem;">&#x1F4DE; {{ m.phone }}</a>
+                        <a href="tel:{{ m.phone }}" style="color: var(--text); text-decoration: none; font-size: 0.85rem;">&#x1F4DE; {{ m.phone }}</a>
                         {% else %}-{% endif %}
                     </td>
                     <td style="font-size: 0.85rem; color: var(--text-light);">
@@ -195,7 +195,7 @@
                     <td dir="ltr" style="text-align: right; white-space: nowrap;">
                         {% set phone = r.phone or r.spouse_phone or r.guardian_phone or r.reporter_phone %}
                         {% if phone %}
-                        <a href="tel:{{ phone }}" style="color: var(--primary-light); text-decoration: none; font-size: 0.85rem;">&#x1F4DE; {{ phone }}</a>
+                        <a href="tel:{{ phone }}" style="color: var(--text); text-decoration: none; font-size: 0.85rem;">&#x1F4DE; {{ phone }}</a>
                         {% if not r.phone %}<span style="font-size:0.65rem; color:var(--text-light); display:block; direction:rtl;">{% if r.spouse_phone == phone %}زوج/ة{% elif r.guardian_phone == phone %}ولي أمر{% else %}مبلغ{% endif %}</span>{% endif %}
                         {% else %}-{% endif %}
                     </td>

@@ -3,7 +3,7 @@
 
 {% block content %}
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
-    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+    <h1 style="font-size: 1.4rem; color: var(--text);">
         السجلات <span style="font-size: 0.95rem; color: var(--text-light);">({{ total_count }} سجل)</span>
     </h1>
     <div class="btn-group">
@@ -25,7 +25,7 @@
 
             <!-- Quick Presets - Common organizational requests -->
             <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--filter-preset-bg); border-radius: 8px; border: 1px solid var(--filter-preset-border);">
-                <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.5rem;">&#x26A1; فلاتر سريعة (الطلبات الأكثر شيوعاً)</div>
+                <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary-light); margin-bottom: 0.5rem;">&#x26A1; فلاتر سريعة (الطلبات الأكثر شيوعاً)</div>
                 <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
                     <a href="{{ url_for('admin_records', widows_filter='widows_with_minors') }}" class="btn btn-outline btn-sm">أرامل لديهم قاصرين</a>
                     <a href="{{ url_for('admin_records', widows_filter='widows_deceased') }}" class="btn btn-outline btn-sm">أرامل الشهداء</a>
@@ -690,7 +690,7 @@
                     <td dir="ltr" style="text-align: right; white-space: nowrap;">
                         {% set phone = r.phone or r.spouse_phone or r.guardian_phone or r.reporter_phone %}
                         {% if phone %}
-                        <a href="tel:{{ phone }}" style="color: var(--primary); text-decoration: none; font-size: 0.85rem;" title="{{ phone }}{% if not r.phone %} ({% if r.spouse_phone == phone %}زوج/ة{% elif r.guardian_phone == phone %}ولي أمر{% else %}مبلغ{% endif %}){% endif %}">&#x1F4DE; {{ phone }}</a>
+                        <a href="tel:{{ phone }}" style="color: var(--text); text-decoration: none; font-size: 0.85rem;" title="{{ phone }}{% if not r.phone %} ({% if r.spouse_phone == phone %}زوج/ة{% elif r.guardian_phone == phone %}ولي أمر{% else %}مبلغ{% endif %}){% endif %}">&#x1F4DE; {{ phone }}</a>
                         {% if not r.phone %}<span style="font-size:0.65rem; color:var(--text-light); display:block; direction:rtl;">{% if r.spouse_phone == phone %}زوج/ة{% elif r.guardian_phone == phone %}ولي أمر{% else %}مبلغ{% endif %}</span>{% endif %}
                         {% else %}
                         <span style="color: var(--text-light); font-size: 0.8rem;">-</span>
@@ -756,7 +756,7 @@
 <div id="pdfColModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:1rem;">
     <div style="background:var(--card); border-radius:12px; max-width:700px; width:100%; max-height:85vh; overflow-y:auto; padding:1.5rem; position:relative; color:var(--text);">
         <button onclick="document.getElementById('pdfColModal').style.display='none'" style="position:absolute; top:10px; left:10px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
-        <h3 style="color:var(--primary-dark); margin-bottom:0.5rem;">&#x1F4E5; اختر أعمدة التقرير</h3>
+        <h3 style="color:var(--primary-light); margin-bottom:0.5rem;">&#x1F4E5; اختر أعمدة التقرير</h3>
         <p style="font-size:0.9rem; color:var(--text-light); margin-bottom:0.5rem;">حدد الأعمدة التي تريد إظهارها في التقرير (PDF أو Excel)</p>
 
         <!-- Preset: Deceased with kids under 13 -->
@@ -825,7 +825,7 @@
 <div id="exportToListModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:1rem;">
     <div style="background:var(--card); border-radius:12px; max-width:500px; width:100%; padding:1.5rem; position:relative; color:var(--text);">
         <button onclick="document.getElementById('exportToListModal').style.display='none'" style="position:absolute; top:10px; left:10px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-light);">&times;</button>
-        <h3 style="color:var(--primary-dark); margin-bottom:0.3rem;">&#x1F4CB; تصدير لقائمة مخصصة</h3>
+        <h3 style="color:var(--primary-light); margin-bottom:0.3rem;">&#x1F4CB; تصدير لقائمة مخصصة</h3>
         <p id="etlCount" style="font-size:0.85rem; color:var(--text-light); margin-bottom:1rem;"></p>
 
         <div style="margin-bottom:1rem;">

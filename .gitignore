@@ -10,3 +10,6 @@ uploads/screenshots/*
 *.db
 *.db-shm
 *.db-wal
+node_modules/
+.wa_session_wjs/
+package-lock.json

@@ -3413,8 +3413,8 @@ def api_export_to_list():
     filters = data.get('filters')
     limit = data.get('limit', 0)
 
-    # If filters provided, query the DB for all matching record IDs
-    if filters and not record_ids:
+    # If filters provided (or no explicit record_ids), query the DB for matching IDs
+    if filters is not None and not record_ids:
         db = get_db()
         where_clauses = ["1=1"]
         params = []

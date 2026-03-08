@@ -3419,7 +3419,13 @@ def api_export_to_list():
         where_clauses = ["1=1"]
         params = []
         if filters.get('status'):
-            statuses = filters['status'] if isinstance(filters['status'], list) else [filters['status']]
+            raw = filters['status']
+            if isinstance(raw, list):
+                statuses = raw
+            elif isinstance(raw, str) and ',' in raw:
+                statuses = [s.strip() for s in raw.split(',') if s.strip()]
+            else:
+                statuses = [raw]
             placeholders = ','.join(['?'] * len(statuses))
             where_clauses.append(f"r.status IN ({placeholders})")
             params.extend(statuses)

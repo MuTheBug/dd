@@ -1382,9 +1382,9 @@ function doExportToList() {
         statuses.push(cb.value);
     });
     if (statuses.length > 0) filters.status = statuses;
-    // Other filter params from the page
+    // Other filter params from the page (skip status — already handled from checkboxes)
     for (var key in filterParams) {
-        if (filterParams[key]) filters[key] = filterParams[key];
+        if (filterParams[key] && key !== 'status') filters[key] = filterParams[key];
     }
 
     var body = { filters: filters, limit: limit };

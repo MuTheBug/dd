@@ -2420,6 +2420,26 @@ def records_export_vcf():
         records = records[:int(pdf_limit)]
 
     # Build VCF content
+    def vcf_fold_line(line):
+        """Fold long vCard lines per RFC 2425 (max 75 octets per line).
+        Continuation lines start with a single space."""
+        encoded = line.encode('utf-8')
+        if len(encoded) <= 75:
+            return line
+        # First line: up to 75 bytes
+        chunks = []
+        start = 0
+        limit = 75
+        while start < len(encoded):
+            end = min(start + limit, len(encoded))
+            # Don't split in the middle of a multi-byte UTF-8 character
+            while end < len(encoded) and (encoded[end] & 0xC0) == 0x80:
+                end -= 1
+            chunks.append(encoded[start:end].decode('utf-8'))
+            start = end
+            limit = 74  # subsequent lines: space prefix takes 1 byte
+        return ('\r\n '.join(chunks))
+
     vcf_lines = []
     status_map = {'survivor': 'ناجٍ', 'enforced': 'مغيّب قسراً', 'deceased': 'متوفى'}
 
@@ -2434,8 +2454,8 @@ def records_export_vcf():
         vcf_lines.append('BEGIN:VCARD')
         vcf_lines.append('VERSION:3.0')
         # FN = full display name, N = structured name
-        vcf_lines.append(f'FN:{full_name}')
-        vcf_lines.append(f'N:{last};{first};{father};;')
+        vcf_lines.append(vcf_fold_line(f'FN;CHARSET=UTF-8:{full_name}'))
+        vcf_lines.append(vcf_fold_line(f'N;CHARSET=UTF-8:{last};{first};{father};;'))
 
         # Phone numbers
         phone = (rec['phone'] or '').strip()
@@ -2446,43 +2466,39 @@ def records_export_vcf():
         if phone:
             vcf_lines.append(f'TEL;TYPE=CELL:{phone}')
         if spouse_phone:
-            spouse_label = (rec['spouse_name'] or '').strip()
-            label = f' ({spouse_label})' if spouse_label else ''
             vcf_lines.append(f'TEL;TYPE=HOME:{spouse_phone}')
         if guardian_phone:
             vcf_lines.append(f'TEL;TYPE=WORK:{guardian_phone}')
         if reporter_phone:
-            vcf_lines.append(f'TEL;TYPE=OTHER:{reporter_phone}')
+            vcf_lines.append(f'TEL;TYPE=VOICE:{reporter_phone}')
 
         # Organization / title
         org_parts = []
         if rec['assoc_name']:
             org_parts.append(rec['assoc_name'])
         if org_parts:
-            vcf_lines.append(f'ORG:{";".join(org_parts)}')
+            vcf_lines.append(vcf_fold_line(f'ORG;CHARSET=UTF-8:{";".join(org_parts)}'))
 
         if rec['profession']:
-            vcf_lines.append(f'TITLE:{rec["profession"]}')
+            vcf_lines.append(vcf_fold_line(f'TITLE;CHARSET=UTF-8:{rec["profession"]}'))
 
         # Address
         address = (rec['address'] or '').strip()
         province = (rec['province'] or '').strip()
         if address or province:
             # ADR: PO;ext;street;city;region;postal;country
-            vcf_lines.append(f'ADR;TYPE=HOME:;;{address};;{province};;')
+            vcf_lines.append(vcf_fold_line(f'ADR;TYPE=HOME;CHARSET=UTF-8:;;{address};;{province};;'))
 
-        # Email - not in schema but just in case
-        # Birthday
+        # Birthday (only emit full YYYY-MM-DD dates for compatibility)
         birth_year = rec['birth_year'] or ''
         birth_month = rec['birth_month'] or ''
         birth_day = rec['birth_day'] or ''
-        if birth_year:
-            bday = str(birth_year)
-            if birth_month:
-                bday += f'-{int(birth_month):02d}'
-                if birth_day:
-                    bday += f'-{int(birth_day):02d}'
-            vcf_lines.append(f'BDAY:{bday}')
+        if birth_year and birth_month and birth_day:
+            try:
+                bday = f'{int(birth_year):04d}-{int(birth_month):02d}-{int(birth_day):02d}'
+                vcf_lines.append(f'BDAY:{bday}')
+            except (ValueError, TypeError):
+                pass
 
         # Note field - pack useful info
         rec_keys = rec.keys()
@@ -2532,7 +2548,7 @@ def records_export_vcf():
         if note_parts:
             # vCard NOTE uses escaped newlines
             note_text = '\\n'.join(note_parts)
-            vcf_lines.append(f'NOTE:{note_text}')
+            vcf_lines.append(vcf_fold_line(f'NOTE;CHARSET=UTF-8:{note_text}'))
 
         vcf_lines.append('END:VCARD')
         vcf_lines.append('')

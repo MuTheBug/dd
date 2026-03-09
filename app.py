@@ -1975,6 +1975,40 @@ def build_pdf_filter_conditions(args):
     if args.get('collector_name'):
         conditions.append("collector_name = ?")
         params.append(args['collector_name'])
+    # Data entry date range (created_at is TEXT like '2024-01-15 10:30:00')
+    if args.get('created_from'):
+        conditions.append("created_at >= ?")
+        params.append(args['created_from'])
+    if args.get('created_to'):
+        conditions.append("created_at <= ?")
+        params.append(args['created_to'] + ' 23:59:59')
+    # Collection date range
+    if args.get('collection_date_from'):
+        conditions.append("collection_date >= ?")
+        params.append(args['collection_date_from'])
+    if args.get('collection_date_to'):
+        conditions.append("collection_date <= ?")
+        params.append(args['collection_date_to'])
+    if args.get('source_type'):
+        conditions.append("source_type = ?")
+        params.append(args['source_type'])
+    if args.get('has_phone') == 'yes':
+        conditions.append("(phone IS NOT NULL AND phone != '')")
+    elif args.get('has_phone') == 'no':
+        conditions.append("(phone IS NULL OR phone = '')")
+    if args.get('family_book_number'):
+        conditions.append("family_book_number LIKE ?")
+        params.append(f"%{args['family_book_number']}%")
+    if args.get('national_id_search'):
+        conditions.append("national_id LIKE ?")
+        params.append(f"%{args['national_id_search']}%")
+    if args.get('has_rent') == 'yes':
+        conditions.append("rent_amount IS NOT NULL AND rent_amount != '' AND rent_amount != '0'")
+    elif args.get('has_rent') == 'no':
+        conditions.append("(rent_amount IS NULL OR rent_amount = '' OR rent_amount = '0')")
+    if args.get('detention_facility_search'):
+        conditions.append("detention_facilities_data LIKE ?")
+        params.append(f"%{args['detention_facility_search']}%")
 
     return conditions, params, pdf_status_list
 

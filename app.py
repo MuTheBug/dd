@@ -1148,6 +1148,16 @@ def admin_records():
         'kids_age_to': request.args.get('kids_age_to', ''),
         'collector_name': request.args.get('collector_name', ''),
         'sort_by_need': request.args.get('sort_by_need', ''),
+        'created_from': request.args.get('created_from', ''),
+        'created_to': request.args.get('created_to', ''),
+        'collection_date_from': request.args.get('collection_date_from', ''),
+        'collection_date_to': request.args.get('collection_date_to', ''),
+        'source_type': request.args.get('source_type', ''),
+        'has_phone': request.args.get('has_phone', ''),
+        'family_book_number': request.args.get('family_book_number', ''),
+        'national_id_search': request.args.get('national_id_search', ''),
+        'has_rent': request.args.get('has_rent', ''),
+        'detention_facility_search': request.args.get('detention_facility_search', ''),
     }
 
     if status_list:
@@ -1369,6 +1379,40 @@ def admin_records():
     if filters['collector_name']:
         conditions.append("collector_name = ?")
         params.append(filters['collector_name'])
+    # Data entry date range (created_at is TEXT like '2024-01-15 10:30:00')
+    if filters['created_from']:
+        conditions.append("created_at >= ?")
+        params.append(filters['created_from'])
+    if filters['created_to']:
+        conditions.append("created_at <= ?")
+        params.append(filters['created_to'] + ' 23:59:59')
+    # Collection date range
+    if filters['collection_date_from']:
+        conditions.append("collection_date >= ?")
+        params.append(filters['collection_date_from'])
+    if filters['collection_date_to']:
+        conditions.append("collection_date <= ?")
+        params.append(filters['collection_date_to'])
+    if filters['source_type']:
+        conditions.append("source_type = ?")
+        params.append(filters['source_type'])
+    if filters['has_phone'] == 'yes':
+        conditions.append("(phone IS NOT NULL AND phone != '')")
+    elif filters['has_phone'] == 'no':
+        conditions.append("(phone IS NULL OR phone = '')")
+    if filters['family_book_number']:
+        conditions.append("family_book_number LIKE ?")
+        params.append(f"%{filters['family_book_number']}%")
+    if filters['national_id_search']:
+        conditions.append("national_id LIKE ?")
+        params.append(f"%{filters['national_id_search']}%")
+    if filters['has_rent'] == 'yes':
+        conditions.append("rent_amount IS NOT NULL AND rent_amount != '' AND rent_amount != '0'")
+    elif filters['has_rent'] == 'no':
+        conditions.append("(rent_amount IS NULL OR rent_amount = '' OR rent_amount = '0')")
+    if filters['detention_facility_search']:
+        conditions.append("detention_facilities_data LIKE ?")
+        params.append(f"%{filters['detention_facility_search']}%")
     if filters['search']:
         search_term = f"%{filters['search']}%"
         conditions.append("""(
@@ -1450,12 +1494,17 @@ def admin_records():
     if sort_by_need:
         need_scores = {r['id']: compute_need_score(r) for r in records}
 
+    from datetime import timedelta
+    today = datetime.now().date()
     return render_template('admin_records.html',
         records=records, filters=filters, page=page,
         per_page=per_page, total_pages=total_pages, total_count=count,
         sort_by=sort_by, sort_dir=sort_dir, filter_params=filter_params,
         volunteer_names=[v['full_name'] for v in volunteer_names],
-        need_scores=need_scores
+        need_scores=need_scores,
+        today_date=today.isoformat(),
+        week_ago_date=(today - timedelta(days=7)).isoformat(),
+        month_ago_date=(today - timedelta(days=30)).isoformat(),
     )
 
 
@@ -3447,7 +3496,67 @@ def api_export_to_list():
         if filters.get('widows_filter'):
             where_clauses.append("r.marital = 'married' AND r.gender = 'male' AND r.status IN ('deceased', 'enforced')")
         if filters.get('education_max'):
-            where_clauses.append("r.education IN ('none','primary','middle')")
+            edu_order = ['أمّي', 'ابتدائية', 'إعدادية', 'ثانوية', 'معهد', 'بكالوريوس', 'ماجستير', 'دكتوراه']
+            try:
+                max_idx = edu_order.index(filters['education_max'])
+                included = edu_order[:max_idx + 1]
+                ph = ','.join(['?'] * len(included))
+                where_clauses.append(f"r.education IN ({ph})")
+                params.extend(included)
+            except ValueError:
+                where_clauses.append("r.education IN ('none','primary','middle')")
+        if filters.get('created_from'):
+            where_clauses.append("r.created_at >= ?")
+            params.append(filters['created_from'])
+        if filters.get('created_to'):
+            where_clauses.append("r.created_at <= ?")
+            params.append(filters['created_to'] + ' 23:59:59')
+        if filters.get('collection_date_from'):
+            where_clauses.append("r.collection_date >= ?")
+            params.append(filters['collection_date_from'])
+        if filters.get('collection_date_to'):
+            where_clauses.append("r.collection_date <= ?")
+            params.append(filters['collection_date_to'])
+        if filters.get('source_type'):
+            where_clauses.append("r.source_type = ?")
+            params.append(filters['source_type'])
+        if filters.get('has_phone') == 'yes':
+            where_clauses.append("(r.phone IS NOT NULL AND r.phone != '')")
+        elif filters.get('has_phone') == 'no':
+            where_clauses.append("(r.phone IS NULL OR r.phone = '')")
+        if filters.get('family_book_number'):
+            where_clauses.append("r.family_book_number LIKE ?")
+            params.append(f"%{filters['family_book_number']}%")
+        if filters.get('national_id_search'):
+            where_clauses.append("r.national_id LIKE ?")
+            params.append(f"%{filters['national_id_search']}%")
+        if filters.get('marital'):
+            where_clauses.append("r.marital = ?")
+            params.append(filters['marital'])
+        if filters.get('arrest_place'):
+            where_clauses.append("r.arrest_place LIKE ?")
+            params.append(f"%{filters['arrest_place']}%")
+        if filters.get('arrest_year_from'):
+            where_clauses.append("r.arrest_year >= ?")
+            params.append(int(filters['arrest_year_from']))
+        if filters.get('arrest_year_to'):
+            where_clauses.append("r.arrest_year <= ?")
+            params.append(int(filters['arrest_year_to']))
+        if filters.get('collector_name'):
+            where_clauses.append("r.collector_name = ?")
+            params.append(filters['collector_name'])
+        if filters.get('has_rent') == 'yes':
+            where_clauses.append("r.rent_amount IS NOT NULL AND r.rent_amount != '' AND r.rent_amount != '0'")
+        elif filters.get('has_rent') == 'no':
+            where_clauses.append("(r.rent_amount IS NULL OR r.rent_amount = '' OR r.rent_amount = '0')")
+        if filters.get('detention_facility_search'):
+            where_clauses.append("r.detention_facilities_data LIKE ?")
+            params.append(f"%{filters['detention_facility_search']}%")
+        if filters.get('chronic') == 'yes':
+            where_clauses.append("(r.chronic = 'نعم' OR r.has_hypertension = 1 OR r.has_diabetes = 1)")
+        if filters.get('housing_type'):
+            where_clauses.append("r.housing_type = ?")
+            params.append(filters['housing_type'])
 
         sql = f"SELECT r.id FROM records r WHERE {' AND '.join(where_clauses)} ORDER BY r.id DESC"
         if limit and int(limit) > 0:

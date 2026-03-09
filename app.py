@@ -2440,22 +2440,31 @@ def records_export_vcf():
             limit = 74  # subsequent lines: space prefix takes 1 byte
         return ('\r\n '.join(chunks))
 
+    def vcf_escape(text):
+        """Escape special characters in vCard 3.0 text values."""
+        if not text:
+            return ''
+        return text.replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,')
+
     vcf_lines = []
     status_map = {'survivor': 'ناجٍ', 'enforced': 'مغيّب قسراً', 'deceased': 'متوفى'}
 
     for rec in records:
-        first = rec['first_name'] or ''
-        father = rec['father_name'] or ''
-        last = rec['last_name'] or ''
+        first = vcf_escape(rec['first_name'] or '')
+        father = vcf_escape(rec['father_name'] or '')
+        last = vcf_escape(rec['last_name'] or '')
         full_name = ' '.join(part for part in [first, father, last] if part)
         if not full_name:
             continue
 
         vcf_lines.append('BEGIN:VCARD')
         vcf_lines.append('VERSION:3.0')
+        vcf_lines.append('PRODID:-//DD//VCF Export//AR')
         # FN = full display name, N = structured name
-        vcf_lines.append(vcf_fold_line(f'FN;CHARSET=UTF-8:{full_name}'))
-        vcf_lines.append(vcf_fold_line(f'N;CHARSET=UTF-8:{last};{first};{father};;'))
+        # vCard 3.0 default charset is UTF-8, no CHARSET param needed
+        vcf_lines.append(vcf_fold_line(f'FN:{full_name}'))
+        # N components separated by unescaped semicolons
+        vcf_lines.append(vcf_fold_line(f'N:{last};{first};{father};;'))
 
         # Phone numbers
         phone = (rec['phone'] or '').strip()
@@ -2473,21 +2482,18 @@ def records_export_vcf():
             vcf_lines.append(f'TEL;TYPE=VOICE:{reporter_phone}')
 
         # Organization / title
-        org_parts = []
         if rec['assoc_name']:
-            org_parts.append(rec['assoc_name'])
-        if org_parts:
-            vcf_lines.append(vcf_fold_line(f'ORG;CHARSET=UTF-8:{";".join(org_parts)}'))
+            vcf_lines.append(vcf_fold_line(f'ORG:{vcf_escape(rec["assoc_name"])}'))
 
         if rec['profession']:
-            vcf_lines.append(vcf_fold_line(f'TITLE;CHARSET=UTF-8:{rec["profession"]}'))
+            vcf_lines.append(vcf_fold_line(f'TITLE:{vcf_escape(rec["profession"])}'))
 
         # Address
-        address = (rec['address'] or '').strip()
-        province = (rec['province'] or '').strip()
+        address = vcf_escape((rec['address'] or '').strip())
+        province = vcf_escape((rec['province'] or '').strip())
         if address or province:
-            # ADR: PO;ext;street;city;region;postal;country
-            vcf_lines.append(vcf_fold_line(f'ADR;TYPE=HOME;CHARSET=UTF-8:;;{address};;{province};;'))
+            # ADR components separated by unescaped semicolons
+            vcf_lines.append(vcf_fold_line(f'ADR;TYPE=HOME:;;{address};;{province};;'))
 
         # Birthday (only emit full YYYY-MM-DD dates for compatibility)
         birth_year = rec['birth_year'] or ''
@@ -2546,19 +2552,20 @@ def records_export_vcf():
             note_parts.append(f'رقم دفتر العائلة: {rec["family_book_number"]}')
 
         if note_parts:
-            # vCard NOTE uses escaped newlines
-            note_text = '\\n'.join(note_parts)
-            vcf_lines.append(vcf_fold_line(f'NOTE;CHARSET=UTF-8:{note_text}'))
+            # vCard NOTE: escape special chars, use \n for newlines
+            note_text = '\\n'.join(vcf_escape(p) for p in note_parts)
+            vcf_lines.append(vcf_fold_line(f'NOTE:{note_text}'))
 
         vcf_lines.append('END:VCARD')
         vcf_lines.append('')
 
     vcf_content = '\r\n'.join(vcf_lines)
-    buf = BytesIO(vcf_content.encode('utf-8'))
+    # UTF-8 BOM helps Android detect encoding for Arabic text
+    buf = BytesIO(b'\xef\xbb\xbf' + vcf_content.encode('utf-8'))
     buf.seek(0)
 
     filename = f'contacts_{int(time.time())}.vcf'
-    return send_file(buf, mimetype='text/vcard',
+    return send_file(buf, mimetype='text/vcard; charset=utf-8',
                      as_attachment=True, download_name=filename)
 
 

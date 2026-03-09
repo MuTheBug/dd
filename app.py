@@ -3455,15 +3455,17 @@ def api_export_to_list():
       - record_ids: explicit list of IDs (legacy, from visible table)
       - filters + limit: re-query the DB to get ALL matching IDs
     """
-    data = request.get_json()
+    data = request.get_json() or {}
     list_id = data.get('list_id')
     list_name = data.get('list_name', '').strip()
     record_ids = data.get('record_ids', [])
     filters = data.get('filters')
     limit = data.get('limit', 0)
 
-    # If filters provided (or no explicit record_ids), query the DB for matching IDs
-    if filters is not None and not record_ids:
+    # If no explicit record_ids, query the DB for matching IDs
+    if not record_ids:
+        if filters is None:
+            filters = {}
         db = get_db()
         where_clauses = ["1=1"]
         params = []

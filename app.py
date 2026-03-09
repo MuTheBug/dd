@@ -2371,6 +2371,177 @@ def records_list_excel():
 
 
 # ---------------------------------------------------------------------------
+# Export: VCF contacts (Android-compatible vCard)
+# ---------------------------------------------------------------------------
+@app.route('/admin/records/vcf', methods=['GET', 'POST'])
+@admin_required
+def records_export_vcf():
+    """Export filtered records as a .vcf file for importing contacts on Android."""
+    db = get_db()
+    args = request.form if request.method == 'POST' else request.args
+
+    conditions, params, pdf_status_list = build_pdf_filter_conditions(args)
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    records = db.execute(
+        f"SELECT * FROM records{where} ORDER BY id DESC LIMIT 500", params
+    ).fetchall()
+
+    # Post-filters (same as PDF/Excel)
+    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
+    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
+    if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
+        records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
+    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+    if args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18:
+        if args['has_kids_under_18'] == 'yes':
+            records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]
+        else:
+            records = [r for r in records if not record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]
+
+    # Custom record ordering
+    record_order = args.getlist('record_order')
+    if record_order:
+        ordered_ids = [int(x) for x in record_order if x.isdigit()]
+        rec_map = {r['id']: r for r in records}
+        missing_ids = [rid for rid in ordered_ids if rid not in rec_map]
+        if missing_ids:
+            placeholders = ','.join(['?'] * len(missing_ids))
+            extra = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", missing_ids).fetchall()
+            for r in extra:
+                rec_map[r['id']] = r
+        records = [rec_map[rid] for rid in ordered_ids if rid in rec_map]
+
+    pdf_limit = args.get('pdf_limit', '').strip()
+    if pdf_limit and pdf_limit.isdigit() and int(pdf_limit) > 0:
+        records = records[:int(pdf_limit)]
+
+    # Build VCF content
+    vcf_lines = []
+    status_map = {'survivor': 'ناجٍ', 'enforced': 'مغيّب قسراً', 'deceased': 'متوفى'}
+
+    for rec in records:
+        first = rec['first_name'] or ''
+        father = rec['father_name'] or ''
+        last = rec['last_name'] or ''
+        full_name = ' '.join(part for part in [first, father, last] if part)
+        if not full_name:
+            continue
+
+        vcf_lines.append('BEGIN:VCARD')
+        vcf_lines.append('VERSION:3.0')
+        # FN = full display name, N = structured name
+        vcf_lines.append(f'FN:{full_name}')
+        vcf_lines.append(f'N:{last};{first};{father};;')
+
+        # Phone numbers
+        phone = (rec['phone'] or '').strip()
+        spouse_phone = (rec['spouse_phone'] or '').strip()
+        guardian_phone = (rec['guardian_phone'] or '').strip()
+        reporter_phone = (rec['reporter_phone'] or '').strip()
+
+        if phone:
+            vcf_lines.append(f'TEL;TYPE=CELL:{phone}')
+        if spouse_phone:
+            spouse_label = (rec['spouse_name'] or '').strip()
+            label = f' ({spouse_label})' if spouse_label else ''
+            vcf_lines.append(f'TEL;TYPE=HOME:{spouse_phone}')
+        if guardian_phone:
+            vcf_lines.append(f'TEL;TYPE=WORK:{guardian_phone}')
+        if reporter_phone:
+            vcf_lines.append(f'TEL;TYPE=OTHER:{reporter_phone}')
+
+        # Organization / title
+        org_parts = []
+        if rec['assoc_name']:
+            org_parts.append(rec['assoc_name'])
+        if org_parts:
+            vcf_lines.append(f'ORG:{";".join(org_parts)}')
+
+        if rec['profession']:
+            vcf_lines.append(f'TITLE:{rec["profession"]}')
+
+        # Address
+        address = (rec['address'] or '').strip()
+        province = (rec['province'] or '').strip()
+        if address or province:
+            # ADR: PO;ext;street;city;region;postal;country
+            vcf_lines.append(f'ADR;TYPE=HOME:;;{address};;{province};;')
+
+        # Email - not in schema but just in case
+        # Birthday
+        birth_year = rec['birth_year'] or ''
+        birth_month = rec.get('birth_month') or ''
+        birth_day = rec.get('birth_day') or ''
+        if birth_year:
+            bday = str(birth_year)
+            if birth_month:
+                bday += f'-{int(birth_month):02d}'
+                if birth_day:
+                    bday += f'-{int(birth_day):02d}'
+            vcf_lines.append(f'BDAY:{bday}')
+
+        # Note field - pack useful info
+        note_parts = []
+        status_label = status_map.get(rec['status'], rec['status'] or '')
+        if status_label:
+            note_parts.append(f'الحالة: {status_label}')
+        if rec['national_id']:
+            note_parts.append(f'الرقم الوطني: {rec["national_id"]}')
+        if rec['mother_name']:
+            note_parts.append(f'الأم: {rec["mother_name"]}')
+        if rec['spouse_name']:
+            note_parts.append(f'الزوج/ة: {rec["spouse_name"]}')
+            if spouse_phone:
+                note_parts.append(f'هاتف الزوج/ة: {spouse_phone}')
+        if rec['guardian_name']:
+            note_parts.append(f'ولي الأمر: {rec["guardian_name"]}')
+            if guardian_phone:
+                note_parts.append(f'هاتف ولي الأمر: {guardian_phone}')
+        if rec['reporter_name']:
+            note_parts.append(f'المبلغ: {rec["reporter_name"]}')
+            if reporter_phone:
+                note_parts.append(f'هاتف المبلغ: {reporter_phone}')
+        if rec['marital']:
+            note_parts.append(f'الحالة الاجتماعية: {rec["marital"]}')
+        if rec['education']:
+            note_parts.append(f'التعليم: {rec["education"]}')
+        if rec['employment']:
+            note_parts.append(f'العمل: {rec["employment"]}')
+        if rec['blood_type']:
+            note_parts.append(f'زمرة الدم: {rec["blood_type"]}')
+        if rec['chronic']:
+            note_parts.append(f'أمراض مزمنة: {rec["chronic"]}')
+        if rec['has_special_needs']:
+            note_parts.append(f'احتياجات خاصة: {rec["special_needs_details"] or "نعم"}')
+        if rec['arrest_year']:
+            note_parts.append(f'سنة الاعتقال: {rec["arrest_year"]}')
+        if rec['arrest_authority']:
+            note_parts.append(f'الجهة: {rec["arrest_authority"]}')
+        if rec['arrest_place']:
+            note_parts.append(f'مكان الاحتجاز: {rec["arrest_place"]}')
+        if rec['notes']:
+            note_parts.append(f'ملاحظات: {rec["notes"]}')
+        if rec['family_book_number']:
+            note_parts.append(f'رقم دفتر العائلة: {rec["family_book_number"]}')
+
+        if note_parts:
+            # vCard NOTE uses escaped newlines
+            note_text = '\\n'.join(note_parts)
+            vcf_lines.append(f'NOTE:{note_text}')
+
+        vcf_lines.append('END:VCARD')
+        vcf_lines.append('')
+
+    vcf_content = '\r\n'.join(vcf_lines)
+    buf = BytesIO(vcf_content.encode('utf-8'))
+    buf.seek(0)
+
+    filename = f'contacts_{int(time.time())}.vcf'
+    return send_file(buf, mimetype='text/vcard',
+                     as_attachment=True, download_name=filename)
+
+
+# ---------------------------------------------------------------------------
 # Export: kids missing birth dates
 # ---------------------------------------------------------------------------
 @app.route('/admin/export/kids_no_birthdate')
@@ -3435,6 +3606,129 @@ def admin_custom_list_excel(lid):
 
     filename = f'list_{lid}_{int(time.time())}.xlsx'
     return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
+
+@app.route('/admin/list/<int:lid>/vcf', methods=['GET', 'POST'])
+@admin_required
+def admin_custom_list_vcf(lid):
+    """Export custom list contacts as a .vcf file for Android import."""
+    db = get_db()
+    clist = db.execute("SELECT * FROM custom_lists WHERE id=?", (lid,)).fetchone()
+    if not clist:
+        flash('القائمة غير موجودة', 'error')
+        return redirect(url_for('admin_custom_lists'))
+
+    items = db.execute("""
+        SELECT r.*
+        FROM custom_list_items cli
+        JOIN records r ON cli.record_id = r.id
+        WHERE cli.list_id = ?
+        ORDER BY cli.added_at ASC
+    """, (lid,)).fetchall()
+
+    manual_items = db.execute(
+        "SELECT * FROM custom_list_manual_items WHERE list_id=? ORDER BY added_at ASC", (lid,)
+    ).fetchall()
+
+    status_map = {'survivor': 'ناجٍ', 'enforced': 'مغيّب قسراً', 'deceased': 'متوفى'}
+    vcf_lines = []
+
+    # Manual items
+    for mi in manual_items:
+        full_name = (mi['full_name'] or '').strip()
+        if not full_name:
+            continue
+        vcf_lines.append('BEGIN:VCARD')
+        vcf_lines.append('VERSION:3.0')
+        vcf_lines.append(f'FN:{full_name}')
+        vcf_lines.append(f'N:{full_name};;;;')
+        phone = (mi['phone'] or '').strip()
+        if phone:
+            vcf_lines.append(f'TEL;TYPE=CELL:{phone}')
+        note_parts = []
+        if mi['status']:
+            note_parts.append(f'الحالة: {status_map.get(mi["status"], mi["status"])}')
+        if mi['notes']:
+            note_parts.append(f'ملاحظات: {mi["notes"]}')
+        if note_parts:
+            sep = '\\n'
+            vcf_lines.append(f'NOTE:{sep.join(note_parts)}')
+        vcf_lines.append('END:VCARD')
+        vcf_lines.append('')
+
+    # Record items (same logic as main VCF export)
+    for rec in items:
+        first = rec['first_name'] or ''
+        father = rec['father_name'] or ''
+        last = rec['last_name'] or ''
+        full_name = ' '.join(part for part in [first, father, last] if part)
+        if not full_name:
+            continue
+
+        vcf_lines.append('BEGIN:VCARD')
+        vcf_lines.append('VERSION:3.0')
+        vcf_lines.append(f'FN:{full_name}')
+        vcf_lines.append(f'N:{last};{first};{father};;')
+
+        phone = (rec['phone'] or '').strip()
+        spouse_phone = (rec['spouse_phone'] or '').strip()
+        guardian_phone = (rec['guardian_phone'] or '').strip()
+        reporter_phone = (rec['reporter_phone'] or '').strip()
+
+        if phone:
+            vcf_lines.append(f'TEL;TYPE=CELL:{phone}')
+        if spouse_phone:
+            vcf_lines.append(f'TEL;TYPE=HOME:{spouse_phone}')
+        if guardian_phone:
+            vcf_lines.append(f'TEL;TYPE=WORK:{guardian_phone}')
+        if reporter_phone:
+            vcf_lines.append(f'TEL;TYPE=OTHER:{reporter_phone}')
+
+        if rec['profession']:
+            vcf_lines.append(f'TITLE:{rec["profession"]}')
+
+        address = (rec['address'] or '').strip()
+        province = (rec['province'] or '').strip()
+        if address or province:
+            vcf_lines.append(f'ADR;TYPE=HOME:;;{address};;{province};;')
+
+        birth_year = rec['birth_year'] or ''
+        birth_month = rec.get('birth_month') or ''
+        birth_day = rec.get('birth_day') or ''
+        if birth_year:
+            bday = str(birth_year)
+            if birth_month:
+                bday += f'-{int(birth_month):02d}'
+                if birth_day:
+                    bday += f'-{int(birth_day):02d}'
+            vcf_lines.append(f'BDAY:{bday}')
+
+        note_parts = []
+        status_label = status_map.get(rec['status'], rec['status'] or '')
+        if status_label:
+            note_parts.append(f'الحالة: {status_label}')
+        if rec['national_id']:
+            note_parts.append(f'الرقم الوطني: {rec["national_id"]}')
+        if rec['mother_name']:
+            note_parts.append(f'الأم: {rec["mother_name"]}')
+        if rec['spouse_name']:
+            note_parts.append(f'الزوج/ة: {rec["spouse_name"]}')
+        if rec['notes']:
+            note_parts.append(f'ملاحظات: {rec["notes"]}')
+        if note_parts:
+            sep = '\\n'
+            vcf_lines.append(f'NOTE:{sep.join(note_parts)}')
+
+        vcf_lines.append('END:VCARD')
+        vcf_lines.append('')
+
+    vcf_content = '\r\n'.join(vcf_lines)
+    buf = BytesIO(vcf_content.encode('utf-8'))
+    buf.seek(0)
+
+    filename = f'list_{lid}_contacts_{int(time.time())}.vcf'
+    return send_file(buf, mimetype='text/vcard',
                      as_attachment=True, download_name=filename)
 
 

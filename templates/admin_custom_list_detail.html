@@ -249,9 +249,10 @@
             {% endfor %}
         </div>
 
-        <div style="display:flex; gap:0.5rem;">
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
             <button type="button" onclick="clExportPdf()" class="btn btn-primary" style="flex:1;">&#x1F4C4; تصدير PDF</button>
             <button type="button" onclick="clExportExcel()" class="btn btn-outline" style="flex:1; background:#217346; color:white; border-color:#217346;">&#x1F4CA; تصدير Excel</button>
+            <a href="{{ url_for('admin_custom_list_vcf', lid=clist.id) }}" class="btn btn-outline" style="flex:1; background:#0ea5e9; color:white; border-color:#0ea5e9; text-align:center; text-decoration:none;">&#x1F4F1; تصدير جهات اتصال</a>
         </div>
     </div>
 </div>

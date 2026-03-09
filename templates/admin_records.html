@@ -909,9 +909,10 @@
                 </div>
             </div>
         </div>
-        <div style="display:flex; gap:0.5rem;">
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
             <button type="button" onclick="exportPdf()" class="btn btn-primary" style="flex:1;">&#x1F4C4; تصدير PDF</button>
             <button type="button" onclick="exportExcel()" class="btn btn-outline" style="flex:1; background:#217346; color:white; border-color:#217346;">&#x1F4CA; تصدير Excel</button>
+            <button type="button" onclick="exportVcf()" class="btn btn-outline" style="flex:1; background:#0ea5e9; color:white; border-color:#0ea5e9;">&#x1F4F1; تصدير جهات اتصال</button>
         </div>
     </div>
 </div>
@@ -1377,6 +1378,41 @@ function exportExcel() {
         for (var pk in presetOverrides) addField(pk, presetOverrides[pk]);
     }
     for (var i = 0; i < cols.length; i++) addField('cols', cols[i]);
+    var limitVal = document.getElementById('pdfLimitInput').value.trim();
+    if (limitVal && parseInt(limitVal) > 0) addField('pdf_limit', limitVal);
+    if (recordsLoaded && orderedRecords.length > 0) {
+        for (var i = 0; i < orderedRecords.length; i++) {
+            addField('record_order', orderedRecords[i].id);
+        }
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+    document.getElementById('pdfColModal').style.display = 'none';
+}
+
+function exportVcf() {
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{{ url_for("records_export_vcf") }}';
+    form.style.display = 'none';
+
+    function addField(name, value) {
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = name; inp.value = value;
+        form.appendChild(inp);
+    }
+
+    document.querySelectorAll('input[name="status"]:checked').forEach(function(cb) {
+        addField('status', cb.value);
+    });
+    for (var key in filterParams) {
+        if (filterParams[key]) addField(key, filterParams[key]);
+    }
+    if (presetOverrides) {
+        for (var pk in presetOverrides) addField(pk, presetOverrides[pk]);
+    }
     var limitVal = document.getElementById('pdfLimitInput').value.trim();
     if (limitVal && parseInt(limitVal) > 0) addField('pdf_limit', limitVal);
     if (recordsLoaded && orderedRecords.length > 0) {

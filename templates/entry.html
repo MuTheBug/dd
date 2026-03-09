@@ -1166,8 +1166,12 @@ function submitForm() {
     var progressBar = document.getElementById('submitProgressBar');
     var statusEl = document.getElementById('submitStatus');
     overlay.classList.add('active');
+    statusEl.textContent = '\u062c\u0627\u0631\u064a \u0631\u0641\u0639 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0648\u0627\u0644\u0645\u0644\u0641\u0627\u062a...';
+    progressBar.style.width = '0%';
 
     var formData = new FormData(document.getElementById('entryForm'));
+    var maxRetries = 3;
+    var retryCount = 0;
     var xhr = new XMLHttpRequest();
 
     xhr.upload.addEventListener('progress', function(e) {
@@ -1226,27 +1230,48 @@ function submitForm() {
     });
 
     xhr.addEventListener('error', function() {
-        overlay.classList.remove('active');
-        isSubmitting = false;
-        var resultMsg = document.getElementById('resultMsg');
-        resultMsg.className = 'result-msg error';
-        resultMsg.textContent = '\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0628\u0627\u0644\u062e\u0627\u062f\u0645. \u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0648\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (retryCount < maxRetries) {
+            retryCount++;
+            var delay = retryCount * 3000;
+            statusEl.textContent = '\u0627\u0646\u0642\u0637\u0639 \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 ' + retryCount + '/' + maxRetries + '...';
+            progressBar.style.width = '0%';
+            setTimeout(function() { doSend(formData); }, delay);
+        } else {
+            overlay.classList.remove('active');
+            isSubmitting = false;
+            var resultMsg = document.getElementById('resultMsg');
+            resultMsg.className = 'result-msg error';
+            resultMsg.textContent = '\u0641\u0634\u0644 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0628\u0627\u0644\u062e\u0627\u062f\u0645 \u0628\u0639\u062f \u0639\u062f\u0629 \u0645\u062d\u0627\u0648\u0644\u0627\u062a. \u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0648\u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649. \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0645\u062d\u0641\u0648\u0638\u0629 \u0643\u0645\u0633\u0648\u062f\u0629.';
+            saveDraft();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     });
 
     xhr.addEventListener('timeout', function() {
-        overlay.classList.remove('active');
-        isSubmitting = false;
-        var resultMsg = document.getElementById('resultMsg');
-        resultMsg.className = 'result-msg error';
-        resultMsg.textContent = '\u0627\u0646\u062a\u0647\u062a \u0645\u0647\u0644\u0629 \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u0642\u062f \u064a\u0643\u0648\u0646 \u0627\u0644\u062e\u0627\u062f\u0645 \u0645\u0634\u063a\u0648\u0644\u0627\u064b. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (retryCount < maxRetries) {
+            retryCount++;
+            var delay = retryCount * 3000;
+            statusEl.textContent = '\u0627\u0646\u062a\u0647\u062a \u0645\u0647\u0644\u0629 \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 ' + retryCount + '/' + maxRetries + '...';
+            progressBar.style.width = '0%';
+            setTimeout(function() { doSend(formData); }, delay);
+        } else {
+            overlay.classList.remove('active');
+            isSubmitting = false;
+            var resultMsg = document.getElementById('resultMsg');
+            resultMsg.className = 'result-msg error';
+            resultMsg.textContent = '\u0627\u0646\u062a\u0647\u062a \u0645\u0647\u0644\u0629 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0628\u0639\u062f \u0639\u062f\u0629 \u0645\u062d\u0627\u0648\u0644\u0627\u062a. \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0645\u062d\u0641\u0648\u0638\u0629 \u0643\u0645\u0633\u0648\u062f\u0629.';
+            saveDraft();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     });
 
-    xhr.open('POST', document.getElementById('entryForm').action, true);
-    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-    xhr.timeout = 120000; // 2 minute timeout
-    xhr.send(formData);
+    function doSend(fd) {
+        xhr.open('POST', document.getElementById('entryForm').action, true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.timeout = 300000; // 5 minute timeout for large uploads
+        xhr.send(fd);
+    }
+    doSend(formData);
 }
 
 // === Auto-save draft to localStorage ===
@@ -1277,17 +1302,29 @@ function loadDraft() {
         if (!saved) return;
         var data = JSON.parse(saved);
         var form = document.getElementById('entryForm');
+        var restored = false;
         for (var key in data) {
             if (key === '_step') continue;
             var el = form.querySelector('[name="' + key + '"]');
             if (el) {
                 if (el.type === 'checkbox') el.checked = data[key];
-                else el.value = data[key];
+                else { el.value = data[key]; restored = true; }
             }
         }
         if (data._step) { currentStep = data._step; updateStepUI(); }
         if (data.status) handleStatusChange();
         if (data.marital) handleMarital();
+        // Show file re-attach reminder if draft was restored
+        if (restored) {
+            var resultMsg = document.getElementById('resultMsg');
+            if (resultMsg) {
+                resultMsg.className = 'result-msg';
+                resultMsg.style.background = '#fff3cd';
+                resultMsg.style.color = '#856404';
+                resultMsg.style.border = '1px solid #ffc107';
+                resultMsg.textContent = '\u062a\u0645 \u0627\u0633\u062a\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u0633\u0648\u062f\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629. \u064a\u0631\u062c\u0649 \u0625\u0639\u0627\u062f\u0629 \u0625\u0631\u0641\u0627\u0642 \u0627\u0644\u0635\u0648\u0631 \u0648\u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0625\u0646 \u0648\u062c\u062f\u062a.';
+            }
+        }
     } catch(e) {}
 }
 

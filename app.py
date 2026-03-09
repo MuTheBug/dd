@@ -3995,21 +3995,78 @@ def get_lan_ip():
     return "0.0.0.0"
 
 
-if __name__ == '__main__':
-    migrate_db()
+CONFIG_FILE = os.path.join(BASE_DIR, 'server_config.json')
+
+
+def load_server_config():
+    """Load server configuration (fixed IP, port) from server_config.json."""
+    defaults = {'fixed_ip': '', 'port': 5000}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                cfg = json.load(f)
+            defaults.update(cfg)
+        except Exception:
+            pass
+    return defaults
+
+
+def save_server_config(cfg):
+    """Save server configuration to server_config.json."""
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(cfg, f, indent=2)
+
+
+@app.route('/admin/server-config', methods=['GET', 'POST'])
+def admin_server_config():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    cfg = load_server_config()
+    if request.method == 'POST':
+        cfg['fixed_ip'] = request.form.get('fixed_ip', '').strip()
+        try:
+            cfg['port'] = int(request.form.get('port', 5000))
+        except ValueError:
+            cfg['port'] = 5000
+        save_server_config(cfg)
+        flash('تم حفظ إعدادات الخادم. أعد تشغيل التطبيق لتطبيق التغييرات.', 'success')
+        return redirect(url_for('admin_server_config'))
     lan_ip = get_lan_ip()
-    port = 5000
+    return render_template('admin_server_config.html', config=cfg, current_ip=lan_ip)
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='HAQQUNA - Victim Documentation System')
+    parser.add_argument('--ip', type=str, default='', help='Fixed IP address to bind/display (e.g. 192.168.1.100)')
+    parser.add_argument('--port', type=int, default=0, help='Port number (default: 5000)')
+    args = parser.parse_args()
+
+    migrate_db()
+
+    # Load config: command-line args override config file
+    cfg = load_server_config()
+    fixed_ip = args.ip or cfg.get('fixed_ip', '')
+    port = args.port or cfg.get('port', 5000)
+
+    lan_ip = fixed_ip if fixed_ip else get_lan_ip()
+
     print("\n" + "="*60)
     print("  HAQQUNA - نظام توثيق الضحايا")
     print("  Berkeley Protocol Documentation System")
     print("="*60)
     print(f"  Local:      http://localhost:{port}")
     print(f"  Network:    http://{lan_ip}:{port}")
+    if fixed_ip:
+        print(f"  Fixed IP:   {fixed_ip} (configured)")
     print(f"  Admin:      http://{lan_ip}:{port}/admin")
     print(f"  Data Entry: http://{lan_ip}:{port}/entry")
     print(f"  Password:   {ADMIN_PASSWORD}")
     print("="*60)
     print(f"  * Other devices on your network can connect using:")
     print(f"    http://{lan_ip}:{port}")
+    if not fixed_ip:
+        print(f"  * To set a fixed IP, run: python app.py --ip 192.168.1.100")
+        print(f"    or configure in Admin > Server Config")
     print("="*60 + "\n")
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

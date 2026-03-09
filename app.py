@@ -4019,7 +4019,7 @@ def save_server_config(cfg):
 
 @app.route('/admin/server-config', methods=['GET', 'POST'])
 def admin_server_config():
-    if not session.get('admin'):
+    if not session.get('is_admin'):
         return redirect(url_for('admin_login'))
     cfg = load_server_config()
     if request.method == 'POST':

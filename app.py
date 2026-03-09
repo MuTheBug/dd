@@ -595,6 +595,10 @@ def migrate_db():
     conn.close()
 
 
+# Run migrations at module load to ensure schema is up-to-date
+migrate_db()
+
+
 # Volunteer statuses
 VOLUNTEER_STATUSES = [
     ('active', 'نشط'),
@@ -2470,8 +2474,8 @@ def records_export_vcf():
         # Email - not in schema but just in case
         # Birthday
         birth_year = rec['birth_year'] or ''
-        birth_month = rec.get('birth_month') or ''
-        birth_day = rec.get('birth_day') or ''
+        birth_month = rec['birth_month'] or ''
+        birth_day = rec['birth_day'] or ''
         if birth_year:
             bday = str(birth_year)
             if birth_month:
@@ -2481,6 +2485,7 @@ def records_export_vcf():
             vcf_lines.append(f'BDAY:{bday}')
 
         # Note field - pack useful info
+        rec_keys = rec.keys()
         note_parts = []
         status_label = status_map.get(rec['status'], rec['status'] or '')
         if status_label:
@@ -2521,7 +2526,7 @@ def records_export_vcf():
             note_parts.append(f'مكان الاحتجاز: {rec["arrest_place"]}')
         if rec['notes']:
             note_parts.append(f'ملاحظات: {rec["notes"]}')
-        if rec['family_book_number']:
+        if 'family_book_number' in rec_keys and rec['family_book_number']:
             note_parts.append(f'رقم دفتر العائلة: {rec["family_book_number"]}')
 
         if note_parts:
@@ -3694,8 +3699,8 @@ def admin_custom_list_vcf(lid):
             vcf_lines.append(f'ADR;TYPE=HOME:;;{address};;{province};;')
 
         birth_year = rec['birth_year'] or ''
-        birth_month = rec.get('birth_month') or ''
-        birth_day = rec.get('birth_day') or ''
+        birth_month = rec['birth_month'] or ''
+        birth_day = rec['birth_day'] or ''
         if birth_year:
             bday = str(birth_year)
             if birth_month:

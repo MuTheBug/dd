@@ -2459,9 +2459,7 @@ def records_export_vcf():
 
         vcf_lines.append('BEGIN:VCARD')
         vcf_lines.append('VERSION:3.0')
-        vcf_lines.append('PRODID:-//DD//VCF Export//AR')
         # FN = full display name, N = structured name
-        # vCard 3.0 default charset is UTF-8, no CHARSET param needed
         vcf_lines.append(vcf_fold_line(f'FN:{full_name}'))
         # N components separated by unescaped semicolons
         vcf_lines.append(vcf_fold_line(f'N:{last};{first};{father};;'))
@@ -2560,12 +2558,11 @@ def records_export_vcf():
         vcf_lines.append('')
 
     vcf_content = '\r\n'.join(vcf_lines)
-    # UTF-8 BOM helps Android detect encoding for Arabic text
-    buf = BytesIO(b'\xef\xbb\xbf' + vcf_content.encode('utf-8'))
+    buf = BytesIO(vcf_content.encode('utf-8'))
     buf.seek(0)
 
     filename = f'contacts_{int(time.time())}.vcf'
-    return send_file(buf, mimetype='text/vcard; charset=utf-8',
+    return send_file(buf, mimetype='text/vcard',
                      as_attachment=True, download_name=filename)
 
 
@@ -3660,17 +3657,41 @@ def admin_custom_list_vcf(lid):
     ).fetchall()
 
     status_map = {'survivor': 'ناجٍ', 'enforced': 'مغيّب قسراً', 'deceased': 'متوفى'}
+
+    def vcf_fold_line(line):
+        """Fold long vCard lines per RFC 2425 (max 75 octets per line)."""
+        encoded = line.encode('utf-8')
+        if len(encoded) <= 75:
+            return line
+        chunks = []
+        start = 0
+        limit = 75
+        while start < len(encoded):
+            end = min(start + limit, len(encoded))
+            while end < len(encoded) and (encoded[end] & 0xC0) == 0x80:
+                end -= 1
+            chunks.append(encoded[start:end].decode('utf-8'))
+            start = end
+            limit = 74
+        return ('\r\n '.join(chunks))
+
+    def vcf_escape(text):
+        """Escape special characters in vCard 3.0 text values."""
+        if not text:
+            return ''
+        return text.replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,')
+
     vcf_lines = []
 
     # Manual items
     for mi in manual_items:
-        full_name = (mi['full_name'] or '').strip()
+        full_name = vcf_escape((mi['full_name'] or '').strip())
         if not full_name:
             continue
         vcf_lines.append('BEGIN:VCARD')
         vcf_lines.append('VERSION:3.0')
-        vcf_lines.append(f'FN:{full_name}')
-        vcf_lines.append(f'N:{full_name};;;;')
+        vcf_lines.append(vcf_fold_line(f'FN:{full_name}'))
+        vcf_lines.append(vcf_fold_line(f'N:{full_name};;;;'))
         phone = (mi['phone'] or '').strip()
         if phone:
             vcf_lines.append(f'TEL;TYPE=CELL:{phone}')
@@ -3680,24 +3701,24 @@ def admin_custom_list_vcf(lid):
         if mi['notes']:
             note_parts.append(f'ملاحظات: {mi["notes"]}')
         if note_parts:
-            sep = '\\n'
-            vcf_lines.append(f'NOTE:{sep.join(note_parts)}')
+            note_text = '\\n'.join(vcf_escape(p) for p in note_parts)
+            vcf_lines.append(vcf_fold_line(f'NOTE:{note_text}'))
         vcf_lines.append('END:VCARD')
         vcf_lines.append('')
 
     # Record items (same logic as main VCF export)
     for rec in items:
-        first = rec['first_name'] or ''
-        father = rec['father_name'] or ''
-        last = rec['last_name'] or ''
+        first = vcf_escape(rec['first_name'] or '')
+        father = vcf_escape(rec['father_name'] or '')
+        last = vcf_escape(rec['last_name'] or '')
         full_name = ' '.join(part for part in [first, father, last] if part)
         if not full_name:
             continue
 
         vcf_lines.append('BEGIN:VCARD')
         vcf_lines.append('VERSION:3.0')
-        vcf_lines.append(f'FN:{full_name}')
-        vcf_lines.append(f'N:{last};{first};{father};;')
+        vcf_lines.append(vcf_fold_line(f'FN:{full_name}'))
+        vcf_lines.append(vcf_fold_line(f'N:{last};{first};{father};;'))
 
         phone = (rec['phone'] or '').strip()
         spouse_phone = (rec['spouse_phone'] or '').strip()
@@ -3714,23 +3735,22 @@ def admin_custom_list_vcf(lid):
             vcf_lines.append(f'TEL;TYPE=OTHER:{reporter_phone}')
 
         if rec['profession']:
-            vcf_lines.append(f'TITLE:{rec["profession"]}')
+            vcf_lines.append(vcf_fold_line(f'TITLE:{vcf_escape(rec["profession"])}'))
 
-        address = (rec['address'] or '').strip()
-        province = (rec['province'] or '').strip()
+        address = vcf_escape((rec['address'] or '').strip())
+        province = vcf_escape((rec['province'] or '').strip())
         if address or province:
-            vcf_lines.append(f'ADR;TYPE=HOME:;;{address};;{province};;')
+            vcf_lines.append(vcf_fold_line(f'ADR;TYPE=HOME:;;{address};;{province};;'))
 
         birth_year = rec['birth_year'] or ''
         birth_month = rec['birth_month'] or ''
         birth_day = rec['birth_day'] or ''
-        if birth_year:
-            bday = str(birth_year)
-            if birth_month:
-                bday += f'-{int(birth_month):02d}'
-                if birth_day:
-                    bday += f'-{int(birth_day):02d}'
-            vcf_lines.append(f'BDAY:{bday}')
+        if birth_year and birth_month and birth_day:
+            try:
+                bday = f'{int(birth_year):04d}-{int(birth_month):02d}-{int(birth_day):02d}'
+                vcf_lines.append(f'BDAY:{bday}')
+            except (ValueError, TypeError):
+                pass
 
         note_parts = []
         status_label = status_map.get(rec['status'], rec['status'] or '')
@@ -3745,8 +3765,8 @@ def admin_custom_list_vcf(lid):
         if rec['notes']:
             note_parts.append(f'ملاحظات: {rec["notes"]}')
         if note_parts:
-            sep = '\\n'
-            vcf_lines.append(f'NOTE:{sep.join(note_parts)}')
+            note_text = '\\n'.join(vcf_escape(p) for p in note_parts)
+            vcf_lines.append(vcf_fold_line(f'NOTE:{note_text}'))
 
         vcf_lines.append('END:VCARD')
         vcf_lines.append('')

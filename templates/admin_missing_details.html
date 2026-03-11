@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}تفاصيل ناقصة - حقنا{% endblock %}
+
+{% block content %}
+<style>
+@media print {
+    .no-print { display: none !important; }
+    body { font-size: 11pt; }
+    .card { box-shadow: none !important; border: 1px solid #ccc; }
+    table { font-size: 10pt; }
+    .missing-tag { border: 1px solid #999 !important; background: #f5f5f5 !important; color: #333 !important; }
+}
+.missing-tag {
+    display: inline-block;
+    background: #fff3e0;
+    color: #e65100;
+    border: 1px solid #ffcc80;
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    margin: 0.1rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+.completion-bar {
+    width: 60px;
+    height: 8px;
+    background: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+}
+.completion-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+</style>
+
+<div class="no-print" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+        التفاصيل الناقصة
+        <span style="font-size: 0.95rem; color: var(--text-light);">({{ summary.total }} ملف يحتاج إكمال)</span>
+    </h1>
+    <div class="btn-group">
+        <button onclick="window.print()" class="btn btn-primary btn-sm">&#x1F5A8; طباعة</button>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline btn-sm">لوحة التحكم</a>
+    </div>
+</div>
+
+<!-- Print Header -->
+<div style="display: none;" class="print-only">
+    <h1 style="text-align: center; font-size: 1.3rem; margin-bottom: 0.5rem;">تقرير التفاصيل الناقصة - حقنا</h1>
+    <p style="text-align: center; font-size: 0.9rem; color: #666; margin-bottom: 1rem;">{{ summary.total }} ملف يحتاج إكمال</p>
+</div>
+<style>@media print { .print-only { display: block !important; } }</style>
+
+<!-- Summary Cards -->
+<div class="no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+    <a href="{{ url_for('admin_missing_details', type='all') }}" class="stat-card {{ 'stat-total' if profile_type=='all' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='all' }}">
+        <div class="stat-number">{{ summary.total }}</div>
+        <div class="stat-label">الكل</div>
+    </a>
+    <a href="{{ url_for('admin_missing_details', type='records') }}" class="stat-card {{ 'stat-enforced' if profile_type=='records' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='records' }}">
+        <div class="stat-number">{{ summary.records }}</div>
+        <div class="stat-label">سجلات</div>
+    </a>
+    <a href="{{ url_for('admin_missing_details', type='volunteers') }}" class="stat-card {{ 'stat-survivor' if profile_type=='volunteers' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='volunteers' }}">
+        <div class="stat-number">{{ summary.volunteers }}</div>
+        <div class="stat-label">متطوعون</div>
+    </a>
+    <a href="{{ url_for('admin_missing_details', type='members') }}" class="stat-card {{ 'stat-deceased' if profile_type=='members' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='members' }}">
+        <div class="stat-number">{{ summary.members }}</div>
+        <div class="stat-label">منتسبون</div>
+    </a>
+</div>
+
+<!-- Results Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>النوع</th>
+                    <th>الاسم</th>
+                    <th style="width: 90px;">الاكتمال</th>
+                    <th>الحقول الناقصة</th>
+                    <th class="no-print" style="width: 70px;">إجراء</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in results %}
+                <tr>
+                    <td>{{ r.id }}</td>
+                    <td>
+                        {% if r.type_key == 'volunteers' %}
+                        <span class="status-badge status-survivor">{{ r.type }}</span>
+                        {% elif r.type_key == 'members' %}
+                        <span class="status-badge status-enforced">{{ r.type }}</span>
+                        {% else %}
+                        <span class="status-badge" style="background: #e3f2fd; color: #1565c0;">{{ r.type }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-weight: 600;">{{ r.name }}</td>
+                    <td>
+                        {% set pct = (((r.total_fields - r.missing_count) / r.total_fields) * 100) | int %}
+                        <div class="completion-bar">
+                            <div class="completion-fill" style="width: {{ pct }}%; background: {{ '#4caf50' if pct >= 70 else '#ff9800' if pct >= 40 else '#f44336' }};"></div>
+                        </div>
+                        <span style="font-size: 0.8rem; margin-right: 0.3rem;">{{ pct }}%</span>
+                    </td>
+                    <td>
+                        {% for field in r.missing %}
+                        <span class="missing-tag">{{ field }}</span>
+                        {% endfor %}
+                    </td>
+                    <td class="no-print">
+                        <a href="{{ r.edit_url }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                        جميع الملفات مكتملة - لا توجد تفاصيل ناقصة
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

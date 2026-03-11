@@ -4338,6 +4338,134 @@ def admin_server_config():
     return render_template('admin_server_config.html', config=cfg, current_ip=lan_ip)
 
 
+@app.route('/admin/missing-details')
+@admin_required
+def admin_missing_details():
+    """Show profiles with missing/incomplete fields across volunteers, members, and records."""
+    db = get_db()
+    profile_type = request.args.get('type', 'all')
+
+    results = []
+
+    # --- Volunteers ---
+    volunteer_fields = [
+        ('phone', 'الهاتف'),
+        ('email', 'البريد الإلكتروني'),
+        ('national_id', 'الرقم الوطني'),
+        ('province', 'المحافظة'),
+        ('address', 'العنوان'),
+        ('role', 'الدور'),
+        ('specialization', 'التخصص'),
+        ('join_date', 'تاريخ الانضمام'),
+    ]
+    if profile_type in ('all', 'volunteers'):
+        volunteers = db.execute("SELECT * FROM volunteers ORDER BY full_name").fetchall()
+        for v in volunteers:
+            missing = [label for col, label in volunteer_fields if not v[col] or not str(v[col]).strip()]
+            if missing:
+                results.append({
+                    'type': 'متطوع',
+                    'type_key': 'volunteers',
+                    'id': v['id'],
+                    'name': v['full_name'],
+                    'missing': missing,
+                    'missing_count': len(missing),
+                    'total_fields': len(volunteer_fields),
+                    'edit_url': url_for('admin_volunteer_edit', vid=v['id']),
+                })
+
+    # --- Members ---
+    member_fields = [
+        ('father_name', 'اسم الأب'),
+        ('phone', 'الهاتف'),
+        ('email', 'البريد الإلكتروني'),
+        ('national_id', 'الرقم الوطني'),
+        ('birth_year', 'سنة الميلاد'),
+        ('gender', 'الجنس'),
+        ('province', 'المحافظة'),
+        ('address', 'العنوان'),
+        ('membership_type', 'نوع العضوية'),
+        ('membership_number', 'رقم العضوية'),
+        ('join_date', 'تاريخ الانضمام'),
+    ]
+    if profile_type in ('all', 'members'):
+        members = db.execute("SELECT * FROM members ORDER BY full_name").fetchall()
+        for m in members:
+            missing = []
+            for col, label in member_fields:
+                val = m[col]
+                if col == 'birth_year':
+                    if not val or val == 0:
+                        missing.append(label)
+                elif not val or not str(val).strip():
+                    missing.append(label)
+            if missing:
+                results.append({
+                    'type': 'منتسب',
+                    'type_key': 'members',
+                    'id': m['id'],
+                    'name': m['full_name'],
+                    'missing': missing,
+                    'missing_count': len(missing),
+                    'total_fields': len(member_fields),
+                    'edit_url': url_for('admin_member_edit', mid=m['id']),
+                })
+
+    # --- Records ---
+    record_fields = [
+        ('first_name', 'الاسم'),
+        ('father_name', 'اسم الأب'),
+        ('last_name', 'الكنية'),
+        ('mother_name', 'اسم الأم'),
+        ('gender', 'الجنس'),
+        ('province', 'المحافظة'),
+        ('national_id', 'الرقم الوطني'),
+        ('phone', 'الهاتف'),
+        ('birth_year', 'سنة الميلاد'),
+        ('arrest_year', 'سنة الاعتقال'),
+        ('arrest_authority', 'جهة الاعتقال'),
+        ('arrest_place', 'مكان الاحتجاز'),
+        ('marital', 'الحالة الاجتماعية'),
+        ('address', 'العنوان'),
+        ('photo_path', 'الصورة'),
+    ]
+    if profile_type in ('all', 'records'):
+        records = db.execute("SELECT * FROM records ORDER BY id").fetchall()
+        for r in records:
+            missing = []
+            for col, label in record_fields:
+                val = r[col]
+                if col in ('birth_year', 'arrest_year'):
+                    if not val or val == 0:
+                        missing.append(label)
+                elif not val or not str(val).strip():
+                    missing.append(label)
+            if missing:
+                full_name = ' '.join(filter(None, [r['first_name'], r['father_name'], r['last_name']]))
+                results.append({
+                    'type': 'سجل',
+                    'type_key': 'records',
+                    'id': r['id'],
+                    'name': full_name or f"سجل #{r['id']}",
+                    'missing': missing,
+                    'missing_count': len(missing),
+                    'total_fields': len(record_fields),
+                    'edit_url': url_for('admin_record_edit', record_id=r['id']),
+                })
+
+    # Summary counts
+    summary = {
+        'total': len(results),
+        'volunteers': sum(1 for r in results if r['type_key'] == 'volunteers'),
+        'members': sum(1 for r in results if r['type_key'] == 'members'),
+        'records': sum(1 for r in results if r['type_key'] == 'records'),
+    }
+
+    return render_template('admin_missing_details.html',
+                           results=results, summary=summary,
+                           profile_type=profile_type)
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='HAQQUNA - Victim Documentation System')

@@ -141,6 +141,7 @@
         <a href="{{ url_for('admin_records', status='deceased') }}" class="btn btn-danger btn-sm">المتوفون ({{ stats.deceased }})</a>
         <a href="{{ url_for('admin_records', has_photo='no') }}" class="btn btn-outline btn-sm">بدون صورة</a>
         <a href="{{ url_for('admin_records', has_document='no') }}" class="btn btn-outline btn-sm">بدون وثائق</a>
+        <a href="{{ url_for('admin_missing_details') }}" class="btn btn-warning btn-sm">&#x1F4CB; التفاصيل الناقصة</a>
     </div>
 </div>
 {% endblock %}

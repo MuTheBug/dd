@@ -2419,31 +2419,12 @@ def records_export_vcf():
     if pdf_limit and pdf_limit.isdigit() and int(pdf_limit) > 0:
         records = records[:int(pdf_limit)]
 
-    # Build VCF content
-    def vcf_fold_line(line):
-        """Fold long vCard lines per RFC 2425 (max 75 octets per line).
-        Continuation lines start with a single space."""
-        encoded = line.encode('utf-8')
-        if len(encoded) <= 75:
-            return line
-        # First line: up to 75 bytes
-        chunks = []
-        start = 0
-        limit = 75
-        while start < len(encoded):
-            end = min(start + limit, len(encoded))
-            # Don't split in the middle of a multi-byte UTF-8 character
-            while end < len(encoded) and (encoded[end] & 0xC0) == 0x80:
-                end -= 1
-            chunks.append(encoded[start:end].decode('utf-8'))
-            start = end
-            limit = 74  # subsequent lines: space prefix takes 1 byte
-        return ('\r\n '.join(chunks))
-
+    # Build VCF content (vCard 2.1 for maximum Android compatibility)
     def vcf_escape(text):
-        """Escape special characters in vCard 3.0 text values."""
+        """Escape special characters in vCard text values and strip newlines."""
         if not text:
             return ''
+        text = text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
         return text.replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,')
 
     vcf_lines = []
@@ -2458,11 +2439,9 @@ def records_export_vcf():
             continue
 
         vcf_lines.append('BEGIN:VCARD')
-        vcf_lines.append('VERSION:3.0')
-        # FN = full display name, N = structured name
-        vcf_lines.append(vcf_fold_line(f'FN:{full_name}'))
-        # N components separated by unescaped semicolons
-        vcf_lines.append(vcf_fold_line(f'N:{last};{first};{father};;'))
+        vcf_lines.append('VERSION:2.1')
+        vcf_lines.append(f'FN;CHARSET=UTF-8:{full_name}')
+        vcf_lines.append(f'N;CHARSET=UTF-8:{last};{first};{father};;')
 
         # Phone numbers
         phone = (rec['phone'] or '').strip()
@@ -2471,27 +2450,26 @@ def records_export_vcf():
         reporter_phone = (rec['reporter_phone'] or '').strip()
 
         if phone:
-            vcf_lines.append(f'TEL;TYPE=CELL:{phone}')
+            vcf_lines.append(f'TEL;CELL:{phone}')
         if spouse_phone:
-            vcf_lines.append(f'TEL;TYPE=HOME:{spouse_phone}')
+            vcf_lines.append(f'TEL;HOME:{spouse_phone}')
         if guardian_phone:
-            vcf_lines.append(f'TEL;TYPE=WORK:{guardian_phone}')
+            vcf_lines.append(f'TEL;WORK:{guardian_phone}')
         if reporter_phone:
-            vcf_lines.append(f'TEL;TYPE=VOICE:{reporter_phone}')
+            vcf_lines.append(f'TEL;VOICE:{reporter_phone}')
 
         # Organization / title
         if rec['assoc_name']:
-            vcf_lines.append(vcf_fold_line(f'ORG:{vcf_escape(rec["assoc_name"])}'))
+            vcf_lines.append(f'ORG;CHARSET=UTF-8:{vcf_escape(rec["assoc_name"])}')
 
         if rec['profession']:
-            vcf_lines.append(vcf_fold_line(f'TITLE:{vcf_escape(rec["profession"])}'))
+            vcf_lines.append(f'TITLE;CHARSET=UTF-8:{vcf_escape(rec["profession"])}')
 
         # Address
         address = vcf_escape((rec['address'] or '').strip())
         province = vcf_escape((rec['province'] or '').strip())
         if address or province:
-            # ADR components separated by unescaped semicolons
-            vcf_lines.append(vcf_fold_line(f'ADR;TYPE=HOME:;;{address};;{province};;'))
+            vcf_lines.append(f'ADR;HOME;CHARSET=UTF-8:;;{address};;{province};;')
 
         # Birthday (only emit full YYYY-MM-DD dates for compatibility)
         birth_year = rec['birth_year'] or ''
@@ -2550,9 +2528,8 @@ def records_export_vcf():
             note_parts.append(f'رقم دفتر العائلة: {rec["family_book_number"]}')
 
         if note_parts:
-            # vCard NOTE: escape special chars, use \n for newlines
             note_text = '\\n'.join(vcf_escape(p) for p in note_parts)
-            vcf_lines.append(vcf_fold_line(f'NOTE:{note_text}'))
+            vcf_lines.append(f'NOTE;CHARSET=UTF-8:{note_text}')
 
         vcf_lines.append('END:VCARD')
         vcf_lines.append('')
@@ -2562,7 +2539,7 @@ def records_export_vcf():
     buf.seek(0)
 
     filename = f'contacts_{int(time.time())}.vcf'
-    return send_file(buf, mimetype='text/vcard',
+    return send_file(buf, mimetype='text/x-vcard',
                      as_attachment=True, download_name=filename)
 
 
@@ -3658,27 +3635,11 @@ def admin_custom_list_vcf(lid):
 
     status_map = {'survivor': 'ناجٍ', 'enforced': 'مغيّب قسراً', 'deceased': 'متوفى'}
 
-    def vcf_fold_line(line):
-        """Fold long vCard lines per RFC 2425 (max 75 octets per line)."""
-        encoded = line.encode('utf-8')
-        if len(encoded) <= 75:
-            return line
-        chunks = []
-        start = 0
-        limit = 75
-        while start < len(encoded):
-            end = min(start + limit, len(encoded))
-            while end < len(encoded) and (encoded[end] & 0xC0) == 0x80:
-                end -= 1
-            chunks.append(encoded[start:end].decode('utf-8'))
-            start = end
-            limit = 74
-        return ('\r\n '.join(chunks))
-
     def vcf_escape(text):
-        """Escape special characters in vCard 3.0 text values."""
+        """Escape special characters in vCard text values and strip newlines."""
         if not text:
             return ''
+        text = text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
         return text.replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,')
 
     vcf_lines = []
@@ -3689,12 +3650,12 @@ def admin_custom_list_vcf(lid):
         if not full_name:
             continue
         vcf_lines.append('BEGIN:VCARD')
-        vcf_lines.append('VERSION:3.0')
-        vcf_lines.append(vcf_fold_line(f'FN:{full_name}'))
-        vcf_lines.append(vcf_fold_line(f'N:{full_name};;;;'))
+        vcf_lines.append('VERSION:2.1')
+        vcf_lines.append(f'FN;CHARSET=UTF-8:{full_name}')
+        vcf_lines.append(f'N;CHARSET=UTF-8:{full_name};;;;')
         phone = (mi['phone'] or '').strip()
         if phone:
-            vcf_lines.append(f'TEL;TYPE=CELL:{phone}')
+            vcf_lines.append(f'TEL;CELL:{phone}')
         note_parts = []
         if mi['status']:
             note_parts.append(f'الحالة: {status_map.get(mi["status"], mi["status"])}')
@@ -3702,7 +3663,7 @@ def admin_custom_list_vcf(lid):
             note_parts.append(f'ملاحظات: {mi["notes"]}')
         if note_parts:
             note_text = '\\n'.join(vcf_escape(p) for p in note_parts)
-            vcf_lines.append(vcf_fold_line(f'NOTE:{note_text}'))
+            vcf_lines.append(f'NOTE;CHARSET=UTF-8:{note_text}')
         vcf_lines.append('END:VCARD')
         vcf_lines.append('')
 
@@ -3716,9 +3677,9 @@ def admin_custom_list_vcf(lid):
             continue
 
         vcf_lines.append('BEGIN:VCARD')
-        vcf_lines.append('VERSION:3.0')
-        vcf_lines.append(vcf_fold_line(f'FN:{full_name}'))
-        vcf_lines.append(vcf_fold_line(f'N:{last};{first};{father};;'))
+        vcf_lines.append('VERSION:2.1')
+        vcf_lines.append(f'FN;CHARSET=UTF-8:{full_name}')
+        vcf_lines.append(f'N;CHARSET=UTF-8:{last};{first};{father};;')
 
         phone = (rec['phone'] or '').strip()
         spouse_phone = (rec['spouse_phone'] or '').strip()
@@ -3726,21 +3687,21 @@ def admin_custom_list_vcf(lid):
         reporter_phone = (rec['reporter_phone'] or '').strip()
 
         if phone:
-            vcf_lines.append(f'TEL;TYPE=CELL:{phone}')
+            vcf_lines.append(f'TEL;CELL:{phone}')
         if spouse_phone:
-            vcf_lines.append(f'TEL;TYPE=HOME:{spouse_phone}')
+            vcf_lines.append(f'TEL;HOME:{spouse_phone}')
         if guardian_phone:
-            vcf_lines.append(f'TEL;TYPE=WORK:{guardian_phone}')
+            vcf_lines.append(f'TEL;WORK:{guardian_phone}')
         if reporter_phone:
-            vcf_lines.append(f'TEL;TYPE=OTHER:{reporter_phone}')
+            vcf_lines.append(f'TEL;VOICE:{reporter_phone}')
 
         if rec['profession']:
-            vcf_lines.append(vcf_fold_line(f'TITLE:{vcf_escape(rec["profession"])}'))
+            vcf_lines.append(f'TITLE;CHARSET=UTF-8:{vcf_escape(rec["profession"])}')
 
         address = vcf_escape((rec['address'] or '').strip())
         province = vcf_escape((rec['province'] or '').strip())
         if address or province:
-            vcf_lines.append(vcf_fold_line(f'ADR;TYPE=HOME:;;{address};;{province};;'))
+            vcf_lines.append(f'ADR;HOME;CHARSET=UTF-8:;;{address};;{province};;')
 
         birth_year = rec['birth_year'] or ''
         birth_month = rec['birth_month'] or ''
@@ -3766,7 +3727,7 @@ def admin_custom_list_vcf(lid):
             note_parts.append(f'ملاحظات: {rec["notes"]}')
         if note_parts:
             note_text = '\\n'.join(vcf_escape(p) for p in note_parts)
-            vcf_lines.append(vcf_fold_line(f'NOTE:{note_text}'))
+            vcf_lines.append(f'NOTE;CHARSET=UTF-8:{note_text}')
 
         vcf_lines.append('END:VCARD')
         vcf_lines.append('')
@@ -3776,7 +3737,7 @@ def admin_custom_list_vcf(lid):
     buf.seek(0)
 
     filename = f'list_{lid}_contacts_{int(time.time())}.vcf'
-    return send_file(buf, mimetype='text/vcard',
+    return send_file(buf, mimetype='text/x-vcard',
                      as_attachment=True, download_name=filename)
 
 

@@ -4344,8 +4344,15 @@ def admin_missing_details():
     """Show profiles with missing/incomplete fields across volunteers, members, and records."""
     db = get_db()
     profile_type = request.args.get('type', 'all')
+    sort = request.args.get('sort', 'missing_desc')
+    field_filter = request.args.get('field', '')
 
     results = []
+
+    def _is_empty(val, is_int=False):
+        if is_int:
+            return not val or val == 0
+        return not val or not str(val).strip()
 
     # --- Volunteers ---
     volunteer_fields = [
@@ -4361,7 +4368,7 @@ def admin_missing_details():
     if profile_type in ('all', 'volunteers'):
         volunteers = db.execute("SELECT * FROM volunteers ORDER BY full_name").fetchall()
         for v in volunteers:
-            missing = [label for col, label in volunteer_fields if not v[col] or not str(v[col]).strip()]
+            missing = [label for col, label in volunteer_fields if _is_empty(v[col])]
             if missing:
                 results.append({
                     'type': 'متطوع',
@@ -4392,14 +4399,8 @@ def admin_missing_details():
     if profile_type in ('all', 'members'):
         members = db.execute("SELECT * FROM members ORDER BY full_name").fetchall()
         for m in members:
-            missing = []
-            for col, label in member_fields:
-                val = m[col]
-                if col == 'birth_year':
-                    if not val or val == 0:
-                        missing.append(label)
-                elif not val or not str(val).strip():
-                    missing.append(label)
+            missing = [label for col, label in member_fields
+                       if _is_empty(m[col], is_int=(col == 'birth_year'))]
             if missing:
                 results.append({
                     'type': 'منتسب',
@@ -4413,8 +4414,8 @@ def admin_missing_details():
                     'edit_url': url_for('admin_member_edit', mid=m['id']),
                 })
 
-    # --- Records ---
-    record_fields = [
+    # --- Records (status-aware) ---
+    record_base_fields = [
         ('first_name', 'الاسم'),
         ('father_name', 'اسم الأب'),
         ('last_name', 'الكنية'),
@@ -4424,24 +4425,39 @@ def admin_missing_details():
         ('national_id', 'الرقم الوطني'),
         ('phone', 'الهاتف'),
         ('birth_year', 'سنة الميلاد'),
-        ('arrest_year', 'سنة الاعتقال'),
-        ('arrest_authority', 'جهة الاعتقال'),
-        ('arrest_place', 'مكان الاحتجاز'),
         ('marital', 'الحالة الاجتماعية'),
         ('address', 'العنوان'),
         ('photo_path', 'الصورة'),
     ]
+    # Fields checked only when status is known
+    record_arrest_fields = [
+        ('arrest_year', 'سنة الاعتقال'),
+        ('arrest_authority', 'جهة الاعتقال'),
+        ('arrest_place', 'مكان الاحتجاز'),
+    ]
+    record_survivor_fields = [
+        ('release_year', 'سنة الإفراج'),
+    ]
+    record_deceased_fields = [
+        ('death_year', 'سنة الوفاة'),
+        ('death_place', 'مكان الوفاة'),
+    ]
     if profile_type in ('all', 'records'):
         records = db.execute("SELECT * FROM records ORDER BY id").fetchall()
         for r in records:
-            missing = []
-            for col, label in record_fields:
-                val = r[col]
-                if col in ('birth_year', 'arrest_year'):
-                    if not val or val == 0:
-                        missing.append(label)
-                elif not val or not str(val).strip():
-                    missing.append(label)
+            # Build status-aware field list
+            fields_to_check = list(record_base_fields)
+            rec_status = r['status'] or ''
+            if rec_status in ('enforced', 'survivor', 'deceased'):
+                fields_to_check.extend(record_arrest_fields)
+            if rec_status == 'survivor':
+                fields_to_check.extend(record_survivor_fields)
+            if rec_status == 'deceased':
+                fields_to_check.extend(record_deceased_fields)
+
+            int_cols = {'birth_year', 'arrest_year', 'release_year', 'death_year'}
+            missing = [label for col, label in fields_to_check
+                       if _is_empty(r[col], is_int=(col in int_cols))]
             if missing:
                 full_name = ' '.join(filter(None, [r['first_name'], r['father_name'], r['last_name']]))
                 results.append({
@@ -4452,9 +4468,24 @@ def admin_missing_details():
                     'phone': r['phone'] or r['spouse_phone'] or r['reporter_phone'] or '',
                     'missing': missing,
                     'missing_count': len(missing),
-                    'total_fields': len(record_fields),
+                    'total_fields': len(fields_to_check),
                     'edit_url': url_for('admin_record_edit', record_id=r['id']),
                 })
+
+    # Filter by specific missing field
+    if field_filter:
+        results = [r for r in results if field_filter in r['missing']]
+
+    # Collect all unique missing field names for the dropdown
+    all_fields = sorted(set(f for r in results for f in r['missing']))
+
+    # Sort results
+    if sort == 'missing_asc':
+        results.sort(key=lambda x: x['missing_count'])
+    elif sort == 'name':
+        results.sort(key=lambda x: x['name'])
+    else:  # missing_desc (default)
+        results.sort(key=lambda x: x['missing_count'], reverse=True)
 
     # Summary counts
     summary = {
@@ -4466,7 +4497,140 @@ def admin_missing_details():
 
     return render_template('admin_missing_details.html',
                            results=results, summary=summary,
-                           profile_type=profile_type)
+                           profile_type=profile_type, sort=sort,
+                           field_filter=field_filter, all_fields=all_fields)
+
+
+@app.route('/admin/missing-details/excel')
+@admin_required
+def admin_missing_details_excel():
+    """Export missing details report as Excel."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    # Reuse the same logic by calling the view function internals
+    # Re-fetch data inline to avoid circular dependency
+    db = get_db()
+    profile_type = request.args.get('type', 'all')
+    field_filter = request.args.get('field', '')
+
+    results = []
+
+    def _is_empty(val, is_int=False):
+        if is_int:
+            return not val or val == 0
+        return not val or not str(val).strip()
+
+    volunteer_fields = [
+        ('phone', 'الهاتف'), ('email', 'البريد الإلكتروني'),
+        ('national_id', 'الرقم الوطني'), ('province', 'المحافظة'),
+        ('address', 'العنوان'), ('role', 'الدور'),
+        ('specialization', 'التخصص'), ('join_date', 'تاريخ الانضمام'),
+    ]
+    if profile_type in ('all', 'volunteers'):
+        for v in db.execute("SELECT * FROM volunteers ORDER BY full_name").fetchall():
+            missing = [label for col, label in volunteer_fields if _is_empty(v[col])]
+            if missing:
+                results.append({'type': 'متطوع', 'id': v['id'], 'name': v['full_name'],
+                                'phone': v['phone'] or '', 'missing': missing,
+                                'total': len(volunteer_fields)})
+
+    member_fields = [
+        ('father_name', 'اسم الأب'), ('phone', 'الهاتف'),
+        ('email', 'البريد الإلكتروني'), ('national_id', 'الرقم الوطني'),
+        ('birth_year', 'سنة الميلاد'), ('gender', 'الجنس'),
+        ('province', 'المحافظة'), ('address', 'العنوان'),
+        ('membership_type', 'نوع العضوية'), ('membership_number', 'رقم العضوية'),
+        ('join_date', 'تاريخ الانضمام'),
+    ]
+    if profile_type in ('all', 'members'):
+        for m in db.execute("SELECT * FROM members ORDER BY full_name").fetchall():
+            missing = [label for col, label in member_fields
+                       if _is_empty(m[col], is_int=(col == 'birth_year'))]
+            if missing:
+                results.append({'type': 'منتسب', 'id': m['id'], 'name': m['full_name'],
+                                'phone': m['phone'] or '', 'missing': missing,
+                                'total': len(member_fields)})
+
+    record_base = [
+        ('first_name', 'الاسم'), ('father_name', 'اسم الأب'),
+        ('last_name', 'الكنية'), ('mother_name', 'اسم الأم'),
+        ('gender', 'الجنس'), ('province', 'المحافظة'),
+        ('national_id', 'الرقم الوطني'), ('phone', 'الهاتف'),
+        ('birth_year', 'سنة الميلاد'), ('marital', 'الحالة الاجتماعية'),
+        ('address', 'العنوان'), ('photo_path', 'الصورة'),
+    ]
+    arrest_f = [('arrest_year', 'سنة الاعتقال'), ('arrest_authority', 'جهة الاعتقال'),
+                ('arrest_place', 'مكان الاحتجاز')]
+    survivor_f = [('release_year', 'سنة الإفراج')]
+    deceased_f = [('death_year', 'سنة الوفاة'), ('death_place', 'مكان الوفاة')]
+    int_cols = {'birth_year', 'arrest_year', 'release_year', 'death_year'}
+
+    if profile_type in ('all', 'records'):
+        for r in db.execute("SELECT * FROM records ORDER BY id").fetchall():
+            fields = list(record_base)
+            s = r['status'] or ''
+            if s in ('enforced', 'survivor', 'deceased'):
+                fields.extend(arrest_f)
+            if s == 'survivor':
+                fields.extend(survivor_f)
+            if s == 'deceased':
+                fields.extend(deceased_f)
+            missing = [label for col, label in fields if _is_empty(r[col], is_int=(col in int_cols))]
+            if missing:
+                name = ' '.join(filter(None, [r['first_name'], r['father_name'], r['last_name']]))
+                results.append({'type': 'سجل', 'id': r['id'], 'name': name or f"سجل #{r['id']}",
+                                'phone': r['phone'] or r['spouse_phone'] or r['reporter_phone'] or '',
+                                'missing': missing, 'total': len(fields)})
+
+    if field_filter:
+        results = [r for r in results if field_filter in r['missing']]
+    results.sort(key=lambda x: len(x['missing']), reverse=True)
+
+    # Build Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'التفاصيل الناقصة'
+    ws.sheet_view.rightToLeft = True
+
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='1565C0', end_color='1565C0', fill_type='solid')
+    header_align = Alignment(horizontal='center', vertical='center')
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    headers = ['#', 'النوع', 'الاسم', 'الهاتف', 'الاكتمال %', 'الحقول الناقصة']
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+
+    for row_idx, r in enumerate(results, 2):
+        pct = int(((r['total'] - len(r['missing'])) / r['total']) * 100) if r['total'] else 0
+        values = [r['id'], r['type'], r['name'], r['phone'], f"{pct}%",
+                  '، '.join(r['missing'])]
+        for col_idx, val in enumerate(values, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal='right' if col_idx != 5 else 'center',
+                                       vertical='center', wrap_text=(col_idx == 6))
+
+    # Auto-width
+    for col_idx in range(1, len(headers) + 1):
+        ws.column_dimensions[chr(64 + col_idx) if col_idx <= 26 else 'A'].width = \
+            max(12, min(50, max((len(str(ws.cell(row=r, column=col_idx).value or ''))
+                                 for r in range(1, len(results) + 2)), default=12)))
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True,
+                     download_name='missing_details.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 if __name__ == '__main__':

@@ -9,6 +9,7 @@
     .card { box-shadow: none !important; border: 1px solid #ccc; }
     table { font-size: 10pt; }
     .missing-tag { border: 1px solid #999 !important; background: #f5f5f5 !important; color: #333 !important; }
+    .print-only { display: block !important; }
 }
 .missing-tag {
     display: inline-block;
@@ -35,6 +36,13 @@
     border-radius: 4px;
     transition: width 0.3s;
 }
+.sort-link {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+}
+.sort-link:hover { color: var(--primary); }
+.sort-active { color: var(--primary); font-weight: 700; }
 </style>
 
 <div class="no-print" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
@@ -44,48 +52,66 @@
     </h1>
     <div class="btn-group">
         <button onclick="window.print()" class="btn btn-primary btn-sm">&#x1F5A8; طباعة</button>
+        <a href="{{ url_for('admin_missing_details_excel', type=profile_type, field=field_filter) }}" class="btn btn-success btn-sm">&#x1F4E5; Excel</a>
         <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline btn-sm">لوحة التحكم</a>
     </div>
 </div>
 
 <!-- Print Header -->
 <div style="display: none;" class="print-only">
-    <h1 style="text-align: center; font-size: 1.3rem; margin-bottom: 0.5rem;">تقرير التفاصيل الناقصة - حقنا</h1>
-    <p style="text-align: center; font-size: 0.9rem; color: #666; margin-bottom: 1rem;">{{ summary.total }} ملف يحتاج إكمال</p>
+    <h1 style="text-align: center; font-size: 1.3rem; margin-bottom: 0.3rem;">تقرير التفاصيل الناقصة - حقنا</h1>
+    <p style="text-align: center; font-size: 0.9rem; color: #666; margin-bottom: 0.2rem;">{{ summary.total }} ملف يحتاج إكمال</p>
+    <p style="text-align: center; font-size: 0.8rem; color: #999; margin-bottom: 1rem;" id="printDate"></p>
 </div>
-<style>@media print { .print-only { display: block !important; } }</style>
 
 <!-- Summary Cards -->
 <div class="no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
-    <a href="{{ url_for('admin_missing_details', type='all') }}" class="stat-card {{ 'stat-total' if profile_type=='all' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='all' }}">
+    <a href="{{ url_for('admin_missing_details', type='all', field=field_filter) }}" class="stat-card {{ 'stat-total' if profile_type=='all' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='all' }}">
         <div class="stat-number">{{ summary.total }}</div>
         <div class="stat-label">الكل</div>
     </a>
-    <a href="{{ url_for('admin_missing_details', type='records') }}" class="stat-card {{ 'stat-enforced' if profile_type=='records' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='records' }}">
+    <a href="{{ url_for('admin_missing_details', type='records', field=field_filter) }}" class="stat-card {{ 'stat-enforced' if profile_type=='records' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='records' }}">
         <div class="stat-number">{{ summary.records }}</div>
         <div class="stat-label">سجلات</div>
     </a>
-    <a href="{{ url_for('admin_missing_details', type='volunteers') }}" class="stat-card {{ 'stat-survivor' if profile_type=='volunteers' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='volunteers' }}">
+    <a href="{{ url_for('admin_missing_details', type='volunteers', field=field_filter) }}" class="stat-card {{ 'stat-survivor' if profile_type=='volunteers' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='volunteers' }}">
         <div class="stat-number">{{ summary.volunteers }}</div>
         <div class="stat-label">متطوعون</div>
     </a>
-    <a href="{{ url_for('admin_missing_details', type='members') }}" class="stat-card {{ 'stat-deceased' if profile_type=='members' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='members' }}">
+    <a href="{{ url_for('admin_missing_details', type='members', field=field_filter) }}" class="stat-card {{ 'stat-deceased' if profile_type=='members' }}" style="text-decoration: none; cursor: pointer; {{ 'outline: 2px solid var(--primary);' if profile_type=='members' }}">
         <div class="stat-number">{{ summary.members }}</div>
         <div class="stat-label">منتسبون</div>
     </a>
 </div>
 
+<!-- Filters -->
+<div class="no-print" style="display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;">
+    <input type="text" id="searchBox" placeholder="بحث بالاسم أو الهاتف..." oninput="filterTable()" style="padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; min-width: 200px; flex: 1; max-width: 350px;">
+    <select id="fieldFilter" onchange="location.href=this.value" style="padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;">
+        <option value="{{ url_for('admin_missing_details', type=profile_type) }}" {{ 'selected' if not field_filter }}>كل الحقول</option>
+        {% for f in all_fields %}
+        <option value="{{ url_for('admin_missing_details', type=profile_type, field=f) }}" {{ 'selected' if field_filter == f }}>{{ f }}</option>
+        {% endfor %}
+    </select>
+</div>
+
 <!-- Results Table -->
 <div class="card" style="padding: 0; overflow: hidden;">
     <div class="table-wrapper">
-        <table>
+        <table id="missingTable">
             <thead>
                 <tr>
                     <th style="width: 40px;">#</th>
                     <th>النوع</th>
-                    <th>الاسم</th>
+                    <th>
+                        <a href="{{ url_for('admin_missing_details', type=profile_type, field=field_filter, sort='name') }}" class="sort-link {{ 'sort-active' if sort=='name' }}">الاسم</a>
+                    </th>
                     <th>الهاتف</th>
-                    <th style="width: 90px;">الاكتمال</th>
+                    <th style="width: 90px;">
+                        <a href="{{ url_for('admin_missing_details', type=profile_type, field=field_filter, sort='missing_asc' if sort=='missing_desc' else 'missing_desc') }}" class="sort-link {{ 'sort-active' if sort in ('missing_desc','missing_asc') }}">
+                            الاكتمال {{ '&#x25B2;' if sort=='missing_asc' else '&#x25BC;' if sort=='missing_desc' else '' }}
+                        </a>
+                    </th>
                     <th>الحقول الناقصة</th>
                     <th class="no-print" style="width: 70px;">إجراء</th>
                 </tr>
@@ -138,4 +164,20 @@
         </table>
     </div>
 </div>
+
+<script>
+// Print date
+document.getElementById('printDate').textContent = 'تاريخ الطباعة: ' + new Date().toLocaleDateString('ar-SY', {year:'numeric', month:'long', day:'numeric'});
+
+// Client-side search
+function filterTable() {
+    var q = document.getElementById('searchBox').value.toLowerCase();
+    var rows = document.querySelectorAll('#missingTable tbody tr');
+    rows.forEach(function(row) {
+        var name = (row.cells[2] && row.cells[2].textContent || '').toLowerCase();
+        var phone = (row.cells[3] && row.cells[3].textContent || '').toLowerCase();
+        row.style.display = (!q || name.indexOf(q) !== -1 || phone.indexOf(q) !== -1) ? '' : 'none';
+    });
+}
+</script>
 {% endblock %}

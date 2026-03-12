@@ -84,6 +84,7 @@
                     <th style="width: 40px;">#</th>
                     <th>النوع</th>
                     <th>الاسم</th>
+                    <th>الهاتف</th>
                     <th style="width: 90px;">الاكتمال</th>
                     <th>الحقول الناقصة</th>
                     <th class="no-print" style="width: 70px;">إجراء</th>
@@ -103,6 +104,13 @@
                         {% endif %}
                     </td>
                     <td style="font-weight: 600;">{{ r.name }}</td>
+                    <td style="direction: ltr; text-align: right; white-space: nowrap;">
+                        {% if r.phone %}
+                        <a href="tel:{{ r.phone }}" style="color: var(--primary); text-decoration: none;">{{ r.phone }}</a>
+                        {% else %}
+                        <span style="color: #ccc;">-</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% set pct = (((r.total_fields - r.missing_count) / r.total_fields) * 100) | int %}
                         <div class="completion-bar">
@@ -121,7 +129,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-light);">
                         جميع الملفات مكتملة - لا توجد تفاصيل ناقصة
                     </td>
                 </tr>

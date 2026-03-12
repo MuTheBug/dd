@@ -5,7 +5,7 @@
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;">
     <h1 style="font-size: 1.4rem; color: var(--primary-dark);">لوحة التحكم</h1>
     <div class="btn-group">
-        <a href="{{ url_for('admin_records') }}" class="btn btn-primary btn-sm">&#x1F4CB; السجلات</a>
+        <a href="{{ url_for('admin_records') }}" class="btn btn-primary btn-sm">السجلات</a>
         <a href="{{ url_for('admin_volunteers') }}" class="btn btn-outline btn-sm">المتطوعون</a>
         <a href="{{ url_for('admin_members') }}" class="btn btn-outline btn-sm">المنتسبون</a>
         <a href="{{ url_for('entry_form') }}" class="btn btn-outline btn-sm">+ إضافة حالة</a>
@@ -30,6 +30,47 @@
     <div class="stat-card stat-deceased">
         <div class="stat-number">{{ stats.deceased }}</div>
         <div class="stat-label">متوفى</div>
+    </div>
+</div>
+
+<!-- Data Completeness Widget (D1) -->
+<div class="card" style="margin-bottom: 1rem; padding: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+            <h3 style="font-size: 1rem; margin-bottom: 0.3rem;">اكتمال البيانات</h3>
+            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-light);">
+                <span>السجلات: {{ stats.total - stats.incomplete_records }}/{{ stats.total }}</span>
+                <span>المتطوعون: {{ stats.vol_stats.active - stats.incomplete_vols }}/{{ stats.vol_stats.active }}</span>
+                <span>المنتسبون: {{ stats.incomplete_members }} ناقص</span>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="width: 120px; height: 10px; background: #eee; border-radius: 5px; overflow: hidden;">
+                <div style="height: 100%; width: {{ stats.completion_pct }}%; background: {{ '#4caf50' if stats.completion_pct >= 80 else '#ff9800' if stats.completion_pct >= 50 else '#f44336' }}; border-radius: 5px;"></div>
+            </div>
+            <span style="font-weight: 700; font-size: 1.1rem; color: {{ '#4caf50' if stats.completion_pct >= 80 else '#ff9800' if stats.completion_pct >= 50 else '#f44336' }};">{{ stats.completion_pct }}%</span>
+            <a href="{{ url_for('admin_missing_details') }}" class="btn btn-outline btn-sm" style="margin-right: 0.5rem;">عرض الناقصة</a>
+        </div>
+    </div>
+</div>
+
+<!-- Health & Vulnerability Stats (D3) -->
+<div class="stats-grid" style="margin-bottom: 1rem;">
+    <div class="stat-card" style="background: #fff3e0; border-right: 4px solid #ff9800;">
+        <div class="stat-number" style="color: #e65100;">{{ stats.health_stats.chronic }}</div>
+        <div class="stat-label">أمراض مزمنة</div>
+    </div>
+    <div class="stat-card" style="background: #fce4ec; border-right: 4px solid #e91e63;">
+        <div class="stat-number" style="color: #c62828;">{{ stats.health_stats.special_needs }}</div>
+        <div class="stat-label">احتياجات خاصة</div>
+    </div>
+    <div class="stat-card" style="background: #e8f5e9; border-right: 4px solid #4caf50;">
+        <div class="stat-number" style="color: #2e7d32;">{{ stats.health_stats.paying_rent }}</div>
+        <div class="stat-label">مستأجرون</div>
+    </div>
+    <div class="stat-card" style="background: #e3f2fd; border-right: 4px solid #1976d2;">
+        <div class="stat-number" style="color: #1565c0;">{{ stats.health_stats.no_breadwinner }}</div>
+        <div class="stat-label">بلا معيل</div>
     </div>
 </div>
 
@@ -60,6 +101,28 @@
         </div>
     </div>
 
+    <!-- Age Distribution (D2) -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F382;</div>
+            <h3>التوزيع حسب العمر</h3>
+        </div>
+        <div class="chart-bar-container">
+            {% set max_age = 1 %}
+            {% for k, v in stats.age_brackets.items() %}{% if v > max_age %}{% set max_age = v %}{% endif %}{% endfor %}
+            {% for bracket, count in stats.age_brackets.items() %}
+            <div class="chart-bar-item">
+                <span class="chart-bar-label">{{ bracket }}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (count / max_age * 100) if max_age else 0 }}%; background: linear-gradient(90deg, #5c6bc0, #9fa8da);">
+                        {{ count }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
     <!-- Province Stats -->
     <div class="card">
         <div class="card-header">
@@ -74,6 +137,27 @@
                 <div class="chart-bar-track">
                     <div class="chart-bar-fill" style="width: {{ (prov[1] / max_prov * 100) }}%">
                         {{ prov[1] }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Education Stats (D4) -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F393;</div>
+            <h3>التوزيع حسب التعليم</h3>
+        </div>
+        <div class="chart-bar-container">
+            {% set max_edu = stats.edu_stats[0][1] if stats.edu_stats else 1 %}
+            {% for edu in stats.edu_stats[:8] %}
+            <div class="chart-bar-item">
+                <span class="chart-bar-label">{{ edu[0] or 'غير محدد' }}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (edu[1] / max_edu * 100) }}%; background: linear-gradient(90deg, #26a69a, #80cbc4);">
+                        {{ edu[1] }}
                     </div>
                 </div>
             </div>
@@ -127,6 +211,60 @@
             {% endfor %}
         </div>
     </div>
+
+    <!-- Volunteer Summary (D6) -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F91D;</div>
+            <h3>ملخص المتطوعين</h3>
+        </div>
+        <div style="padding: 0.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; text-align: center;">
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">{{ stats.vol_stats.active }}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-light);">متطوع نشط</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #ff9800;">{{ stats.vol_stats.total_hours }}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-light);">ساعات عمل</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #4caf50;">{{ stats.vol_stats.total_activities }}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-light);">نشاط</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Summary (D5) -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F4B0;</div>
+            <h3>ملخص الاشتراكات</h3>
+        </div>
+        <div style="padding: 0.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; text-align: center;">
+                <div>
+                    <div style="font-size: 1.3rem; font-weight: 700; color: #4caf50;">{{ '{:,}'.format(stats.payment_stats.total_paid) }}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-light);">مدفوع ({{ stats.payment_stats.paid_count }})</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.3rem; font-weight: 700; color: #f44336;">{{ '{:,}'.format(stats.payment_stats.total_due - stats.payment_stats.total_paid) }}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-light);">متبقي ({{ stats.payment_stats.unpaid_count }})</div>
+                </div>
+            </div>
+            {% if stats.payment_stats.total_due > 0 %}
+            <div style="margin-top: 0.5rem;">
+                <div style="width: 100%; height: 8px; background: #ffcdd2; border-radius: 4px; overflow: hidden;">
+                    <div style="height: 100%; width: {{ (stats.payment_stats.total_paid / stats.payment_stats.total_due * 100) | int }}%; background: #4caf50; border-radius: 4px;"></div>
+                </div>
+                <div style="text-align: center; font-size: 0.8rem; color: var(--text-light); margin-top: 0.2rem;">
+                    نسبة التحصيل: {{ (stats.payment_stats.total_paid / stats.payment_stats.total_due * 100) | int }}%
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 <!-- Quick Access -->
@@ -141,7 +279,9 @@
         <a href="{{ url_for('admin_records', status='deceased') }}" class="btn btn-danger btn-sm">المتوفون ({{ stats.deceased }})</a>
         <a href="{{ url_for('admin_records', has_photo='no') }}" class="btn btn-outline btn-sm">بدون صورة</a>
         <a href="{{ url_for('admin_records', has_document='no') }}" class="btn btn-outline btn-sm">بدون وثائق</a>
-        <a href="{{ url_for('admin_missing_details') }}" class="btn btn-warning btn-sm">&#x1F4CB; التفاصيل الناقصة</a>
+        <a href="{{ url_for('admin_missing_details') }}" class="btn btn-warning btn-sm">التفاصيل الناقصة</a>
+        <a href="{{ url_for('admin_backup') }}" class="btn btn-outline btn-sm">النسخ الاحتياطي</a>
+        <a href="{{ url_for('admin_import') }}" class="btn btn-outline btn-sm">استيراد بيانات</a>
     </div>
 </div>
 {% endblock %}

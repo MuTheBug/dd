@@ -15,7 +15,10 @@ import json
 import base64
 import secrets
 import time
-from datetime import datetime
+import re
+import shutil
+import zipfile
+from datetime import datetime, timedelta
 from functools import wraps
 from io import BytesIO
 from urllib.parse import quote
@@ -24,6 +27,7 @@ from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     jsonify, send_file, session, g, make_response, send_from_directory
 )
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # ---------------------------------------------------------------------------
 # App configuration
@@ -36,8 +40,44 @@ app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB per request
+app.permanent_session_lifetime = timedelta(hours=8)
 
-ADMIN_PASSWORD = 'haqquna2024'
+
+@app.before_request
+def check_session_timeout():
+    """Auto-logout after 8 hours of inactivity."""
+    if session.get('is_admin') and session.get('login_time'):
+        if time.time() - session['login_time'] > 8 * 3600:
+            session.clear()
+            flash('انتهت الجلسة، يرجى تسجيل الدخول مجدداً', 'error')
+            return redirect(url_for('admin_login'))
+
+ADMIN_PASSWORD_FILE = os.path.join(BASE_DIR, 'admin_password.hash')
+BACKUP_DIR = os.path.join(BASE_DIR, 'backups')
+
+
+def _get_admin_password_hash():
+    """Read the hashed admin password from file, create default if missing."""
+    if os.path.exists(ADMIN_PASSWORD_FILE):
+        with open(ADMIN_PASSWORD_FILE, 'r') as f:
+            return f.read().strip()
+    # First run: create default hashed password
+    default_hash = generate_password_hash('haqquna2024')
+    with open(ADMIN_PASSWORD_FILE, 'w') as f:
+        f.write(default_hash)
+    return default_hash
+
+
+def _set_admin_password(new_password):
+    """Save a new hashed admin password."""
+    with open(ADMIN_PASSWORD_FILE, 'w') as f:
+        f.write(generate_password_hash(new_password))
+
+
+# Login rate limiting
+_login_attempts = {}  # {ip: [(timestamp, ...), ...]}
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_MINUTES = 15
 
 def _normalize_children(children):
     """Normalize children data: map camelCase keys to snake_case."""
@@ -357,6 +397,18 @@ def db_execute_with_retry(db, sql, params=None, max_retries=3):
             raise
 
 
+def log_audit(action, entity_type, entity_id=None, details=''):
+    """Log an admin action to the audit trail."""
+    try:
+        db = get_db()
+        ip = request.remote_addr if request else ''
+        db.execute("INSERT INTO audit_log (action, entity_type, entity_id, details, ip_address) VALUES (?,?,?,?,?)",
+                   (action, entity_type, entity_id, details, ip))
+        db.commit()
+    except Exception:
+        pass  # Never let audit logging break the main operation
+
+
 @app.teardown_appcontext
 def close_db(exception):
     db = g.pop('db', None)
@@ -591,6 +643,19 @@ def migrate_db():
         )
     """)
 
+    # -- Audit log table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT DEFAULT (datetime('now','localtime')),
+            action TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id INTEGER,
+            details TEXT DEFAULT '',
+            ip_address TEXT DEFAULT ''
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -739,10 +804,86 @@ def entry_form():
     return render_template('entry.html', volunteer_names=[v['full_name'] for v in volunteer_names])
 
 
+REQUIRED_ENTRY_FIELDS = {
+    'first_name': 'الاسم',
+    'last_name': 'الكنية',
+    'status': 'الحالة',
+    'province': 'المحافظة',
+    'gender': 'الجنس',
+}
+
+
+def _validate_entry(form):
+    """Validate entry form data. Returns (errors, warnings) lists."""
+    errors = []
+    warnings = []
+
+    # Required fields
+    for field, label in REQUIRED_ENTRY_FIELDS.items():
+        if not form.get(field, '').strip():
+            errors.append(f'الحقل "{label}" مطلوب')
+
+    # Phone format (warning only)
+    phone = form.get('phone', '').strip().replace(' ', '').replace('-', '')
+    if phone and not re.match(r'^\+?\d{7,15}$', phone):
+        warnings.append('صيغة رقم الهاتف غير معتادة')
+
+    # National ID format (warning only)
+    nid = form.get('national_id', '').strip().replace(' ', '')
+    if nid and not re.match(r'^\d{11}$', nid):
+        warnings.append('الرقم الوطني يجب أن يكون 11 رقماً')
+
+    # Date logic
+    birth_year = int(form.get('birth_year', 0) or 0)
+    arrest_year = int(form.get('arrest_year', 0) or 0)
+    death_year = int(form.get('death_year', 0) or 0)
+    release_year = int(form.get('release_year', 0) or 0)
+
+    if birth_year and death_year and death_year < birth_year:
+        errors.append('سنة الوفاة لا يمكن أن تكون قبل سنة الميلاد')
+    if birth_year and arrest_year and arrest_year < birth_year:
+        errors.append('سنة الاعتقال لا يمكن أن تكون قبل سنة الميلاد')
+    if arrest_year and release_year and release_year < arrest_year:
+        errors.append('سنة الإفراج لا يمكن أن تكون قبل سنة الاعتقال')
+
+    return errors, warnings
+
+
 @app.route('/entry', methods=['POST'])
 def entry_submit():
     db = get_db()
     form = request.form
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    force = form.get('force', '') == 'true'
+
+    # Validate
+    errors, warnings = _validate_entry(form)
+    if errors and not force:
+        if is_ajax:
+            return jsonify({'success': False, 'errors': errors, 'warnings': warnings})
+        for e in errors:
+            flash(e, 'error')
+        return redirect(url_for('entry_form'))
+
+    # Duplicate detection
+    if not force:
+        first = form.get('first_name', '').strip()
+        father = form.get('father_name', '').strip()
+        last = form.get('last_name', '').strip()
+        nid = form.get('national_id', '').strip()
+        dup = None
+        if nid:
+            dup = db.execute("SELECT id, first_name, father_name, last_name FROM records WHERE national_id=? AND national_id != ''", (nid,)).fetchone()
+        if not dup and first and last:
+            dup = db.execute("SELECT id, first_name, father_name, last_name FROM records WHERE first_name=? AND father_name=? AND last_name=?",
+                             (first, father, last)).fetchone()
+        if dup:
+            dup_name = ' '.join(filter(None, [dup['first_name'], dup['father_name'], dup['last_name']]))
+            msg = f'يوجد سجل مشابه: {dup_name} (#{dup["id"]}). أضف force=true للحفظ رغم ذلك.'
+            if is_ajax:
+                return jsonify({'success': False, 'duplicate': True, 'existing_id': dup['id'], 'message': msg, 'warnings': warnings})
+            flash(msg, 'error')
+            return redirect(url_for('entry_form'))
 
     # Handle file uploads
     photo_path, photo_hash = '', ''
@@ -920,11 +1061,14 @@ def entry_submit():
                 continue
             raise
 
-    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    log_audit('record_create', 'record', details=form.get('first_name', '') + ' ' + form.get('last_name', ''))
+    resp_msg = 'تم حفظ السجل بنجاح. شكراً لمساهمتك في التوثيق.'
+    if warnings:
+        resp_msg += ' (تنبيهات: ' + '، '.join(warnings) + ')'
     if is_ajax:
-        return jsonify({'success': True, 'message': 'تم حفظ السجل بنجاح. شكراً لمساهمتك في التوثيق.'})
+        return jsonify({'success': True, 'message': resp_msg, 'warnings': warnings})
 
-    flash('تم حفظ السجل بنجاح. شكراً لمساهمتك في التوثيق.', 'success')
+    flash(resp_msg, 'success')
     return redirect(url_for('entry_form'))
 
 
@@ -934,10 +1078,29 @@ def entry_submit():
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
-        if request.form.get('password') == ADMIN_PASSWORD:
+        ip = request.remote_addr or '0.0.0.0'
+        now = time.time()
+        # Clean old attempts and check rate limit
+        cutoff = now - LOGIN_LOCKOUT_MINUTES * 60
+        _login_attempts[ip] = [t for t in _login_attempts.get(ip, []) if t > cutoff]
+        if len(_login_attempts[ip]) >= LOGIN_MAX_ATTEMPTS:
+            remaining = int((cutoff + LOGIN_LOCKOUT_MINUTES * 60 - now + _login_attempts[ip][0]) / 60) + 1
+            flash(f'تم حظر تسجيل الدخول لمدة {remaining} دقائق بسبب محاولات كثيرة', 'error')
+            return render_template('admin_login.html')
+
+        pw_hash = _get_admin_password_hash()
+        if check_password_hash(pw_hash, request.form.get('password', '')):
             session['is_admin'] = True
+            session['login_time'] = time.time()
+            session.permanent = True
+            _login_attempts.pop(ip, None)
             return redirect(url_for('admin_dashboard'))
-        flash('كلمة المرور غير صحيحة', 'error')
+        _login_attempts.setdefault(ip, []).append(now)
+        attempts_left = LOGIN_MAX_ATTEMPTS - len(_login_attempts[ip])
+        msg = 'كلمة المرور غير صحيحة'
+        if attempts_left <= 2:
+            msg += f' ({attempts_left} محاولات متبقية)'
+        flash(msg, 'error')
     return render_template('admin_login.html')
 
 
@@ -945,6 +1108,26 @@ def admin_login():
 def admin_logout():
     session.pop('is_admin', None)
     return redirect(url_for('index'))
+
+
+@app.route('/admin/change-password', methods=['GET', 'POST'])
+@admin_required
+def admin_change_password():
+    if request.method == 'POST':
+        current = request.form.get('current_password', '')
+        new_pw = request.form.get('new_password', '')
+        confirm = request.form.get('confirm_password', '')
+        if not check_password_hash(_get_admin_password_hash(), current):
+            flash('كلمة المرور الحالية غير صحيحة', 'error')
+        elif len(new_pw) < 6:
+            flash('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل', 'error')
+        elif new_pw != confirm:
+            flash('كلمة المرور الجديدة غير متطابقة', 'error')
+        else:
+            _set_admin_password(new_pw)
+            flash('تم تغيير كلمة المرور بنجاح', 'success')
+            return redirect(url_for('admin_dashboard'))
+    return render_template('admin_change_password.html')
 
 
 @app.route('/admin')
@@ -984,11 +1167,96 @@ def admin_dashboard():
         "SELECT arrest_year, COUNT(*) as cnt FROM records WHERE arrest_year > 0 GROUP BY arrest_year ORDER BY arrest_year"
     ).fetchall()
 
+    # Age distribution (D2)
+    current_year = datetime.now().year
+    age_brackets = {'0-17': 0, '18-30': 0, '31-45': 0, '46-60': 0, '60+': 0, 'غير محدد': 0}
+    birth_years = db.execute("SELECT birth_year FROM records").fetchall()
+    for row in birth_years:
+        by = row['birth_year'] or 0
+        if by <= 0:
+            age_brackets['غير محدد'] += 1
+        else:
+            age = current_year - by
+            if age < 18:
+                age_brackets['0-17'] += 1
+            elif age <= 30:
+                age_brackets['18-30'] += 1
+            elif age <= 45:
+                age_brackets['31-45'] += 1
+            elif age <= 60:
+                age_brackets['46-60'] += 1
+            else:
+                age_brackets['60+'] += 1
+
+    # Health & vulnerability stats (D3)
+    health_stats = {
+        'chronic': db.execute("SELECT COUNT(*) FROM records WHERE chronic IS NOT NULL AND chronic != '' AND chronic != 'لا'").fetchone()[0],
+        'special_needs': db.execute("SELECT COUNT(*) FROM records WHERE has_special_needs = 1").fetchone()[0],
+        'hypertension': db.execute("SELECT COUNT(*) FROM records WHERE has_hypertension = 1").fetchone()[0],
+        'diabetes': db.execute("SELECT COUNT(*) FROM records WHERE has_diabetes = 1").fetchone()[0],
+        'paying_rent': db.execute("SELECT COUNT(*) FROM records WHERE housing_type = 'إيجار'").fetchone()[0],
+        'no_breadwinner': db.execute("SELECT COUNT(*) FROM records WHERE breadwinner = '' OR breadwinner = 'لا يوجد' OR breadwinner IS NULL").fetchone()[0],
+    }
+
+    # Education breakdown (D4)
+    edu_stats = db.execute(
+        "SELECT education, COUNT(*) as cnt FROM records WHERE education IS NOT NULL AND education != '' GROUP BY education ORDER BY cnt DESC"
+    ).fetchall()
+
+    # Member payment summary (D5)
+    payment_stats = {'total_due': 0, 'total_paid': 0, 'paid_count': 0, 'unpaid_count': 0}
+    try:
+        ps = db.execute("SELECT status, COUNT(*) as cnt, SUM(amount) as total FROM member_payments GROUP BY status").fetchall()
+        for p in ps:
+            if p['status'] == 'paid':
+                payment_stats['paid_count'] = p['cnt']
+                payment_stats['total_paid'] = p['total'] or 0
+            else:
+                payment_stats['unpaid_count'] = p['cnt']
+            payment_stats['total_due'] += p['total'] or 0
+    except Exception:
+        pass
+
+    # Volunteer summary (D6)
+    vol_stats = {
+        'active': db.execute("SELECT COUNT(*) FROM volunteers WHERE status='active'").fetchone()[0],
+        'total_hours': 0,
+        'total_activities': db.execute("SELECT COUNT(*) FROM volunteer_activities").fetchone()[0],
+    }
+    try:
+        h = db.execute("SELECT SUM(hours) FROM volunteer_attendance").fetchone()[0]
+        vol_stats['total_hours'] = round(h or 0, 1)
+    except Exception:
+        pass
+
+    # Data completeness (D1) - quick count
+    total_profiles = total + vol_stats['active'] + db.execute("SELECT COUNT(*) FROM members").fetchone()[0]
+    # Simplified: count records with key missing fields
+    incomplete_records = db.execute(
+        "SELECT COUNT(*) FROM records WHERE first_name='' OR status='' OR province='' OR gender='' OR phone='' OR national_id=''"
+    ).fetchone()[0]
+    incomplete_vols = db.execute(
+        "SELECT COUNT(*) FROM volunteers WHERE phone='' OR national_id='' OR role=''"
+    ).fetchone()[0]
+    incomplete_members = db.execute(
+        "SELECT COUNT(*) FROM members WHERE phone='' OR national_id='' OR membership_type=''"
+    ).fetchone()[0]
+    completion_pct = round((1 - (incomplete_records + incomplete_vols + incomplete_members) / max(total_profiles, 1)) * 100)
+
     stats = {
         'total': total, 'survivors': survivors, 'enforced': enforced,
         'deceased': deceased, 'males': males, 'females': females,
         'province_stats': province_stats, 'authority_stats': authority_stats,
-        'year_stats': year_stats
+        'year_stats': year_stats,
+        'age_brackets': age_brackets,
+        'health_stats': health_stats,
+        'edu_stats': edu_stats,
+        'payment_stats': payment_stats,
+        'vol_stats': vol_stats,
+        'completion_pct': completion_pct,
+        'incomplete_records': incomplete_records,
+        'incomplete_vols': incomplete_vols,
+        'incomplete_members': incomplete_members,
     }
 
     return render_template('admin_dashboard.html', stats=stats)
@@ -1701,6 +1969,7 @@ def admin_record_edit(record_id):
             record_id
         ))
         db.commit()
+        log_audit('record_edit', 'record', record_id)
         flash('تم تحديث السجل بنجاح', 'success')
         return redirect(url_for('admin_record_detail', record_id=record_id))
 
@@ -1721,6 +1990,7 @@ def admin_record_delete(record_id):
     db = get_db()
     db.execute("DELETE FROM records WHERE id = ?", (record_id,))
     db.commit()
+    log_audit('record_delete', 'record', record_id)
     flash('تم حذف السجل', 'success')
     return redirect(url_for('admin_records'))
 
@@ -2840,6 +3110,7 @@ def admin_volunteer_add():
             request.form.get('notes', '').strip(),
         ))
         db.commit()
+        log_audit('volunteer_create', 'volunteer', details=request.form.get('full_name', ''))
         flash('تم إضافة المتطوع بنجاح', 'success')
         return redirect(url_for('admin_volunteers'))
     return render_template('admin_volunteer_form.html', volunteer=None)
@@ -2875,6 +3146,7 @@ def admin_volunteer_edit(vid):
             vid,
         ))
         db.commit()
+        log_audit('volunteer_edit', 'volunteer', vid)
         flash('تم تعديل بيانات المتطوع بنجاح', 'success')
         return redirect(url_for('admin_volunteers'))
     return render_template('admin_volunteer_form.html', volunteer=volunteer)
@@ -2886,6 +3158,7 @@ def admin_volunteer_delete(vid):
     db = get_db()
     db.execute("DELETE FROM volunteers WHERE id=?", (vid,))
     db.commit()
+    log_audit('volunteer_delete', 'volunteer', vid)
     flash('تم حذف المتطوع', 'success')
     return redirect(url_for('admin_volunteers'))
 
@@ -3159,6 +3432,7 @@ def admin_member_add():
             request.form.get('notes', '').strip(),
         ))
         db.commit()
+        log_audit('member_create', 'member', details=request.form.get('full_name', ''))
         flash('تم إضافة المنتسب بنجاح', 'success')
         return redirect(url_for('admin_members'))
     return render_template('admin_member_form.html', member=None)
@@ -3198,6 +3472,7 @@ def admin_member_edit(mid):
             mid,
         ))
         db.commit()
+        log_audit('member_edit', 'member', mid)
         flash('تم تعديل بيانات المنتسب بنجاح', 'success')
         return redirect(url_for('admin_members'))
     return render_template('admin_member_form.html', member=member)
@@ -3209,6 +3484,7 @@ def admin_member_delete(mid):
     db = get_db()
     db.execute("DELETE FROM members WHERE id=?", (mid,))
     db.commit()
+    log_audit('member_delete', 'member', mid)
     flash('تم حذف المنتسب', 'success')
     return redirect(url_for('admin_members'))
 
@@ -4380,6 +4656,7 @@ def admin_missing_details():
                     'missing_count': len(missing),
                     'total_fields': len(volunteer_fields),
                     'edit_url': url_for('admin_volunteer_edit', vid=v['id']),
+                    'priority': len(missing) * 5,
                 })
 
     # --- Members ---
@@ -4412,6 +4689,7 @@ def admin_missing_details():
                     'missing_count': len(missing),
                     'total_fields': len(member_fields),
                     'edit_url': url_for('admin_member_edit', mid=m['id']),
+                    'priority': len(missing) * 5,
                 })
 
     # --- Records (status-aware) ---
@@ -4465,6 +4743,9 @@ def admin_missing_details():
                        if _is_empty(r[col], is_int=(col in int_cols))]
             if missing:
                 full_name = ' '.join(filter(None, [r['first_name'], r['father_name'], r['last_name']]))
+                # Priority = missing fields weight + vulnerability score
+                need = compute_need_score(r)
+                priority = len(missing) * 5 + need
                 results.append({
                     'type': 'سجل',
                     'type_key': 'records',
@@ -4475,6 +4756,7 @@ def admin_missing_details():
                     'missing_count': len(missing),
                     'total_fields': len(fields_to_check),
                     'edit_url': url_for('admin_record_edit', record_id=r['id']),
+                    'priority': priority,
                 })
 
     # Filter by specific missing field
@@ -4489,6 +4771,8 @@ def admin_missing_details():
         results.sort(key=lambda x: x['missing_count'])
     elif sort == 'name':
         results.sort(key=lambda x: x['name'])
+    elif sort == 'priority_desc':
+        results.sort(key=lambda x: x.get('priority', 0), reverse=True)
     else:  # missing_desc (default)
         results.sort(key=lambda x: x['missing_count'], reverse=True)
 
@@ -4640,6 +4924,275 @@ def admin_missing_details_excel():
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
+@app.route('/admin/audit-log')
+@admin_required
+def admin_audit_log():
+    db = get_db()
+    page = int(request.args.get('page', 1))
+    per_page = 50
+    entity_type = request.args.get('entity_type', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+
+    query = "SELECT * FROM audit_log WHERE 1=1"
+    params = []
+    if entity_type:
+        query += " AND entity_type=?"
+        params.append(entity_type)
+    if date_from:
+        query += " AND timestamp >= ?"
+        params.append(date_from)
+    if date_to:
+        query += " AND timestamp <= ?"
+        params.append(date_to + ' 23:59:59')
+
+    total = db.execute(query.replace("SELECT *", "SELECT COUNT(*)"), params).fetchone()[0]
+    query += " ORDER BY id DESC LIMIT ? OFFSET ?"
+    params.extend([per_page, (page - 1) * per_page])
+    logs = db.execute(query, params).fetchall()
+
+    return render_template('admin_audit_log.html', logs=logs, total=total,
+                           page=page, per_page=per_page, entity_type=entity_type,
+                           date_from=date_from, date_to=date_to)
+
+
+# ---------------------------------------------------------------------------
+# Routes – Backup & Import
+# ---------------------------------------------------------------------------
+@app.route('/admin/backup')
+@admin_required
+def admin_backup():
+    """Backup management page."""
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    backups = []
+    for f in sorted(os.listdir(BACKUP_DIR), reverse=True):
+        fp = os.path.join(BACKUP_DIR, f)
+        if os.path.isfile(fp):
+            size = os.path.getsize(fp)
+            size_mb = round(size / (1024 * 1024), 2)
+            mtime = datetime.fromtimestamp(os.path.getmtime(fp)).strftime('%Y-%m-%d %H:%M')
+            backups.append({'name': f, 'size': size_mb, 'date': mtime})
+    return render_template('admin_backup.html', backups=backups)
+
+
+@app.route('/admin/backup/create', methods=['POST'])
+@admin_required
+def admin_backup_create():
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_name = f'registry_{ts}.db'
+    backup_path = os.path.join(BACKUP_DIR, backup_name)
+    shutil.copy2(DB_PATH, backup_path)
+
+    # Also zip uploads if they exist and aren't too large
+    uploads_dir = app.config['UPLOAD_FOLDER']
+    if os.path.exists(uploads_dir) and os.listdir(uploads_dir):
+        zip_name = f'uploads_{ts}.zip'
+        zip_path = os.path.join(BACKUP_DIR, zip_name)
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(uploads_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, BASE_DIR)
+                    zf.write(file_path, arcname)
+
+    log_audit('backup_create', 'system', details=backup_name)
+    flash(f'تم إنشاء النسخة الاحتياطية: {backup_name}', 'success')
+    return redirect(url_for('admin_backup'))
+
+
+@app.route('/admin/backup/download/<filename>')
+@admin_required
+def admin_backup_download(filename):
+    return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
+
+
+@app.route('/admin/backup/<filename>/delete', methods=['POST'])
+@admin_required
+def admin_backup_delete(filename):
+    fp = os.path.join(BACKUP_DIR, filename)
+    if os.path.exists(fp) and os.path.commonpath([BACKUP_DIR, os.path.realpath(fp)]) == BACKUP_DIR:
+        os.remove(fp)
+        log_audit('backup_delete', 'system', details=filename)
+        flash('تم حذف النسخة الاحتياطية', 'success')
+    else:
+        flash('الملف غير موجود', 'error')
+    return redirect(url_for('admin_backup'))
+
+
+@app.route('/admin/backup/restore', methods=['POST'])
+@admin_required
+def admin_backup_restore():
+    backup_file = request.form.get('filename', '')
+    fp = os.path.join(BACKUP_DIR, backup_file)
+    if not os.path.exists(fp) or not backup_file.endswith('.db'):
+        flash('ملف النسخة الاحتياطية غير صالح', 'error')
+        return redirect(url_for('admin_backup'))
+
+    # Safety backup before restore
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    safety = os.path.join(BACKUP_DIR, f'pre_restore_{ts}.db')
+    shutil.copy2(DB_PATH, safety)
+
+    # Close current connection and restore
+    db = g.pop('db', None)
+    if db:
+        db.close()
+    shutil.copy2(fp, DB_PATH)
+
+    log_audit('backup_restore', 'system', details=f'Restored from {backup_file}, safety backup: pre_restore_{ts}.db')
+    flash(f'تم استعادة قاعدة البيانات من {backup_file}', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/import', methods=['GET', 'POST'])
+@admin_required
+def admin_import():
+    if request.method == 'POST':
+        from openpyxl import load_workbook
+        file = request.files.get('file')
+        import_type = request.form.get('import_type', 'records')
+        if not file or not file.filename:
+            flash('يرجى اختيار ملف', 'error')
+            return redirect(url_for('admin_import'))
+
+        try:
+            wb = load_workbook(file, read_only=True)
+            ws = wb.active
+            rows = list(ws.iter_rows(min_row=2, values_only=True))
+            headers = [cell.value for cell in ws[1]]
+            wb.close()
+        except Exception as e:
+            flash(f'خطأ في قراءة الملف: {e}', 'error')
+            return redirect(url_for('admin_import'))
+
+        db = get_db()
+        inserted = 0
+        skipped = []
+
+        if import_type == 'records':
+            col_map = {h: i for i, h in enumerate(headers) if h}
+            for row_num, row in enumerate(rows, 2):
+                def g(col):
+                    idx = col_map.get(col)
+                    return str(row[idx]).strip() if idx is not None and idx < len(row) and row[idx] else ''
+
+                first = g('first_name') or g('الاسم')
+                last = g('last_name') or g('الكنية')
+                if not first:
+                    skipped.append(f'سطر {row_num}: الاسم مطلوب')
+                    continue
+
+                slug = f"{first}-{last}-{int(time.time())}".replace(' ', '-')
+                try:
+                    db.execute("""INSERT INTO records (first_name, father_name, last_name, mother_name,
+                        gender, status, province, national_id, phone, birth_year,
+                        marital, address, housing_type, record_slug)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (first, g('father_name') or g('اسم الأب'), last,
+                         g('mother_name') or g('اسم الأم'),
+                         g('gender') or g('الجنس'), g('status') or g('الحالة'),
+                         g('province') or g('المحافظة'), g('national_id') or g('الرقم الوطني'),
+                         g('phone') or g('الهاتف'), int(g('birth_year') or g('سنة الميلاد') or 0),
+                         g('marital') or g('الحالة الاجتماعية'), g('address') or g('العنوان'),
+                         g('housing_type') or g('نوع السكن'), slug))
+                    inserted += 1
+                except Exception as e:
+                    skipped.append(f'سطر {row_num}: {e}')
+
+        elif import_type == 'volunteers':
+            col_map = {h: i for i, h in enumerate(headers) if h}
+            for row_num, row in enumerate(rows, 2):
+                def g(col):
+                    idx = col_map.get(col)
+                    return str(row[idx]).strip() if idx is not None and idx < len(row) and row[idx] else ''
+
+                name = g('full_name') or g('الاسم')
+                if not name:
+                    skipped.append(f'سطر {row_num}: الاسم مطلوب')
+                    continue
+                try:
+                    db.execute("INSERT INTO volunteers (full_name, phone, email, national_id, province, address, role, specialization) VALUES (?,?,?,?,?,?,?,?)",
+                               (name, g('phone') or g('الهاتف'), g('email') or g('البريد'),
+                                g('national_id') or g('الرقم الوطني'), g('province') or g('المحافظة'),
+                                g('address') or g('العنوان'), g('role') or g('الدور'),
+                                g('specialization') or g('التخصص')))
+                    inserted += 1
+                except Exception as e:
+                    skipped.append(f'سطر {row_num}: {e}')
+
+        elif import_type == 'members':
+            col_map = {h: i for i, h in enumerate(headers) if h}
+            for row_num, row in enumerate(rows, 2):
+                def g(col):
+                    idx = col_map.get(col)
+                    return str(row[idx]).strip() if idx is not None and idx < len(row) and row[idx] else ''
+
+                name = g('full_name') or g('الاسم')
+                if not name:
+                    skipped.append(f'سطر {row_num}: الاسم مطلوب')
+                    continue
+                try:
+                    db.execute("INSERT INTO members (full_name, father_name, phone, email, national_id, province, address, membership_type) VALUES (?,?,?,?,?,?,?,?)",
+                               (name, g('father_name') or g('اسم الأب'),
+                                g('phone') or g('الهاتف'), g('email') or g('البريد'),
+                                g('national_id') or g('الرقم الوطني'), g('province') or g('المحافظة'),
+                                g('address') or g('العنوان'), g('membership_type') or g('نوع العضوية')))
+                    inserted += 1
+                except Exception as e:
+                    skipped.append(f'سطر {row_num}: {e}')
+
+        db.commit()
+        log_audit('bulk_import', import_type, details=f'{inserted} inserted, {len(skipped)} skipped')
+        flash(f'تم استيراد {inserted} سجل بنجاح' + (f'، تم تخطي {len(skipped)} سطر' if skipped else ''), 'success')
+        if skipped:
+            for s in skipped[:10]:
+                flash(s, 'error')
+        return redirect(url_for('admin_import'))
+
+    return render_template('admin_import.html')
+
+
+@app.route('/admin/import/template')
+@admin_required
+def admin_import_template():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    import_type = request.args.get('type', 'records')
+    wb = Workbook()
+    ws = wb.active
+    ws.sheet_view.rightToLeft = True
+
+    if import_type == 'volunteers':
+        headers = ['الاسم', 'الهاتف', 'البريد', 'الرقم الوطني', 'المحافظة', 'العنوان', 'الدور', 'التخصص']
+        ws.title = 'متطوعون'
+    elif import_type == 'members':
+        headers = ['الاسم', 'اسم الأب', 'الهاتف', 'البريد', 'الرقم الوطني', 'المحافظة', 'العنوان', 'نوع العضوية']
+        ws.title = 'منتسبون'
+    else:
+        headers = ['الاسم', 'اسم الأب', 'الكنية', 'اسم الأم', 'الجنس', 'الحالة', 'المحافظة',
+                    'الرقم الوطني', 'الهاتف', 'سنة الميلاد', 'الحالة الاجتماعية', 'العنوان', 'نوع السكن']
+        ws.title = 'سجلات'
+
+    hfont = Font(bold=True, color='FFFFFF')
+    hfill = PatternFill(start_color='1565C0', end_color='1565C0', fill_type='solid')
+    for i, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=i, value=h)
+        cell.font = hfont
+        cell.fill = hfill
+        cell.alignment = Alignment(horizontal='center')
+        ws.column_dimensions[chr(64 + i)].width = 18
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True,
+                     download_name=f'template_{import_type}.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='HAQQUNA - Victim Documentation System')
@@ -4666,7 +5219,7 @@ if __name__ == '__main__':
         print(f"  Fixed IP:   {fixed_ip} (configured)")
     print(f"  Admin:      http://{lan_ip}:{port}/admin")
     print(f"  Data Entry: http://{lan_ip}:{port}/entry")
-    print(f"  Password:   {ADMIN_PASSWORD}")
+    print(f"  Password:   (stored in admin_password.hash)")
     print("="*60)
     print(f"  * Other devices on your network can connect using:")
     print(f"    http://{lan_ip}:{port}")

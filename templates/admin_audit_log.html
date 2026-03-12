@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}سجل العمليات - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+        سجل العمليات
+        <span style="font-size: 0.95rem; color: var(--text-light);">({{ total }} عملية)</span>
+    </h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline btn-sm">لوحة التحكم</a>
+</div>
+
+<!-- Filters -->
+<form method="GET" style="display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;">
+    <select name="entity_type" style="padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;">
+        <option value="">كل الأنواع</option>
+        <option value="record" {{ 'selected' if entity_type == 'record' }}>سجلات</option>
+        <option value="volunteer" {{ 'selected' if entity_type == 'volunteer' }}>متطوعون</option>
+        <option value="member" {{ 'selected' if entity_type == 'member' }}>منتسبون</option>
+        <option value="system" {{ 'selected' if entity_type == 'system' }}>نظام</option>
+    </select>
+    <input type="date" name="date_from" value="{{ date_from }}" placeholder="من تاريخ" style="padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;">
+    <input type="date" name="date_to" value="{{ date_to }}" placeholder="إلى تاريخ" style="padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;">
+    <button type="submit" class="btn btn-primary btn-sm">تصفية</button>
+</form>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 50px;">#</th>
+                    <th style="width: 150px;">التاريخ</th>
+                    <th>العملية</th>
+                    <th>النوع</th>
+                    <th>معرّف</th>
+                    <th>التفاصيل</th>
+                    <th style="width: 110px;">IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.id }}</td>
+                    <td style="white-space: nowrap; font-size: 0.85rem;">{{ log.timestamp }}</td>
+                    <td>
+                        {% if 'create' in log.action or 'add' in log.action %}
+                        <span style="color: #2e7d32;">{{ log.action }}</span>
+                        {% elif 'delete' in log.action %}
+                        <span style="color: #c62828;">{{ log.action }}</span>
+                        {% elif 'edit' in log.action or 'update' in log.action %}
+                        <span style="color: #f57f17;">{{ log.action }}</span>
+                        {% else %}
+                        {{ log.action }}
+                        {% endif %}
+                    </td>
+                    <td>{{ log.entity_type }}</td>
+                    <td>{{ log.entity_id or '-' }}</td>
+                    <td style="font-size: 0.85rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">{{ log.details }}</td>
+                    <td style="direction: ltr; font-size: 0.85rem;">{{ log.ip_address }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-light);">لا توجد عمليات مسجلة</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if total > per_page %}
+<div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+    {% if page > 1 %}
+    <a href="{{ url_for('admin_audit_log', page=page-1, entity_type=entity_type, date_from=date_from, date_to=date_to) }}" class="btn btn-outline btn-sm">السابق</a>
+    {% endif %}
+    <span style="padding: 0.4rem 0.8rem; font-size: 0.9rem;">صفحة {{ page }} من {{ ((total - 1) // per_page) + 1 }}</span>
+    {% if page * per_page < total %}
+    <a href="{{ url_for('admin_audit_log', page=page+1, entity_type=entity_type, date_from=date_from, date_to=date_to) }}" class="btn btn-outline btn-sm">التالي</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

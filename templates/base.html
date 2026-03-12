@@ -32,6 +32,10 @@
                 <a href="{{ url_for('admin_activities') }}">النشاطات</a>
                 <a href="{{ url_for('admin_custom_lists') }}">القوائم</a>
                 <a href="{{ url_for('admin_missing_details') }}">الناقصة</a>
+                <a href="{{ url_for('admin_backup') }}">النسخ الاحتياطي</a>
+                <a href="{{ url_for('admin_import') }}">استيراد</a>
+                <a href="{{ url_for('admin_audit_log') }}">سجل العمليات</a>
+                <a href="{{ url_for('admin_change_password') }}">كلمة المرور</a>
                 <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
                 {% else %}
                 <a href="{{ url_for('admin_login') }}">دخول الإدارة</a>

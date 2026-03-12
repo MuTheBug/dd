@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}استيراد بيانات - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">استيراد بيانات من Excel</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline btn-sm">لوحة التحكم</a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+    <!-- Upload Form -->
+    <div class="card" style="padding: 1.5rem;">
+        <h3 style="margin-bottom: 1rem;">رفع ملف Excel</h3>
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label>نوع البيانات</label>
+                <select name="import_type" id="importType" style="width: 100%;">
+                    <option value="records">سجلات (ضحايا)</option>
+                    <option value="volunteers">متطوعون</option>
+                    <option value="members">منتسبون</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label>ملف Excel (.xlsx)</label>
+                <input type="file" name="file" accept=".xlsx,.xls" required style="width: 100%;">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">استيراد</button>
+        </form>
+    </div>
+
+    <!-- Template Downloads -->
+    <div class="card" style="padding: 1.5rem;">
+        <h3 style="margin-bottom: 1rem;">تنزيل قوالب فارغة</h3>
+        <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1rem;">
+            حمّل قالب Excel فارغاً مع أسماء الأعمدة الصحيحة، ثم املأه بالبيانات وارفعه.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <a href="{{ url_for('admin_import_template', type='records') }}" class="btn btn-outline btn-sm">قالب السجلات</a>
+            <a href="{{ url_for('admin_import_template', type='volunteers') }}" class="btn btn-outline btn-sm">قالب المتطوعين</a>
+            <a href="{{ url_for('admin_import_template', type='members') }}" class="btn btn-outline btn-sm">قالب المنتسبين</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

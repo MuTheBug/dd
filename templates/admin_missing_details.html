@@ -10,6 +10,8 @@
     table { font-size: 10pt; }
     .missing-tag { border: 1px solid #999 !important; background: #f5f5f5 !important; color: #333 !important; }
     .print-only { display: block !important; }
+    .bulk-bar { display: none !important; }
+    tr.hidden-for-print { display: none !important; }
 }
 .missing-tag {
     display: inline-block;
@@ -43,6 +45,18 @@
 }
 .sort-link:hover { color: var(--primary); }
 .sort-active { color: var(--primary); font-weight: 700; }
+.priority-high { background: #ffcdd2; color: #c62828; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+.priority-mid { background: #fff3e0; color: #e65100; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+.priority-low { background: #e8f5e9; color: #2e7d32; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+.bulk-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: var(--primary-dark, #1565c0); color: #fff; padding: 0.6rem 1.5rem;
+    display: none; align-items: center; justify-content: space-between;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+}
+.bulk-bar.active { display: flex; }
+.bulk-bar .btn { color: #fff; border-color: rgba(255,255,255,0.5); }
+.bulk-bar .btn:hover { background: rgba(255,255,255,0.15); }
 </style>
 
 <div class="no-print" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
@@ -51,8 +65,9 @@
         <span style="font-size: 0.95rem; color: var(--text-light);">({{ summary.total }} ملف يحتاج إكمال)</span>
     </h1>
     <div class="btn-group">
-        <button onclick="window.print()" class="btn btn-primary btn-sm">&#x1F5A8; طباعة</button>
-        <a href="{{ url_for('admin_missing_details_excel', type=profile_type, field=field_filter) }}" class="btn btn-success btn-sm">&#x1F4E5; Excel</a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">طباعة</button>
+        <a href="{{ url_for('admin_missing_details_excel', type=profile_type, field=field_filter) }}" class="btn btn-success btn-sm">Excel</a>
+        <button onclick="showExportModal()" class="btn btn-outline btn-sm">تصدير إلى قائمة</button>
         <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline btn-sm">لوحة التحكم</a>
     </div>
 </div>
@@ -101,6 +116,7 @@
         <table id="missingTable">
             <thead>
                 <tr>
+                    <th class="no-print" style="width: 30px;"><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>
                     <th style="width: 40px;">#</th>
                     <th>النوع</th>
                     <th>
@@ -112,13 +128,19 @@
                             الاكتمال {{ '&#x25B2;' if sort=='missing_asc' else '&#x25BC;' if sort=='missing_desc' else '' }}
                         </a>
                     </th>
+                    <th style="width: 70px;">
+                        <a href="{{ url_for('admin_missing_details', type=profile_type, field=field_filter, sort='priority_desc') }}" class="sort-link {{ 'sort-active' if sort=='priority_desc' }}">
+                            الأولوية {{ '&#x25BC;' if sort=='priority_desc' else '' }}
+                        </a>
+                    </th>
                     <th>الحقول الناقصة</th>
                     <th class="no-print" style="width: 70px;">إجراء</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in results %}
-                <tr>
+                <tr data-id="{{ r.id }}" data-type="{{ r.type_key }}">
+                    <td class="no-print"><input type="checkbox" class="row-check" value="{{ r.type_key }}:{{ r.id }}" onchange="updateBulkBar()"></td>
                     <td>{{ r.id }}</td>
                     <td>
                         {% if r.type_key == 'volunteers' %}
@@ -145,6 +167,10 @@
                         <span style="font-size: 0.8rem; margin-right: 0.3rem;">{{ pct }}%</span>
                     </td>
                     <td>
+                        {% set p = r.priority|default(0) %}
+                        <span class="{{ 'priority-high' if p >= 50 else 'priority-mid' if p >= 20 else 'priority-low' }}">{{ p }}</span>
+                    </td>
+                    <td>
                         {% for field in r.missing %}
                         <span class="missing-tag">{{ field }}</span>
                         {% endfor %}
@@ -155,13 +181,43 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-light);">
                         جميع الملفات مكتملة - لا توجد تفاصيل ناقصة
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- Bulk Action Bar -->
+<div class="bulk-bar no-print" id="bulkBar">
+    <span id="bulkCount">تم تحديد 0</span>
+    <div class="btn-group">
+        <button onclick="bulkPrint()" class="btn btn-outline btn-sm">طباعة المحدد</button>
+        <button onclick="bulkExportList()" class="btn btn-outline btn-sm">إضافة إلى قائمة</button>
+    </div>
+</div>
+
+<!-- Export to List Modal -->
+<div id="exportModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:200; background:rgba(0,0,0,0.5);" onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:var(--bg, #fff); border-radius:12px; max-width:400px; margin:15vh auto; padding:1.5rem; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+        <h3 style="margin-bottom:1rem;">تصدير إلى قائمة مخصصة</h3>
+        <div style="margin-bottom:1rem;">
+            <label>اختر قائمة موجودة أو أنشئ جديدة:</label>
+            <select id="listSelect" style="width:100%; margin-top:0.3rem; padding:0.4rem;">
+                <option value="new">+ إنشاء قائمة جديدة</option>
+            </select>
+        </div>
+        <div id="newListFields" style="margin-bottom:1rem;">
+            <input type="text" id="newListName" placeholder="اسم القائمة" style="width:100%; margin-bottom:0.5rem; padding:0.4rem;">
+            <input type="text" id="newListDesc" placeholder="وصف (اختياري)" style="width:100%; padding:0.4rem;">
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+            <button onclick="doExport(false)" class="btn btn-primary" style="flex:1;">تصدير الكل ({{ summary.records }} سجل)</button>
+            <button onclick="document.getElementById('exportModal').style.display='none'" class="btn btn-outline">إلغاء</button>
+        </div>
     </div>
 </div>
 
@@ -174,9 +230,103 @@ function filterTable() {
     var q = document.getElementById('searchBox').value.toLowerCase();
     var rows = document.querySelectorAll('#missingTable tbody tr');
     rows.forEach(function(row) {
-        var name = (row.cells[2] && row.cells[2].textContent || '').toLowerCase();
-        var phone = (row.cells[3] && row.cells[3].textContent || '').toLowerCase();
+        var name = (row.cells[3] && row.cells[3].textContent || '').toLowerCase();
+        var phone = (row.cells[4] && row.cells[4].textContent || '').toLowerCase();
         row.style.display = (!q || name.indexOf(q) !== -1 || phone.indexOf(q) !== -1) ? '' : 'none';
+    });
+}
+
+// Bulk selection
+function toggleAll(el) {
+    document.querySelectorAll('.row-check').forEach(function(cb) {
+        if (cb.closest('tr').style.display !== 'none') cb.checked = el.checked;
+    });
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    var checked = document.querySelectorAll('.row-check:checked').length;
+    var bar = document.getElementById('bulkBar');
+    document.getElementById('bulkCount').textContent = 'تم تحديد ' + checked;
+    bar.classList.toggle('active', checked > 0);
+}
+
+function bulkPrint() {
+    var rows = document.querySelectorAll('#missingTable tbody tr');
+    rows.forEach(function(row) {
+        var cb = row.querySelector('.row-check');
+        if (cb && !cb.checked) row.classList.add('hidden-for-print');
+    });
+    window.print();
+    rows.forEach(function(row) { row.classList.remove('hidden-for-print'); });
+}
+
+// Export to list
+function showExportModal() {
+    fetch('/api/custom_lists_json').then(r => r.json()).then(function(lists) {
+        var sel = document.getElementById('listSelect');
+        sel.innerHTML = '<option value="new">+ إنشاء قائمة جديدة</option>';
+        lists.forEach(function(l) {
+            sel.innerHTML += '<option value="' + l.id + '">' + l.name + '</option>';
+        });
+    });
+    document.getElementById('exportModal').style.display = '';
+}
+
+function bulkExportList() {
+    showExportModal();
+    // Tag that we're doing bulk export
+    document.getElementById('exportModal').dataset.bulk = 'true';
+}
+
+document.getElementById('listSelect').addEventListener('change', function() {
+    document.getElementById('newListFields').style.display = this.value === 'new' ? '' : 'none';
+});
+
+function doExport(bulkOnly) {
+    var isBulk = document.getElementById('exportModal').dataset.bulk === 'true';
+    var listId = document.getElementById('listSelect').value;
+    var recordIds = [];
+
+    if (isBulk) {
+        document.querySelectorAll('.row-check:checked').forEach(function(cb) {
+            var parts = cb.value.split(':');
+            if (parts[0] === 'records') recordIds.push(parseInt(parts[1]));
+        });
+    } else {
+        // Export all visible records
+        document.querySelectorAll('#missingTable tbody tr').forEach(function(row) {
+            if (row.style.display !== 'none' && row.dataset.type === 'records') {
+                recordIds.push(parseInt(row.dataset.id));
+            }
+        });
+    }
+
+    if (recordIds.length === 0) {
+        alert('لا توجد سجلات للتصدير (فقط نوع "سجل" يمكن تصديره إلى القوائم)');
+        return;
+    }
+
+    var body = { record_ids: recordIds };
+    if (listId === 'new') {
+        body.list_name = document.getElementById('newListName').value || 'تفاصيل ناقصة';
+        body.list_description = document.getElementById('newListDesc').value || '';
+    } else {
+        body.list_id = parseInt(listId);
+    }
+
+    fetch('/api/export_to_list', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+        body: JSON.stringify(body)
+    }).then(r => r.json()).then(function(data) {
+        if (data.success) {
+            alert('تم تصدير ' + recordIds.length + ' سجل إلى القائمة بنجاح');
+            document.getElementById('exportModal').style.display = 'none';
+            document.getElementById('exportModal').dataset.bulk = '';
+        } else {
+            alert(data.message || 'حدث خطأ');
+        }
     });
 }
 </script>

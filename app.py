@@ -4421,12 +4421,16 @@ def admin_missing_details():
         ('last_name', 'الكنية'),
         ('mother_name', 'اسم الأم'),
         ('gender', 'الجنس'),
+        ('status', 'الحالة'),
         ('province', 'المحافظة'),
         ('national_id', 'الرقم الوطني'),
         ('phone', 'الهاتف'),
         ('birth_year', 'سنة الميلاد'),
         ('marital', 'الحالة الاجتماعية'),
         ('address', 'العنوان'),
+        ('housing_type', 'نوع السكن'),
+        ('reporter_name', 'اسم المبلّغ'),
+        ('reporter_relation', 'صلة المبلّغ'),
         ('photo_path', 'الصورة'),
     ]
     # Fields checked only when status is known
@@ -4434,6 +4438,7 @@ def admin_missing_details():
         ('arrest_year', 'سنة الاعتقال'),
         ('arrest_authority', 'جهة الاعتقال'),
         ('arrest_place', 'مكان الاحتجاز'),
+        ('arrest_reason', 'سبب الاعتقال'),
     ]
     record_survivor_fields = [
         ('release_year', 'سنة الإفراج'),
@@ -4555,13 +4560,15 @@ def admin_missing_details_excel():
     record_base = [
         ('first_name', 'الاسم'), ('father_name', 'اسم الأب'),
         ('last_name', 'الكنية'), ('mother_name', 'اسم الأم'),
-        ('gender', 'الجنس'), ('province', 'المحافظة'),
-        ('national_id', 'الرقم الوطني'), ('phone', 'الهاتف'),
-        ('birth_year', 'سنة الميلاد'), ('marital', 'الحالة الاجتماعية'),
-        ('address', 'العنوان'), ('photo_path', 'الصورة'),
+        ('gender', 'الجنس'), ('status', 'الحالة'),
+        ('province', 'المحافظة'), ('national_id', 'الرقم الوطني'),
+        ('phone', 'الهاتف'), ('birth_year', 'سنة الميلاد'),
+        ('marital', 'الحالة الاجتماعية'), ('address', 'العنوان'),
+        ('housing_type', 'نوع السكن'), ('reporter_name', 'اسم المبلّغ'),
+        ('reporter_relation', 'صلة المبلّغ'), ('photo_path', 'الصورة'),
     ]
     arrest_f = [('arrest_year', 'سنة الاعتقال'), ('arrest_authority', 'جهة الاعتقال'),
-                ('arrest_place', 'مكان الاحتجاز')]
+                ('arrest_place', 'مكان الاحتجاز'), ('arrest_reason', 'سبب الاعتقال')]
     survivor_f = [('release_year', 'سنة الإفراج')]
     deceased_f = [('death_year', 'سنة الوفاة'), ('death_place', 'مكان الوفاة')]
     int_cols = {'birth_year', 'arrest_year', 'release_year', 'death_year'}

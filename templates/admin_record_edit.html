@@ -3,7 +3,11 @@
 
 {% block content %}
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    {% if return_to %}
+    <a href="{{ return_to }}" class="btn btn-outline btn-sm">&#x2192; العودة للقائمة</a>
+    {% else %}
     <a href="{{ url_for('admin_record_detail', record_id=record.id) }}" class="btn btn-outline btn-sm">&#x2192; العودة للتفاصيل</a>
+    {% endif %}
     <h1 style="font-size: 1.3rem; color: var(--primary-dark);">تعديل سجل #{{ record.id }}</h1>
 </div>
 
@@ -19,6 +23,7 @@
 {% endif %}
 
 <form method="POST" enctype="multipart/form-data" {% if record.record_status == 'locked' %}onsubmit="return confirm('هذا السجل مقفل! هل أنت متأكد من التعديل؟')"{% endif %}>
+{% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
 
 <!-- Classification & Reporter -->
 <div class="form-section">

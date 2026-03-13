@@ -176,7 +176,7 @@
                         {% endfor %}
                     </td>
                     <td class="no-print">
-                        <a href="{{ r.edit_url }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
+                        <a href="{{ r.edit_url }}{{ '&' if '?' in r.edit_url else '?' }}return_to={{ request.full_path|urlencode }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
                     </td>
                 </tr>
                 {% else %}

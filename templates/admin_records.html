@@ -824,7 +824,7 @@
                     <td>
                         <div class="btn-group" style="flex-wrap: nowrap;">
                             <a href="{{ url_for('admin_record_detail', record_id=r.id) }}" class="btn btn-primary btn-sm" title="عرض">&#x1F441;</a>
-                            <a href="{{ url_for('admin_record_edit', record_id=r.id) }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
+                            <a href="{{ url_for('admin_record_edit', record_id=r.id, return_to=request.full_path) }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
                         </div>
                     </td>
                 </tr>

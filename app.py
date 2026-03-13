@@ -2403,6 +2403,9 @@ def admin_record_edit(record_id):
         db.commit()
         log_audit('record_edit', 'record', record_id)
         flash('تم تحديث السجل بنجاح', 'success')
+        return_to = request.form.get('return_to', '').strip()
+        if return_to and return_to.startswith('/'):
+            return redirect(return_to)
         return redirect(url_for('admin_record_detail', record_id=record_id))
 
     volunteer_names = db.execute(
@@ -2411,9 +2414,10 @@ def admin_record_edit(record_id):
     services = db.execute(
         "SELECT * FROM record_services WHERE record_id=? ORDER BY created_at DESC", (record_id,)
     ).fetchall()
+    return_to = request.args.get('return_to', '')
     return render_template('admin_record_edit.html', record=record,
                            volunteer_names=[v['full_name'] for v in volunteer_names],
-                           services=services)
+                           services=services, return_to=return_to)
 
 
 @app.route('/admin/record/<int:record_id>/history')

@@ -49,8 +49,9 @@
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>الاسم الكامل</th>
-                    <th>اسم الأب</th>
+                    <th>الاسم</th>
+                    <th>الأب</th>
+                    <th>الكنية</th>
                     <th>الهاتف</th>
                     <th>المحافظة</th>
                     <th>نوع العضوية</th>
@@ -64,8 +65,9 @@
                 {% for m in members %}
                 <tr>
                     <td>{{ m.id }}</td>
-                    <td style="font-weight: 600;">{{ m.full_name }}</td>
+                    <td style="font-weight: 600;">{{ m.first_name or m.full_name }}</td>
                     <td>{{ m.father_name or '-' }}</td>
+                    <td>{{ m.last_name or '-' }}</td>
                     <td dir="ltr" style="text-align: right;">
                         {% if m.phone %}
                         <a href="tel:{{ m.phone }}" style="color: var(--text); text-decoration: none;">&#x1F4DE; {{ m.phone }}</a>
@@ -100,7 +102,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="10" style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-light);">
                         لا يوجد منتسبون مسجلون
                     </td>
                 </tr>

@@ -177,13 +177,13 @@ body {
 }
 .nav-logo { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.2); }
 .nav-title { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.3px; }
-.nav-links { display: flex; align-items: center; gap: 0.2rem; }
+.nav-links { display: flex; align-items: center; gap: 0.2rem; flex-wrap: wrap; }
 .nav-links a {
     color: rgba(255,255,255,0.85);
     text-decoration: none;
-    padding: 0.45rem 0.85rem;
+    padding: 0.35rem 0.6rem;
     border-radius: var(--radius-sm);
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     font-weight: 500;
     transition: var(--transition);
     white-space: nowrap;

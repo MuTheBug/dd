@@ -493,6 +493,22 @@ def migrate_db():
         )
     """)
 
+    # Migrate volunteers: add individual name fields
+    cursor.execute("PRAGMA table_info(volunteers)")
+    vol_existing = {row[1] for row in cursor.fetchall()}
+    vol_new_cols = {
+        'first_name': "TEXT DEFAULT ''",
+        'last_name': "TEXT DEFAULT ''",
+        'father_name': "TEXT DEFAULT ''",
+        'mother_name': "TEXT DEFAULT ''",
+    }
+    for col, typedef in vol_new_cols.items():
+        if col not in vol_existing:
+            try:
+                cursor.execute(f"ALTER TABLE volunteers ADD COLUMN {col} {typedef}")
+            except sqlite3.OperationalError:
+                pass
+
     # -- Members table --
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS members (
@@ -515,6 +531,21 @@ def migrate_db():
             updated_at TEXT DEFAULT (datetime('now','localtime'))
         )
     """)
+
+    # Migrate members: add individual name fields
+    cursor.execute("PRAGMA table_info(members)")
+    mem_existing = {row[1] for row in cursor.fetchall()}
+    mem_new_cols = {
+        'first_name': "TEXT DEFAULT ''",
+        'last_name': "TEXT DEFAULT ''",
+        'mother_name': "TEXT DEFAULT ''",
+    }
+    for col, typedef in mem_new_cols.items():
+        if col not in mem_existing:
+            try:
+                cursor.execute(f"ALTER TABLE members ADD COLUMN {col} {typedef}")
+            except sqlite3.OperationalError:
+                pass
 
     # -- Member payments table --
     cursor.execute("""
@@ -3585,12 +3616,18 @@ def admin_volunteers():
 def admin_volunteer_add():
     if request.method == 'POST':
         db = get_db()
+        first_name = request.form.get('first_name', '').strip()
+        father_name = request.form.get('father_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        mother_name = request.form.get('mother_name', '').strip()
+        full_name = ' '.join(filter(None, [first_name, father_name, last_name]))
         db.execute("""
-            INSERT INTO volunteers (full_name, phone, email, national_id, province,
+            INSERT INTO volunteers (full_name, first_name, last_name, father_name, mother_name,
+                                    phone, email, national_id, province,
                                     address, role, specialization, join_date, status, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            request.form.get('full_name', '').strip(),
+            full_name, first_name, last_name, father_name, mother_name,
             request.form.get('phone', '').strip(),
             request.form.get('email', '').strip(),
             request.form.get('national_id', '').strip(),
@@ -3603,7 +3640,7 @@ def admin_volunteer_add():
             request.form.get('notes', '').strip(),
         ))
         db.commit()
-        log_audit('volunteer_create', 'volunteer', details=request.form.get('full_name', ''))
+        log_audit('volunteer_create', 'volunteer', details=full_name)
         flash('تم إضافة المتطوع بنجاح', 'success')
         return redirect(url_for('admin_volunteers'))
     return render_template('admin_volunteer_form.html', volunteer=None)
@@ -3619,13 +3656,19 @@ def admin_volunteer_edit(vid):
         return redirect(url_for('admin_volunteers'))
 
     if request.method == 'POST':
+        first_name = request.form.get('first_name', '').strip()
+        father_name = request.form.get('father_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        mother_name = request.form.get('mother_name', '').strip()
+        full_name = ' '.join(filter(None, [first_name, father_name, last_name]))
         db.execute("""
-            UPDATE volunteers SET full_name=?, phone=?, email=?, national_id=?, province=?,
+            UPDATE volunteers SET full_name=?, first_name=?, last_name=?, father_name=?, mother_name=?,
+                                  phone=?, email=?, national_id=?, province=?,
                                   address=?, role=?, specialization=?, join_date=?, status=?,
                                   notes=?, updated_at=datetime('now','localtime')
             WHERE id=?
         """, (
-            request.form.get('full_name', '').strip(),
+            full_name, first_name, last_name, father_name, mother_name,
             request.form.get('phone', '').strip(),
             request.form.get('email', '').strip(),
             request.form.get('national_id', '').strip(),
@@ -3903,14 +3946,19 @@ def admin_members():
 def admin_member_add():
     if request.method == 'POST':
         db = get_db()
+        first_name = request.form.get('first_name', '').strip()
+        father_name = request.form.get('father_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        mother_name = request.form.get('mother_name', '').strip()
+        full_name = ' '.join(filter(None, [first_name, father_name, last_name]))
         db.execute("""
-            INSERT INTO members (full_name, father_name, phone, email, national_id,
+            INSERT INTO members (full_name, first_name, last_name, father_name, mother_name,
+                                 phone, email, national_id,
                                  birth_year, gender, province, address,
                                  membership_type, membership_number, join_date, status, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            request.form.get('full_name', '').strip(),
-            request.form.get('father_name', '').strip(),
+            full_name, first_name, last_name, father_name, mother_name,
             request.form.get('phone', '').strip(),
             request.form.get('email', '').strip(),
             request.form.get('national_id', '').strip(),
@@ -3925,7 +3973,7 @@ def admin_member_add():
             request.form.get('notes', '').strip(),
         ))
         db.commit()
-        log_audit('member_create', 'member', details=request.form.get('full_name', ''))
+        log_audit('member_create', 'member', details=full_name)
         flash('تم إضافة المنتسب بنجاح', 'success')
         return redirect(url_for('admin_members'))
     return render_template('admin_member_form.html', member=None)
@@ -3941,15 +3989,20 @@ def admin_member_edit(mid):
         return redirect(url_for('admin_members'))
 
     if request.method == 'POST':
+        first_name = request.form.get('first_name', '').strip()
+        father_name = request.form.get('father_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        mother_name = request.form.get('mother_name', '').strip()
+        full_name = ' '.join(filter(None, [first_name, father_name, last_name]))
         db.execute("""
-            UPDATE members SET full_name=?, father_name=?, phone=?, email=?, national_id=?,
+            UPDATE members SET full_name=?, first_name=?, last_name=?, father_name=?, mother_name=?,
+                               phone=?, email=?, national_id=?,
                                birth_year=?, gender=?, province=?, address=?,
                                membership_type=?, membership_number=?, join_date=?, status=?,
                                notes=?, updated_at=datetime('now','localtime')
             WHERE id=?
         """, (
-            request.form.get('full_name', '').strip(),
-            request.form.get('father_name', '').strip(),
+            full_name, first_name, last_name, father_name, mother_name,
             request.form.get('phone', '').strip(),
             request.form.get('email', '').strip(),
             request.form.get('national_id', '').strip(),

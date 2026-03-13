@@ -11,13 +11,23 @@
         <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
 
             <div class="form-group">
-                <label>الاسم الكامل <span style="color: var(--deceased);">*</span></label>
-                <input type="text" name="full_name" value="{{ member.full_name if member else '' }}" required placeholder="الاسم الثلاثي">
+                <label>الاسم الأول <span style="color: var(--deceased);">*</span></label>
+                <input type="text" name="first_name" value="{{ member.first_name if member else '' }}" required placeholder="الاسم الأول">
             </div>
 
             <div class="form-group">
                 <label>اسم الأب</label>
                 <input type="text" name="father_name" value="{{ member.father_name if member else '' }}" placeholder="اسم الأب">
+            </div>
+
+            <div class="form-group">
+                <label>الكنية (اسم العائلة) <span style="color: var(--deceased);">*</span></label>
+                <input type="text" name="last_name" value="{{ member.last_name if member else '' }}" required placeholder="الكنية">
+            </div>
+
+            <div class="form-group">
+                <label>اسم الأم</label>
+                <input type="text" name="mother_name" value="{{ member.mother_name if member else '' }}" placeholder="اسم الأم">
             </div>
 
             <div class="form-group">

@@ -1562,6 +1562,7 @@ def admin_records():
         'service_provider': request.args.get('service_provider', ''),
         'last_service_from': request.args.get('last_service_from', ''),
         'last_service_to': request.args.get('last_service_to', ''),
+        'service_filter_mode': request.args.get('service_filter_mode', 'received'),
     }
 
     # Record verification status filter
@@ -1823,7 +1824,14 @@ def admin_records():
         conditions.append("detention_facilities_data LIKE ?")
         params.append(f"%{filters['detention_facility_search']}%")
     # Service filters (subqueries on record_services)
-    if filters['service_name'] and filters['service_count_min']:
+    svc_mode = filters.get('service_filter_mode', 'received')
+    if svc_mode == 'not_received' and filters['service_name']:
+        # Never received this specific service
+        conditions.append(
+            "NOT EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
+        )
+        params.append(filters['service_name'])
+    elif filters['service_name'] and filters['service_count_min']:
         conditions.append(
             "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?) >= ?"
         )

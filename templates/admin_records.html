@@ -560,6 +560,13 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>وضع الفلتر</label>
+                    <select name="service_filter_mode" onchange="document.getElementById('serviceCountGroup').style.display = this.value==='not_received' ? 'none' : ''">
+                        <option value="received" {{ 'selected' if filters.service_filter_mode=='received' }}>استلم الخدمة</option>
+                        <option value="not_received" {{ 'selected' if filters.service_filter_mode=='not_received' }}>لم يستلم الخدمة</option>
+                    </select>
+                </div>
+                <div class="form-group" id="serviceCountGroup" style="{{ 'display:none' if filters.service_filter_mode=='not_received' else '' }}">
                     <label>عدد مرات الخدمة (على الأقل)</label>
                     <input type="number" name="service_count_min" value="{{ filters.service_count_min }}" placeholder="مثال: 2" min="1">
                 </div>
@@ -763,7 +770,9 @@
         {% if filters.detention_facility_search %}
         <span class="filter-tag">معتقل: {{ filters.detention_facility_search }}</span>
         {% endif %}
-        {% if filters.service_name %}
+        {% if filters.service_name and filters.service_filter_mode == 'not_received' %}
+        <span class="filter-tag" style="background: #fee2e2; color: #991b1b;">لم يستلم: {{ filters.service_name }}</span>
+        {% elif filters.service_name %}
         <span class="filter-tag" style="background: #dbeafe; color: #1e40af;">خدمة: {{ filters.service_name }}{% if filters.service_count_min %} ({{ filters.service_count_min }}+ مرات){% endif %}</span>
         {% elif filters.service_count_min %}
         <span class="filter-tag" style="background: #dbeafe; color: #1e40af;">خدمات: {{ filters.service_count_min }}+ مرات</span>

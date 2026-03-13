@@ -682,7 +682,7 @@ if (linkSearchInput) {
         var q = this.value.trim();
         if (q.length < 2) { linkSearchResults.style.display = 'none'; return; }
         linkSearchTimer = setTimeout(function() {
-            fetch('/api/search_records?q=' + encodeURIComponent(q) + '&exclude={{ record.id }}')
+            fetch('/api/search_records_for_link?q=' + encodeURIComponent(q) + '&exclude={{ record.id }}')
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (!data.length) {

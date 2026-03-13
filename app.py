@@ -2423,9 +2423,9 @@ def admin_record_unlink(record_id, link_id):
     return redirect(url_for('admin_record_detail', record_id=record_id))
 
 
-@app.route('/api/search_records')
+@app.route('/api/search_records_for_link')
 @admin_required
-def api_search_records():
+def api_search_records_for_link():
     """Search records by name for linking UI."""
     q = request.args.get('q', '').strip()
     exclude_id = int(request.args.get('exclude', 0))

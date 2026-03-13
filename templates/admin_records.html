@@ -562,11 +562,11 @@
                 <div class="form-group">
                     <label>وضع الفلتر</label>
                     <select name="service_filter_mode" onchange="document.getElementById('serviceCountGroup').style.display = this.value==='not_received' ? 'none' : ''">
-                        <option value="received" {{ 'selected' if filters.service_filter_mode=='received' }}>استلم الخدمة</option>
-                        <option value="not_received" {{ 'selected' if filters.service_filter_mode=='not_received' }}>لم يستلم الخدمة</option>
+                        <option value="received" {{ 'selected' if filters.service_filter_mode != 'not_received' }}>استلم الخدمة</option>
+                        <option value="not_received" {{ 'selected' if filters.service_filter_mode == 'not_received' }}>لم يستلم الخدمة</option>
                     </select>
                 </div>
-                <div class="form-group" id="serviceCountGroup" style="{{ 'display:none' if filters.service_filter_mode=='not_received' else '' }}">
+                <div class="form-group" id="serviceCountGroup" style="{{ 'display:none' if filters.service_filter_mode == 'not_received' else '' }}">
                     <label>عدد مرات الخدمة (على الأقل)</label>
                     <input type="number" name="service_count_min" value="{{ filters.service_count_min }}" placeholder="مثال: 2" min="1">
                 </div>
@@ -833,7 +833,7 @@
             </thead>
             <tbody>
                 {% for r in records %}
-                <tr>
+                <tr id="record-{{ r.id }}">
                     <td>{{ r.id }}</td>
                     <td style="font-weight: 600;">{{ r.first_name }}</td>
                     <td>{{ r.father_name }}</td>
@@ -1769,5 +1769,22 @@ document.querySelectorAll('#filterForm select, #filterForm input[type="checkbox"
 window.addEventListener('popstate', function() {
     location.reload();
 });
+
+// Highlight and scroll to record after returning from edit
+(function() {
+    var hash = window.location.hash;
+    var m = hash.match(/^#highlight-(\d+)$/);
+    if (m) {
+        var row = document.getElementById('record-' + m[1]);
+        if (row) {
+            row.scrollIntoView({behavior: 'smooth', block: 'center'});
+            row.style.transition = 'background 0.3s';
+            row.style.background = '#fef08a';
+            setTimeout(function() { row.style.background = ''; }, 3000);
+        }
+        // Clean up the hash
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+})();
 </script>
 {% endblock %}

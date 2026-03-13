@@ -1562,7 +1562,7 @@ def admin_records():
         'service_provider': request.args.get('service_provider', ''),
         'last_service_from': request.args.get('last_service_from', ''),
         'last_service_to': request.args.get('last_service_to', ''),
-        'service_filter_mode': request.args.get('service_filter_mode', 'received'),
+        'service_filter_mode': request.args.get('service_filter_mode', ''),
     }
 
     # Record verification status filter
@@ -1824,7 +1824,7 @@ def admin_records():
         conditions.append("detention_facilities_data LIKE ?")
         params.append(f"%{filters['detention_facility_search']}%")
     # Service filters (subqueries on record_services)
-    svc_mode = filters.get('service_filter_mode', 'received')
+    svc_mode = filters.get('service_filter_mode', '') or 'received'
     if svc_mode == 'not_received' and filters['service_name']:
         # Never received this specific service
         conditions.append(
@@ -2460,7 +2460,9 @@ def admin_record_edit(record_id):
         flash('تم تحديث السجل بنجاح', 'success')
         return_to = request.form.get('return_to', '').strip()
         if return_to and return_to.startswith('/'):
-            return redirect(return_to)
+            # Strip any existing fragment then append highlight anchor
+            base = return_to.split('#')[0]
+            return redirect(base + f'#highlight-{record_id}')
         return redirect(url_for('admin_record_detail', record_id=record_id))
 
     volunteer_names = db.execute(

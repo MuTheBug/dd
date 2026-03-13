@@ -716,6 +716,23 @@ def migrate_db():
         )
     """)
 
+    # -- Record companions table (people who were with a survivor) --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS record_companions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id INTEGER NOT NULL,
+            first_name TEXT DEFAULT '',
+            father_name TEXT DEFAULT '',
+            last_name TEXT DEFAULT '',
+            mother_name TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            linked_record_id INTEGER,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE,
+            FOREIGN KEY (linked_record_id) REFERENCES records(id) ON DELETE SET NULL
+        )
+    """)
+
     # -- Add record_status column for verification workflow --
     cursor.execute("PRAGMA table_info(records)")
     rec_existing = {row[1] for row in cursor.fetchall()}
@@ -2174,8 +2191,23 @@ def admin_record_detail(record_id):
     services = db.execute(
         "SELECT * FROM record_services WHERE record_id=? ORDER BY created_at DESC", (record_id,)
     ).fetchall()
+    companions = db.execute(
+        "SELECT * FROM record_companions WHERE record_id=? ORDER BY created_at DESC", (record_id,)
+    ).fetchall()
+    # Fetch linked record info for companions that have been linked
+    companions_with_links = []
+    for comp in companions:
+        comp_data = dict(comp)
+        if comp['linked_record_id']:
+            lr = db.execute("SELECT id, first_name, father_name, last_name, status, province FROM records WHERE id=?",
+                            (comp['linked_record_id'],)).fetchone()
+            comp_data['linked_record'] = lr
+        else:
+            comp_data['linked_record'] = None
+        companions_with_links.append(comp_data)
     return render_template('admin_record_detail.html', record=record, services=services,
-                           linked_records=linked_records, changes=changes)
+                           linked_records=linked_records, changes=changes,
+                           companions=companions_with_links)
 
 
 @app.route('/admin/record/<int:record_id>/edit', methods=['GET', 'POST'])
@@ -2452,6 +2484,99 @@ def admin_record_unlink(record_id, link_id):
     log_audit('record_unlink', 'record', record_id, f'removed link {link_id}')
     flash('تم إزالة الربط', 'success')
     return redirect(url_for('admin_record_detail', record_id=record_id))
+
+
+@app.route('/admin/record/<int:record_id>/companion/add', methods=['POST'])
+@admin_required
+def admin_record_add_companion(record_id):
+    """Add a companion (person who was with the survivor)."""
+    db = get_db()
+    first_name = request.form.get('comp_first_name', '').strip()
+    father_name = request.form.get('comp_father_name', '').strip()
+    last_name = request.form.get('comp_last_name', '').strip()
+    mother_name = request.form.get('comp_mother_name', '').strip()
+    notes = request.form.get('comp_notes', '').strip()
+    if not first_name and not last_name:
+        flash('يجب إدخال اسم الشخص', 'error')
+        return redirect(url_for('admin_record_detail', record_id=record_id))
+    db.execute("""
+        INSERT INTO record_companions (record_id, first_name, father_name, last_name, mother_name, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (record_id, first_name, father_name, last_name, mother_name, notes))
+    db.commit()
+    full_name = ' '.join(filter(None, [first_name, father_name, last_name]))
+    log_audit('companion_add', 'record', record_id, full_name)
+    flash('تمت إضافة الشخص المرافق بنجاح', 'success')
+    return redirect(url_for('admin_record_detail', record_id=record_id))
+
+
+@app.route('/admin/record/<int:record_id>/companion/<int:comp_id>/delete', methods=['POST'])
+@admin_required
+def admin_record_delete_companion(record_id, comp_id):
+    """Remove a companion."""
+    db = get_db()
+    db.execute("DELETE FROM record_companions WHERE id = ? AND record_id = ?", (comp_id, record_id))
+    db.commit()
+    log_audit('companion_delete', 'record', record_id, f'companion {comp_id}')
+    flash('تم حذف الشخص المرافق', 'success')
+    return redirect(url_for('admin_record_detail', record_id=record_id))
+
+
+@app.route('/admin/record/<int:record_id>/companion/<int:comp_id>/link', methods=['POST'])
+@admin_required
+def admin_record_link_companion(record_id, comp_id):
+    """Link a companion to an existing record for cross-referencing."""
+    db = get_db()
+    linked_record_id = int(request.form.get('linked_record_id', 0))
+    if linked_record_id:
+        db.execute("UPDATE record_companions SET linked_record_id = ? WHERE id = ? AND record_id = ?",
+                   (linked_record_id, comp_id, record_id))
+        db.commit()
+        log_audit('companion_link', 'record', record_id, f'companion {comp_id} -> record {linked_record_id}')
+        flash('تم ربط المرافق بسجل موجود', 'success')
+    return redirect(url_for('admin_record_detail', record_id=record_id))
+
+
+@app.route('/api/companion_cross_ref/<int:record_id>')
+@admin_required
+def api_companion_cross_ref(record_id):
+    """Find existing records that match companion names for cross-referencing."""
+    db = get_db()
+    companions = db.execute(
+        "SELECT * FROM record_companions WHERE record_id = ? AND linked_record_id IS NULL",
+        (record_id,)
+    ).fetchall()
+    results = []
+    for comp in companions:
+        matches = []
+        parts = [comp['first_name'], comp['father_name'], comp['last_name']]
+        parts = [p for p in parts if p]
+        if not parts:
+            continue
+        conditions = []
+        params = []
+        for part in parts:
+            if part:
+                conditions.append("(first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?)")
+                params.extend([f'%{part}%', f'%{part}%', f'%{part}%'])
+        if conditions:
+            query = f"SELECT id, first_name, father_name, last_name, status, province FROM records WHERE ({' OR '.join(conditions)}) AND id != ? LIMIT 5"
+            params.append(record_id)
+            found = db.execute(query, params).fetchall()
+            for r in found:
+                matches.append({
+                    'id': r['id'],
+                    'name': f"{r['first_name']} {r['father_name']} {r['last_name']}",
+                    'status': r['status'],
+                    'province': r['province'],
+                })
+        if matches:
+            results.append({
+                'companion_id': comp['id'],
+                'companion_name': ' '.join(filter(None, [comp['first_name'], comp['father_name'], comp['last_name']])),
+                'matches': matches,
+            })
+    return jsonify(results)
 
 
 @app.route('/api/search_records_for_link')

@@ -564,6 +564,97 @@
     {% endif %}
 </div>
 
+<!-- Companions (من كان معه) -->
+<div class="card" style="margin-top: 1rem;">
+    <div class="card-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="card-icon">&#x1F465;</div>
+            <h3>من كان معه (المرافقون)</h3>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="crossRefCompanions()" title="بحث عن تطابق مع سجلات موجودة">&#x1F50D; مقارنة</button>
+    </div>
+
+    {% if companions %}
+    <div style="margin-bottom: 1rem;">
+        {% for comp in companions %}
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.4rem;" id="comp-{{ comp.id }}">
+            <div style="flex: 1;">
+                <span style="font-weight: 600;">{{ comp.first_name }}</span>
+                {% if comp.father_name %}<span style="color: var(--text-light);"> بن {{ comp.father_name }}</span>{% endif %}
+                {% if comp.last_name %}<span style="font-weight: 600;"> {{ comp.last_name }}</span>{% endif %}
+                {% if comp.mother_name %}<span style="font-size: 0.82rem; color: var(--text-light);"> (أم: {{ comp.mother_name }})</span>{% endif %}
+                {% if comp.notes %}<span style="font-size: 0.8rem; color: var(--text-light); display: block;">{{ comp.notes }}</span>{% endif %}
+                {% if comp.linked_record %}
+                <a href="{{ url_for('admin_record_detail', record_id=comp.linked_record.id) }}" style="font-size: 0.8rem; color: var(--primary); display: inline-block; margin-top: 2px;">
+                    &#x1F517; مرتبط بسجل: {{ comp.linked_record['first_name'] }} {{ comp.linked_record['last_name'] }}
+                    <span style="padding: 1px 4px; border-radius: 3px; font-size: 0.72rem;
+                        {% if comp.linked_record['status'] == 'survivor' %}background: #d1fae5; color: #065f46;
+                        {% elif comp.linked_record['status'] == 'enforced' %}background: #fed7aa; color: #9a3412;
+                        {% elif comp.linked_record['status'] == 'deceased' %}background: #fee2e2; color: #991b1b;{% endif %}">
+                        {% if comp.linked_record['status'] == 'survivor' %}ناجٍ{% elif comp.linked_record['status'] == 'enforced' %}مغيّب{% elif comp.linked_record['status'] == 'deceased' %}متوفى{% endif %}
+                    </span>
+                </a>
+                {% endif %}
+                <!-- Cross-ref results will be injected here -->
+                <div id="comp-matches-{{ comp.id }}" style="display: none; margin-top: 0.4rem;"></div>
+            </div>
+            <div style="display: flex; gap: 0.3rem; align-items: center;">
+                {% if not comp.linked_record %}
+                <form method="POST" action="{{ url_for('admin_record_delete_companion', record_id=record.id, comp_id=comp.id) }}" style="display:inline" onsubmit="return confirm('حذف هذا المرافق؟')">
+                    <button type="submit" class="btn btn-outline btn-sm" style="color: #dc2626; border-color: #dc2626; padding: 2px 8px;">&times;</button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('admin_record_delete_companion', record_id=record.id, comp_id=comp.id) }}" style="display:inline" onsubmit="return confirm('حذف هذا المرافق؟')">
+                    <button type="submit" class="btn btn-outline btn-sm" style="color: #dc2626; border-color: #dc2626; padding: 2px 8px;">&times;</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1rem;">لم يُضَف أي شخص مرافق بعد</p>
+    {% endif %}
+
+    <!-- Add Companion Form -->
+    <div style="padding: 0.8rem; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">&#x2795; إضافة شخص كان معه</div>
+        <form method="POST" action="{{ url_for('admin_record_add_companion', record_id=record.id) }}">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div>
+                    <label style="font-size: 0.82rem; color: var(--text-light);">الاسم الأول *</label>
+                    <input type="text" name="comp_first_name" required placeholder="الاسم الأول" style="width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px;">
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; color: var(--text-light);">اسم الأب</label>
+                    <input type="text" name="comp_father_name" placeholder="اسم الأب" style="width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px;">
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; color: var(--text-light);">الكنية *</label>
+                    <input type="text" name="comp_last_name" required placeholder="الكنية" style="width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px;">
+                </div>
+                <div>
+                    <label style="font-size: 0.82rem; color: var(--text-light);">اسم الأم</label>
+                    <input type="text" name="comp_mother_name" placeholder="اسم الأم" style="width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px;">
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                <div style="flex: 1;">
+                    <label style="font-size: 0.82rem; color: var(--text-light);">ملاحظة (اختياري)</label>
+                    <input type="text" name="comp_notes" placeholder="مثال: كان معه في نفس الزنزانة..." style="width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px;">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">&#x2795; إضافة</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Cross-reference results area -->
+    <div id="crossRefResults" style="display: none; margin-top: 0.8rem; padding: 0.8rem; background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem; color: #92400e;">&#x1F50D; نتائج المقارنة مع السجلات الموجودة</div>
+        <div id="crossRefContent"></div>
+    </div>
+</div>
+
 <!-- Linked Records -->
 <div class="card" style="margin-top: 1rem;">
     <div class="card-header">
@@ -835,4 +926,46 @@ document.getElementById('smsModal').addEventListener('click', function(e) {
 });
 </script>
 {% endif %}
+
+<script>
+function crossRefCompanions() {
+    var resultsDiv = document.getElementById('crossRefResults');
+    var contentDiv = document.getElementById('crossRefContent');
+    resultsDiv.style.display = 'block';
+    contentDiv.innerHTML = '<span style="color: #92400e;">جاري البحث...</span>';
+
+    fetch('{{ url_for("api_companion_cross_ref", record_id=record.id) }}')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.length) {
+            contentDiv.innerHTML = '<span style="color: #92400e;">لم يُعثر على تطابق مع سجلات موجودة</span>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < data.length; i++) {
+            var comp = data[i];
+            html += '<div style="margin-bottom: 0.6rem; padding: 0.5rem; background: white; border-radius: 6px; border: 1px solid #fbbf24;">';
+            html += '<div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.3rem;">' + comp.companion_name + ' — تطابقات محتملة:</div>';
+            for (var j = 0; j < comp.matches.length; j++) {
+                var m = comp.matches[j];
+                var statusLabel = m.status === 'survivor' ? 'ناجٍ' : m.status === 'enforced' ? 'مغيّب' : m.status === 'deceased' ? 'متوفى' : m.status;
+                var statusColor = m.status === 'survivor' ? '#065f46' : m.status === 'enforced' ? '#9a3412' : '#991b1b';
+                html += '<div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; flex-wrap: wrap;">';
+                html += '<a href="/admin/record/' + m.id + '" style="color: var(--primary); font-weight: 500;">' + m.name + '</a>';
+                html += '<span style="font-size: 0.78rem; color: ' + statusColor + ';">(' + statusLabel + ' - ' + (m.province || '') + ')</span>';
+                html += '<form method="POST" action="/admin/record/{{ record.id }}/companion/' + comp.companion_id + '/link" style="display:inline;">';
+                html += '<input type="hidden" name="linked_record_id" value="' + m.id + '">';
+                html += '<button type="submit" class="btn btn-sm" style="background: #22c55e; color: white; border: none; padding: 2px 8px; font-size: 0.78rem;">&#x1F517; ربط</button>';
+                html += '</form>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        contentDiv.innerHTML = html;
+    })
+    .catch(function() {
+        contentDiv.innerHTML = '<span style="color: #dc2626;">فشل الاتصال</span>';
+    });
+}
+</script>
 {% endblock %}

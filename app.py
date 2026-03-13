@@ -1557,6 +1557,11 @@ def admin_records():
         'has_rent': request.args.get('has_rent', ''),
         'detention_facility_search': request.args.get('detention_facility_search', ''),
         'record_status': request.args.get('record_status', ''),
+        'service_name': request.args.get('service_name', ''),
+        'service_count_min': request.args.get('service_count_min', ''),
+        'service_provider': request.args.get('service_provider', ''),
+        'last_service_from': request.args.get('last_service_from', ''),
+        'last_service_to': request.args.get('last_service_to', ''),
     }
 
     # Record verification status filter
@@ -1817,6 +1822,38 @@ def admin_records():
     if filters['detention_facility_search']:
         conditions.append("detention_facilities_data LIKE ?")
         params.append(f"%{filters['detention_facility_search']}%")
+    # Service filters (subqueries on record_services)
+    if filters['service_name'] and filters['service_count_min']:
+        conditions.append(
+            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?) >= ?"
+        )
+        params.append(filters['service_name'])
+        params.append(int(filters['service_count_min']))
+    elif filters['service_name']:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
+        )
+        params.append(filters['service_name'])
+    elif filters['service_count_min']:
+        conditions.append(
+            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id) >= ?"
+        )
+        params.append(int(filters['service_count_min']))
+    if filters['service_provider']:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.provider = ?)"
+        )
+        params.append(filters['service_provider'])
+    if filters['last_service_from']:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_date >= ?)"
+        )
+        params.append(filters['last_service_from'])
+    if filters['last_service_to']:
+        conditions.append(
+            "(SELECT MAX(rs.service_date) FROM record_services rs WHERE rs.record_id = records.id) <= ?"
+        )
+        params.append(filters['last_service_to'])
     if filters['search']:
         search_term = f"%{filters['search']}%"
         conditions.append("""(
@@ -1893,6 +1930,14 @@ def admin_records():
         "SELECT DISTINCT full_name FROM (SELECT full_name FROM volunteers WHERE status='active' UNION SELECT full_name FROM members WHERE status='active') ORDER BY full_name"
     ).fetchall()
 
+    # Fetch distinct service names and providers for filter dropdowns
+    service_names = db.execute(
+        "SELECT DISTINCT service_name FROM record_services WHERE service_name != '' ORDER BY service_name"
+    ).fetchall()
+    service_providers = db.execute(
+        "SELECT DISTINCT provider FROM record_services WHERE provider != '' ORDER BY provider"
+    ).fetchall()
+
     # Compute need scores if sorting by need
     need_scores = {}
     if sort_by_need:
@@ -1906,6 +1951,8 @@ def admin_records():
         sort_by=sort_by, sort_dir=sort_dir, filter_params=filter_params,
         volunteer_names=[v['full_name'] for v in volunteer_names],
         need_scores=need_scores,
+        service_names=[s['service_name'] for s in service_names],
+        service_providers=[s['provider'] for s in service_providers],
         today_date=today.isoformat(),
         week_ago_date=(today - timedelta(days=7)).isoformat(),
         month_ago_date=(today - timedelta(days=30)).isoformat(),

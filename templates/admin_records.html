@@ -20,7 +20,7 @@
         &#x1F50D; الفلاتر والتصفية
         <span class="arrow" id="filterArrow">&#x25BC;</span>
     </div>
-    <div class="filter-body" id="filterBody" style="{% if not (filters.status_list or filters.province or filters.search or filters.gender or filters.arrest_authority or filters.widows_filter or filters.has_special_needs or filters.education_max or filters.created_from or filters.created_to or filters.source_type or filters.has_phone or filters.collection_date_from) %}display:none{% endif %}">
+    <div class="filter-body" id="filterBody" style="{% if not (filters.status_list or filters.province or filters.search or filters.gender or filters.arrest_authority or filters.widows_filter or filters.has_special_needs or filters.education_max or filters.created_from or filters.created_to or filters.source_type or filters.has_phone or filters.collection_date_from or filters.service_name or filters.service_provider or filters.last_service_from) %}display:none{% endif %}">
         <form method="GET" action="{{ url_for('admin_records') }}" id="filterForm">
 
             <!-- Quick Presets - Common organizational requests -->
@@ -549,6 +549,38 @@
                         <option value="locked" {{ 'selected' if filters.record_status=='locked' }}>مقفل</option>
                     </select>
                 </div>
+                <!-- Services -->
+                <div class="form-group">
+                    <label>&#x1F4E6; نوع الخدمة</label>
+                    <select name="service_name">
+                        <option value="">الكل</option>
+                        {% for sn in service_names %}
+                        <option value="{{ sn }}" {{ 'selected' if filters.service_name==sn }}>{{ sn }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>عدد مرات الخدمة (على الأقل)</label>
+                    <input type="number" name="service_count_min" value="{{ filters.service_count_min }}" placeholder="مثال: 2" min="1">
+                </div>
+                <div class="form-group">
+                    <label>مقدّم الخدمة</label>
+                    <select name="service_provider">
+                        <option value="">الكل</option>
+                        {% for sp in service_providers %}
+                        <option value="{{ sp }}" {{ 'selected' if filters.service_provider==sp }}>{{ sp }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>آخر خدمة (من)</label>
+                    <input type="date" name="last_service_from" value="{{ filters.last_service_from }}">
+                </div>
+                <div class="form-group">
+                    <label>آخر خدمة (إلى)</label>
+                    <input type="date" name="last_service_to" value="{{ filters.last_service_to }}">
+                </div>
+
             </div>
             <div class="filter-actions">
                 <button type="submit" class="btn btn-primary btn-sm">&#x1F50D; تطبيق الفلاتر</button>
@@ -730,6 +762,20 @@
         {% endif %}
         {% if filters.detention_facility_search %}
         <span class="filter-tag">معتقل: {{ filters.detention_facility_search }}</span>
+        {% endif %}
+        {% if filters.service_name %}
+        <span class="filter-tag" style="background: #dbeafe; color: #1e40af;">خدمة: {{ filters.service_name }}{% if filters.service_count_min %} ({{ filters.service_count_min }}+ مرات){% endif %}</span>
+        {% elif filters.service_count_min %}
+        <span class="filter-tag" style="background: #dbeafe; color: #1e40af;">خدمات: {{ filters.service_count_min }}+ مرات</span>
+        {% endif %}
+        {% if filters.service_provider %}
+        <span class="filter-tag" style="background: #dbeafe; color: #1e40af;">مقدّم: {{ filters.service_provider }}</span>
+        {% endif %}
+        {% if filters.last_service_from %}
+        <span class="filter-tag">خدمة من: {{ filters.last_service_from }}</span>
+        {% endif %}
+        {% if filters.last_service_to %}
+        <span class="filter-tag">خدمة إلى: {{ filters.last_service_to }}</span>
         {% endif %}
         {% if filters.sort_by_need == '1' %}
         <span class="filter-tag" style="background:#dc2626; color:white;">&#x1F198; مرتب حسب الاحتياج</span>

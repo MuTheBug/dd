@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}سجل التغييرات - {{ record.first_name }} {{ record.last_name }} - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <a href="{{ url_for('admin_record_detail', record_id=record.id) }}" class="btn btn-outline btn-sm">&#x2192; العودة للسجل</a>
+    <h1 style="font-size: 1.3rem; color: var(--text);">
+        سجل التغييرات: {{ record.first_name }} {{ record.father_name }} {{ record.last_name }}
+    </h1>
+</div>
+
+<!-- Field Filter -->
+<div class="card" style="margin-bottom: 1rem; padding: 0.8rem;">
+    <form method="GET" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+        <label style="font-weight: 600; font-size: 0.9rem;">تصفية حسب الحقل:</label>
+        <select name="field" onchange="this.form.submit()" style="padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px;">
+            <option value="">جميع الحقول</option>
+            {% for f in fields %}
+            <option value="{{ f }}" {{ 'selected' if field_filter == f }}>{{ f }}</option>
+            {% endfor %}
+        </select>
+        {% if field_filter %}
+        <a href="{{ url_for('admin_record_history', record_id=record.id) }}" class="btn btn-outline btn-sm">مسح الفلتر</a>
+        {% endif %}
+        <span style="font-size: 0.85rem; color: var(--text-light);">({{ changes|length }} تغيير)</span>
+    </form>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>الحقل</th>
+                    <th>القيمة القديمة</th>
+                    <th>القيمة الجديدة</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in changes %}
+                <tr>
+                    <td style="white-space: nowrap; font-size: 0.85rem;">{{ c.changed_at }}</td>
+                    <td style="font-weight: 600; font-size: 0.88rem;">{{ c.field_name }}</td>
+                    <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem; color: #dc2626; background: #fef2f2;">{{ c.old_value or '-' }}</td>
+                    <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem; color: #16a34a; background: #f0fdf4;">{{ c.new_value or '-' }}</td>
+                    <td style="font-size: 0.8rem; color: var(--text-light);" dir="ltr">{{ c.ip_address }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-light);">لا توجد تغييرات مسجلة</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -656,6 +656,84 @@ def migrate_db():
         )
     """)
 
+    # -- record_changes table (field-level change history) --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS record_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id INTEGER NOT NULL,
+            field_name TEXT NOT NULL,
+            old_value TEXT DEFAULT '',
+            new_value TEXT DEFAULT '',
+            changed_by TEXT DEFAULT '',
+            changed_at TEXT DEFAULT (datetime('now','localtime')),
+            ip_address TEXT DEFAULT '',
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+        )
+    """)
+
+    # -- record_links table (cross-references between records) --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS record_links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id_a INTEGER NOT NULL,
+            record_id_b INTEGER NOT NULL,
+            link_type TEXT NOT NULL DEFAULT 'related',
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (record_id_a) REFERENCES records(id) ON DELETE CASCADE,
+            FOREIGN KEY (record_id_b) REFERENCES records(id) ON DELETE CASCADE
+        )
+    """)
+
+    # -- Add record_status column for verification workflow --
+    cursor.execute("PRAGMA table_info(records)")
+    rec_existing = {row[1] for row in cursor.fetchall()}
+    if 'record_status' not in rec_existing:
+        try:
+            cursor.execute("ALTER TABLE records ADD COLUMN record_status TEXT DEFAULT 'draft'")
+        except sqlite3.OperationalError:
+            pass
+
+    # -- Database indexes for performance --
+    index_statements = [
+        "CREATE INDEX IF NOT EXISTS idx_records_status ON records(status)",
+        "CREATE INDEX IF NOT EXISTS idx_records_province ON records(province)",
+        "CREATE INDEX IF NOT EXISTS idx_records_gender ON records(gender)",
+        "CREATE INDEX IF NOT EXISTS idx_records_arrest_year ON records(arrest_year)",
+        "CREATE INDEX IF NOT EXISTS idx_records_birth_year ON records(birth_year)",
+        "CREATE INDEX IF NOT EXISTS idx_records_created_at ON records(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_records_collection_date ON records(collection_date)",
+        "CREATE INDEX IF NOT EXISTS idx_records_first_name ON records(first_name)",
+        "CREATE INDEX IF NOT EXISTS idx_records_last_name ON records(last_name)",
+        "CREATE INDEX IF NOT EXISTS idx_records_national_id ON records(national_id)",
+        "CREATE INDEX IF NOT EXISTS idx_records_phone ON records(phone)",
+        "CREATE INDEX IF NOT EXISTS idx_records_marital ON records(marital)",
+        "CREATE INDEX IF NOT EXISTS idx_records_education ON records(education)",
+        "CREATE INDEX IF NOT EXISTS idx_records_housing_type ON records(housing_type)",
+        "CREATE INDEX IF NOT EXISTS idx_records_evidence_level ON records(evidence_level)",
+        "CREATE INDEX IF NOT EXISTS idx_records_verification_status ON records(verification_status)",
+        "CREATE INDEX IF NOT EXISTS idx_records_record_status ON records(record_status)",
+        "CREATE INDEX IF NOT EXISTS idx_records_status_province ON records(status, province)",
+        "CREATE INDEX IF NOT EXISTS idx_records_name ON records(first_name, father_name, last_name)",
+        "CREATE INDEX IF NOT EXISTS idx_volunteers_status ON volunteers(status)",
+        "CREATE INDEX IF NOT EXISTS idx_volunteers_full_name ON volunteers(full_name)",
+        "CREATE INDEX IF NOT EXISTS idx_members_status ON members(status)",
+        "CREATE INDEX IF NOT EXISTS idx_members_full_name ON members(full_name)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_entity_type ON audit_log(entity_type)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_member_payments_member_id ON member_payments(member_id)",
+        "CREATE INDEX IF NOT EXISTS idx_member_payments_status ON member_payments(status)",
+        "CREATE INDEX IF NOT EXISTS idx_custom_list_items_list_id ON custom_list_items(list_id)",
+        "CREATE INDEX IF NOT EXISTS idx_record_changes_record_id ON record_changes(record_id)",
+        "CREATE INDEX IF NOT EXISTS idx_record_links_a ON record_links(record_id_a)",
+        "CREATE INDEX IF NOT EXISTS idx_record_links_b ON record_links(record_id_b)",
+    ]
+    for stmt in index_statements:
+        try:
+            cursor.execute(stmt)
+        except sqlite3.OperationalError:
+            pass
+
     conn.commit()
     conn.close()
 
@@ -1430,7 +1508,13 @@ def admin_records():
         'national_id_search': request.args.get('national_id_search', ''),
         'has_rent': request.args.get('has_rent', ''),
         'detention_facility_search': request.args.get('detention_facility_search', ''),
+        'record_status': request.args.get('record_status', ''),
     }
+
+    # Record verification status filter
+    if filters['record_status']:
+        conditions.append("record_status = ?")
+        params.append(filters['record_status'])
 
     if status_list:
         if len(status_list) == 1:
@@ -1780,6 +1864,250 @@ def admin_records():
     )
 
 
+@app.route('/api/records')
+@admin_required
+def api_records():
+    """AJAX endpoint for filtering records without full page reload."""
+    db = get_db()
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 25))
+
+    # Reuse the same filter logic as admin_records
+    conditions = []
+    params = []
+
+    status_list = request.args.getlist('status')
+    expanded = []
+    for s in status_list:
+        if ',' in s:
+            expanded.extend(s.split(','))
+        elif s:
+            expanded.append(s)
+    status_list = expanded
+
+    # Simple equality filters
+    simple_filters = {
+        'province': 'province', 'gender': 'gender', 'marital': 'marital',
+        'education': 'education', 'housing_type': 'housing_type',
+        'blood_type': 'blood_type', 'case_type': 'case_type',
+        'evidence_level': 'evidence_level', 'verification_status': 'verification_status',
+        'civil_registry_status': 'civil_registry_status',
+        'digital_evidence_type': 'digital_evidence_type',
+        'reporter_relation': 'reporter_relation', 'collector_name': 'collector_name',
+        'breadwinner_relation': 'breadwinner_relation',
+        'digital_evidence_url_status': 'digital_evidence_url_status',
+        'record_status': 'record_status',
+    }
+
+    if status_list:
+        if len(status_list) == 1:
+            conditions.append("status = ?")
+            params.append(status_list[0])
+        else:
+            placeholders = ','.join(['?'] * len(status_list))
+            conditions.append(f"status IN ({placeholders})")
+            params.extend(status_list)
+
+    for param_name, col_name in simple_filters.items():
+        val = request.args.get(param_name, '')
+        if val:
+            conditions.append(f"{col_name} = ?")
+            params.append(val)
+
+    # LIKE filters
+    like_filters = {
+        'spouse_search': 'spouse_name', 'child_name_search': 'children_data',
+        'child_education': 'children_data', 'employment': 'employment',
+        'profession': 'profession', 'address_search': 'address',
+        'arrest_reason': 'arrest_reason', 'employer': 'employer',
+        'breadwinner': 'breadwinner', 'family_book_number': 'family_book_number',
+        'national_id_search': 'national_id', 'detention_facility_search': 'detention_facilities_data',
+        'arrest_place': 'arrest_place',
+    }
+    for param_name, col_name in like_filters.items():
+        val = request.args.get(param_name, '')
+        if val:
+            conditions.append(f"{col_name} LIKE ?")
+            params.append(f"%{val}%")
+
+    # Range filters
+    range_filters = [
+        ('arrest_year_from', 'arrest_year', '>='), ('arrest_year_to', 'arrest_year', '<='),
+        ('birth_year_from', 'birth_year', '>='), ('birth_year_to', 'birth_year', '<='),
+        ('death_year_from', 'death_year', '>='), ('death_year_to', 'death_year', '<='),
+        ('release_year_from', 'release_year', '>='), ('release_year_to', 'release_year', '<='),
+    ]
+    for param_name, col_name, op in range_filters:
+        val = request.args.get(param_name, '')
+        if val:
+            conditions.append(f"{col_name} {op} ?")
+            params.append(int(val))
+
+    # Date range filters
+    if request.args.get('created_from'):
+        conditions.append("created_at >= ?")
+        params.append(request.args['created_from'])
+    if request.args.get('created_to'):
+        conditions.append("created_at <= ?")
+        params.append(request.args['created_to'] + ' 23:59:59')
+    if request.args.get('collection_date_from'):
+        conditions.append("collection_date >= ?")
+        params.append(request.args['collection_date_from'])
+    if request.args.get('collection_date_to'):
+        conditions.append("collection_date <= ?")
+        params.append(request.args['collection_date_to'])
+
+    # Boolean/special filters
+    if request.args.get('has_conflicting_info') == '1':
+        conditions.append("has_conflicting_info = 1")
+    if request.args.get('has_special_needs') == '1':
+        conditions.append("has_special_needs = 1")
+    if request.args.get('has_hypertension') == '1':
+        conditions.append("has_hypertension = 1")
+    if request.args.get('has_diabetes') == '1':
+        conditions.append("has_diabetes = 1")
+    if request.args.get('chronic') == 'yes':
+        conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
+    if request.args.get('has_kids') == 'yes':
+        conditions.append("has_kids = 'yes'")
+    elif request.args.get('has_kids') == 'no':
+        conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
+    if request.args.get('has_kids_under_18') == 'yes':
+        conditions.append("kids_under_18_count > 0")
+    elif request.args.get('has_kids_under_18') == 'no':
+        conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
+    if request.args.get('has_photo') == 'yes':
+        conditions.append("photo_path IS NOT NULL AND photo_path != ''")
+    elif request.args.get('has_photo') == 'no':
+        conditions.append("(photo_path IS NULL OR photo_path = '')")
+    if request.args.get('has_document') == 'yes':
+        conditions.append("document_path IS NOT NULL AND document_path != ''")
+    elif request.args.get('has_document') == 'no':
+        conditions.append("(document_path IS NULL OR document_path = '')")
+    if request.args.get('is_registered') == '1':
+        conditions.append("is_officially_registered = 1")
+    elif request.args.get('is_registered') == '0':
+        conditions.append("(is_officially_registered = 0 OR is_officially_registered IS NULL)")
+    if request.args.get('has_legal') == 'yes':
+        conditions.append("legal = 'نعم'")
+    if request.args.get('has_assoc') == 'yes':
+        conditions.append("assoc = 'yes'")
+    elif request.args.get('has_assoc') == 'no':
+        conditions.append("(assoc != 'yes' OR assoc IS NULL OR assoc = '')")
+    if request.args.get('has_phone') == 'yes':
+        conditions.append("(phone IS NOT NULL AND phone != '')")
+    elif request.args.get('has_phone') == 'no':
+        conditions.append("(phone IS NULL OR phone = '')")
+    if request.args.get('has_rent') == 'yes':
+        conditions.append("rent_amount IS NOT NULL AND rent_amount != '' AND rent_amount != '0'")
+    elif request.args.get('has_rent') == 'no':
+        conditions.append("(rent_amount IS NULL OR rent_amount = '' OR rent_amount = '0')")
+    if request.args.get('has_guardian') == 'yes':
+        conditions.append("guardian_name IS NOT NULL AND guardian_name != ''")
+    elif request.args.get('has_guardian') == 'no':
+        conditions.append("(guardian_name IS NULL OR guardian_name = '')")
+
+    # Widows filter
+    wf = request.args.get('widows_filter', '')
+    if wf == 'widows_deceased':
+        conditions.append("status IN ('deceased') AND gender = 'male' AND marital = 'married'")
+    elif wf == 'widows_enforced':
+        conditions.append("status = 'enforced' AND gender = 'male' AND marital = 'married'")
+    elif wf == 'widows_all':
+        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married'")
+    elif wf == 'widows_with_minors':
+        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married' AND kids_under_18_count > 0")
+
+    # Notes search
+    if request.args.get('notes_search'):
+        conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
+        params.extend([f"%{request.args['notes_search']}%"] * 2)
+
+    # Text search
+    search = request.args.get('search', '')
+    if search:
+        search_term = f"%{search}%"
+        conditions.append("""(
+            first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
+            OR mother_name LIKE ? OR national_id LIKE ? OR phone LIKE ?
+            OR address LIKE ? OR notes LIKE ? OR reporter_name LIKE ?
+            OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
+        )""")
+        params.extend([search_term] * 10)
+
+    # Age range
+    if request.args.get('age_from'):
+        current_year = datetime.now().year
+        max_birth_year = current_year - int(request.args['age_from'])
+        conditions.append("birth_year <= ? AND birth_year > 0")
+        params.append(max_birth_year)
+    if request.args.get('age_to'):
+        current_year = datetime.now().year
+        min_birth_year = current_year - int(request.args['age_to'])
+        conditions.append("birth_year >= ?")
+        params.append(min_birth_year)
+
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+    # Sort
+    sort_by = request.args.get('sort', 'id')
+    sort_dir = request.args.get('dir', 'desc')
+    allowed_sorts = ['id', 'first_name', 'last_name', 'status', 'province', 'arrest_year', 'created_at']
+    if sort_by not in allowed_sorts:
+        sort_by = 'id'
+    if sort_dir not in ('asc', 'desc'):
+        sort_dir = 'desc'
+
+    count = db.execute(f"SELECT COUNT(*) FROM records{where}", params).fetchone()[0]
+    offset = (page - 1) * per_page
+    records = db.execute(
+        f"SELECT id, first_name, father_name, last_name, status, province, arrest_year, "
+        f"arrest_authority, phone, spouse_phone, guardian_phone, reporter_phone, spouse_name, "
+        f"marital, gender, kids_under_18_count, record_status "
+        f"FROM records{where} ORDER BY {sort_by} {sort_dir} LIMIT ? OFFSET ?",
+        params + [per_page, offset]
+    ).fetchall()
+
+    total_pages = (count + per_page - 1) // per_page
+
+    rows = []
+    for r in records:
+        phone = r['phone'] or r['spouse_phone'] or r['guardian_phone'] or r['reporter_phone'] or ''
+        phone_source = ''
+        if phone and not r['phone']:
+            if r['spouse_phone'] == phone:
+                phone_source = 'زوج/ة'
+            elif r['guardian_phone'] == phone:
+                phone_source = 'ولي أمر'
+            else:
+                phone_source = 'مبلغ'
+        rows.append({
+            'id': r['id'],
+            'first_name': r['first_name'] or '',
+            'father_name': r['father_name'] or '',
+            'last_name': r['last_name'] or '',
+            'status': r['status'] or '',
+            'province': r['province'] or '',
+            'arrest_year': r['arrest_year'] if r['arrest_year'] else '',
+            'arrest_authority': r['arrest_authority'] or '',
+            'phone': phone,
+            'phone_source': phone_source,
+            'spouse_name': r['spouse_name'] or '',
+            'is_widow': bool(r['spouse_name'] and r['marital'] == 'married' and r['gender'] == 'male' and r['status'] in ('deceased', 'enforced')),
+            'widow_type': 'أرملة' if r['status'] == 'deceased' else 'زوجة مغيّب' if r['status'] == 'enforced' else '',
+            'kids_under_18': r['kids_under_18_count'] if r['kids_under_18_count'] else '',
+            'record_status': r['record_status'] or 'draft',
+        })
+
+    return jsonify({
+        'records': rows,
+        'total_count': count,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': total_pages,
+    })
+
+
 @app.route('/admin/record/<int:record_id>')
 @admin_required
 def admin_record_detail(record_id):
@@ -1788,10 +2116,35 @@ def admin_record_detail(record_id):
     if not record:
         flash('السجل غير موجود', 'error')
         return redirect(url_for('admin_records'))
+    # Fetch linked records
+    links = db.execute("""
+        SELECT rl.*,
+            CASE WHEN rl.record_id_a = ? THEN rl.record_id_b ELSE rl.record_id_a END as linked_id
+        FROM record_links rl
+        WHERE rl.record_id_a = ? OR rl.record_id_b = ?
+        ORDER BY rl.created_at DESC
+    """, (record_id, record_id, record_id)).fetchall()
+    linked_records = []
+    for link in links:
+        lr = db.execute("SELECT id, first_name, father_name, last_name, status, province FROM records WHERE id = ?",
+                        (link['linked_id'],)).fetchone()
+        if lr:
+            linked_records.append({
+                'link_id': link['id'],
+                'record': lr,
+                'link_type': link['link_type'],
+                'notes': link['notes'],
+            })
+    # Fetch change history (last 20)
+    changes = db.execute(
+        "SELECT * FROM record_changes WHERE record_id = ? ORDER BY changed_at DESC LIMIT 20",
+        (record_id,)
+    ).fetchall()
     services = db.execute(
         "SELECT * FROM record_services WHERE record_id=? ORDER BY created_at DESC", (record_id,)
     ).fetchall()
-    return render_template('admin_record_detail.html', record=record, services=services)
+    return render_template('admin_record_detail.html', record=record, services=services,
+                           linked_records=linked_records, changes=changes)
 
 
 @app.route('/admin/record/<int:record_id>/edit', methods=['GET', 'POST'])
@@ -1968,6 +2321,22 @@ def admin_record_edit(record_id):
             cv_path, form.get('survivor_cv_text', ''), cv_photo_path,
             record_id
         ))
+
+        # Track field-level changes
+        new_record = db.execute("SELECT * FROM records WHERE id = ?", (record_id,)).fetchone()
+        ip = request.remote_addr or ''
+        skip_fields = {'id', 'created_at', 'updated_at', 'record_slug'}
+        for key in record.keys():
+            if key in skip_fields:
+                continue
+            old_val = str(record[key] or '')
+            new_val = str(new_record[key] or '')
+            if old_val != new_val:
+                db.execute(
+                    "INSERT INTO record_changes (record_id, field_name, old_value, new_value, ip_address) VALUES (?,?,?,?,?)",
+                    (record_id, key, old_val, new_val, ip)
+                )
+
         db.commit()
         log_audit('record_edit', 'record', record_id)
         flash('تم تحديث السجل بنجاح', 'success')
@@ -1982,6 +2351,130 @@ def admin_record_edit(record_id):
     return render_template('admin_record_edit.html', record=record,
                            volunteer_names=[v['full_name'] for v in volunteer_names],
                            services=services)
+
+
+@app.route('/admin/record/<int:record_id>/history')
+@admin_required
+def admin_record_history(record_id):
+    """Full change history for a record."""
+    db = get_db()
+    record = db.execute("SELECT id, first_name, father_name, last_name FROM records WHERE id = ?", (record_id,)).fetchone()
+    if not record:
+        flash('السجل غير موجود', 'error')
+        return redirect(url_for('admin_records'))
+    field_filter = request.args.get('field', '')
+    if field_filter:
+        changes = db.execute(
+            "SELECT * FROM record_changes WHERE record_id = ? AND field_name = ? ORDER BY changed_at DESC",
+            (record_id, field_filter)
+        ).fetchall()
+    else:
+        changes = db.execute(
+            "SELECT * FROM record_changes WHERE record_id = ? ORDER BY changed_at DESC LIMIT 500",
+            (record_id,)
+        ).fetchall()
+    # Get distinct field names for the filter dropdown
+    fields = db.execute(
+        "SELECT DISTINCT field_name FROM record_changes WHERE record_id = ? ORDER BY field_name",
+        (record_id,)
+    ).fetchall()
+    return render_template('admin_record_history.html', record=record, changes=changes,
+                           fields=[f['field_name'] for f in fields], field_filter=field_filter)
+
+
+@app.route('/admin/record/<int:record_id>/link', methods=['POST'])
+@admin_required
+def admin_record_link(record_id):
+    """Create a link between two records."""
+    db = get_db()
+    linked_id = int(request.form.get('linked_id', 0))
+    link_type = request.form.get('link_type', 'related')
+    notes = request.form.get('notes', '')
+    if not linked_id or linked_id == record_id:
+        flash('يرجى اختيار سجل صحيح للربط', 'error')
+        return redirect(url_for('admin_record_detail', record_id=record_id))
+    # Check if link already exists
+    existing = db.execute(
+        "SELECT id FROM record_links WHERE (record_id_a=? AND record_id_b=?) OR (record_id_a=? AND record_id_b=?)",
+        (record_id, linked_id, linked_id, record_id)
+    ).fetchone()
+    if existing:
+        flash('الربط موجود بالفعل', 'error')
+        return redirect(url_for('admin_record_detail', record_id=record_id))
+    db.execute(
+        "INSERT INTO record_links (record_id_a, record_id_b, link_type, notes) VALUES (?,?,?,?)",
+        (record_id, linked_id, link_type, notes)
+    )
+    db.commit()
+    log_audit('record_link', 'record', record_id, f'linked to {linked_id} as {link_type}')
+    flash('تم ربط السجلات بنجاح', 'success')
+    return redirect(url_for('admin_record_detail', record_id=record_id))
+
+
+@app.route('/admin/record/<int:record_id>/unlink/<int:link_id>', methods=['POST'])
+@admin_required
+def admin_record_unlink(record_id, link_id):
+    """Remove a link between two records."""
+    db = get_db()
+    db.execute("DELETE FROM record_links WHERE id = ?", (link_id,))
+    db.commit()
+    log_audit('record_unlink', 'record', record_id, f'removed link {link_id}')
+    flash('تم إزالة الربط', 'success')
+    return redirect(url_for('admin_record_detail', record_id=record_id))
+
+
+@app.route('/api/search_records')
+@admin_required
+def api_search_records():
+    """Search records by name for linking UI."""
+    q = request.args.get('q', '').strip()
+    exclude_id = int(request.args.get('exclude', 0))
+    if len(q) < 2:
+        return jsonify([])
+    db = get_db()
+    search_term = f"%{q}%"
+    records = db.execute(
+        "SELECT id, first_name, father_name, last_name, status, province FROM records "
+        "WHERE (first_name LIKE ? OR last_name LIKE ? OR father_name LIKE ? "
+        "OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?) "
+        "AND id != ? LIMIT 10",
+        (search_term, search_term, search_term, search_term, exclude_id)
+    ).fetchall()
+    return jsonify([{
+        'id': r['id'],
+        'name': f"{r['first_name']} {r['father_name']} {r['last_name']}",
+        'status': r['status'],
+        'province': r['province'],
+    } for r in records])
+
+
+@app.route('/admin/record/<int:record_id>/verify', methods=['POST'])
+@admin_required
+def admin_record_verify(record_id):
+    """Change record verification status (draft -> reviewed -> verified -> locked)."""
+    db = get_db()
+    record = db.execute("SELECT id, record_status FROM records WHERE id = ?", (record_id,)).fetchone()
+    if not record:
+        flash('السجل غير موجود', 'error')
+        return redirect(url_for('admin_records'))
+    new_status = request.form.get('record_status', '')
+    valid_statuses = ['draft', 'reviewed', 'verified', 'locked']
+    if new_status not in valid_statuses:
+        flash('حالة غير صالحة', 'error')
+        return redirect(url_for('admin_record_detail', record_id=record_id))
+    old_status = record['record_status'] or 'draft'
+    db.execute("UPDATE records SET record_status = ? WHERE id = ?", (new_status, record_id))
+    # Track the change
+    ip = request.remote_addr or ''
+    db.execute(
+        "INSERT INTO record_changes (record_id, field_name, old_value, new_value, ip_address) VALUES (?,?,?,?,?)",
+        (record_id, 'record_status', old_status, new_status, ip)
+    )
+    db.commit()
+    log_audit('record_verify', 'record', record_id, f'{old_status} -> {new_status}')
+    status_labels = {'draft': 'مسودة', 'reviewed': 'مراجَع', 'verified': 'موثّق', 'locked': 'مقفل'}
+    flash(f'تم تغيير حالة السجل إلى: {status_labels.get(new_status, new_status)}', 'success')
+    return redirect(url_for('admin_record_detail', record_id=record_id))
 
 
 @app.route('/admin/record/<int:record_id>/delete', methods=['POST'])

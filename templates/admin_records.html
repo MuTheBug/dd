@@ -539,6 +539,16 @@
                         <option value="1" {{ 'selected' if filters.has_conflicting_info=='1' }}>يوجد تضارب</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>&#x1F512; حالة التحقق</label>
+                    <select name="record_status">
+                        <option value="">الكل</option>
+                        <option value="draft" {{ 'selected' if filters.record_status=='draft' }}>مسودة</option>
+                        <option value="reviewed" {{ 'selected' if filters.record_status=='reviewed' }}>مراجَع</option>
+                        <option value="verified" {{ 'selected' if filters.record_status=='verified' }}>موثّق</option>
+                        <option value="locked" {{ 'selected' if filters.record_status=='locked' }}>مقفل</option>
+                    </select>
+                </div>
             </div>
             <div class="filter-actions">
                 <button type="submit" class="btn btn-primary btn-sm">&#x1F50D; تطبيق الفلاتر</button>
@@ -712,6 +722,11 @@
         <span class="filter-tag">يدفع إيجار</span>
         {% elif filters.has_rent == 'no' %}
         <span class="filter-tag">بدون إيجار</span>
+        {% endif %}
+        {% if filters.record_status %}
+        <span class="filter-tag" style="background: {% if filters.record_status=='locked' %}#dc2626{% elif filters.record_status=='verified' %}#22c55e{% elif filters.record_status=='reviewed' %}#3b82f6{% else %}#e5e7eb{% endif %}; color: {% if filters.record_status=='draft' %}#374151{% else %}white{% endif %};">
+            حالة التحقق: {% if filters.record_status=='draft' %}مسودة{% elif filters.record_status=='reviewed' %}مراجَع{% elif filters.record_status=='verified' %}موثّق{% elif filters.record_status=='locked' %}مقفل{% endif %}
+        </span>
         {% endif %}
         {% if filters.detention_facility_search %}
         <span class="filter-tag">معتقل: {{ filters.detention_facility_search }}</span>
@@ -1541,5 +1556,163 @@ function doExportToList() {
         resultEl.style.display = 'block';
     });
 }
+
+// ===== AJAX FILTERING =====
+var ajaxDebounceTimer = null;
+var ajaxCurrentPage = {{ page }};
+var ajaxSortBy = '{{ sort_by }}';
+var ajaxSortDir = '{{ sort_dir }}';
+
+function getFilterParams() {
+    var form = document.getElementById('filterForm');
+    var fd = new FormData(form);
+    var params = new URLSearchParams();
+    for (var pair of fd.entries()) {
+        if (pair[1]) params.append(pair[0], pair[1]);
+    }
+    params.set('page', ajaxCurrentPage);
+    params.set('sort', ajaxSortBy);
+    params.set('dir', ajaxSortDir);
+    params.set('per_page', '{{ per_page }}');
+    return params;
+}
+
+function ajaxFilterRecords(newPage) {
+    if (newPage !== undefined) ajaxCurrentPage = newPage;
+    var params = getFilterParams();
+
+    // Update URL without reload
+    var newUrl = '{{ url_for("admin_records") }}?' + params.toString();
+    history.pushState(null, '', newUrl);
+
+    // Show loading
+    var tbody = document.querySelector('#recordsTable tbody');
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:2rem; color:var(--text-light);">جاري التحميل...</td></tr>';
+
+    fetch('{{ url_for("api_records") }}?' + params.toString())
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        renderAjaxTable(data);
+        renderAjaxPagination(data);
+        // Update count
+        var countEl = document.querySelector('h1 span');
+        if (countEl) countEl.textContent = '(' + data.total_count + ' سجل)';
+    })
+    .catch(function(err) {
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:2rem; color:#dc2626;">خطأ في التحميل</td></tr>';
+    });
+}
+
+function renderAjaxTable(data) {
+    var tbody = document.querySelector('#recordsTable tbody');
+    if (!data.records || data.records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:2rem; color:var(--text-light);">لا توجد سجلات مطابقة للفلاتر المحددة</td></tr>';
+        return;
+    }
+    var statusLabels = {'survivor': 'ناجٍ', 'enforced': 'مغيّب', 'deceased': 'متوفى'};
+    var statusClasses = {'survivor': 'status-survivor', 'enforced': 'status-enforced', 'deceased': 'status-deceased'};
+    var recStatusLabels = {'draft': 'مسودة', 'reviewed': 'مراجَع', 'verified': 'موثّق', 'locked': 'مقفل'};
+    var recStatusColors = {'draft': '#9ca3af', 'reviewed': '#3b82f6', 'verified': '#22c55e', 'locked': '#dc2626'};
+    var html = '';
+    for (var i = 0; i < data.records.length; i++) {
+        var r = data.records[i];
+        var statusBadge = statusLabels[r.status] ?
+            '<span class="status-badge ' + statusClasses[r.status] + '">' + statusLabels[r.status] + '</span>' :
+            '<span class="status-badge" style="background:#eee;color:#666;">-</span>';
+        var phoneTd = '';
+        if (r.phone) {
+            phoneTd = '<a href="tel:' + r.phone + '" style="color:var(--text); text-decoration:none; font-size:0.85rem;">&#x1F4DE; ' + r.phone + '</a>';
+            if (r.phone_source) phoneTd += '<span style="font-size:0.65rem; color:var(--text-light); display:block; direction:rtl;">' + r.phone_source + '</span>';
+        } else {
+            phoneTd = '<span style="color:var(--text-light); font-size:0.8rem;">-</span>';
+        }
+        var spouseTd = r.spouse_name || '-';
+        if (r.is_widow) spouseTd += '<span style="display:block; font-size:0.65rem; padding:1px 4px; border-radius:3px; margin-top:2px; background:#fde68a; color:#92400e;">' + r.widow_type + '</span>';
+        var recStatusBadge = '';
+        if (r.record_status && r.record_status !== 'draft') {
+            recStatusBadge = ' <span style="font-size:0.65rem; padding:1px 5px; border-radius:3px; background:' + (recStatusColors[r.record_status]||'#9ca3af') + '; color:white;">' + (recStatusLabels[r.record_status]||r.record_status) + '</span>';
+        }
+        html += '<tr>' +
+            '<td>' + r.id + '</td>' +
+            '<td style="font-weight:600;">' + r.first_name + recStatusBadge + '</td>' +
+            '<td>' + r.father_name + '</td>' +
+            '<td>' + r.last_name + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' + r.province + '</td>' +
+            '<td>' + (r.arrest_year || '-') + '</td>' +
+            '<td style="max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + (r.arrest_authority || '-') + '</td>' +
+            '<td dir="ltr" style="text-align:right; white-space:nowrap;">' + phoneTd + '</td>' +
+            '<td style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + spouseTd + '</td>' +
+            '<td>' + (r.kids_under_18 || '-') + '</td>' +
+            '<td><div class="btn-group" style="flex-wrap:nowrap;">' +
+            '<a href="/admin/record/' + r.id + '" class="btn btn-primary btn-sm" title="عرض">&#x1F441;</a>' +
+            '<a href="/admin/record/' + r.id + '/edit" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>' +
+            '</div></td></tr>';
+    }
+    tbody.innerHTML = html;
+}
+
+function renderAjaxPagination(data) {
+    var container = document.querySelector('.pagination');
+    if (!container) {
+        // Create pagination container if it doesn't exist
+        var card = document.querySelector('#recordsTable').closest('.card');
+        container = document.createElement('div');
+        container.className = 'pagination';
+        card.parentNode.insertBefore(container, card.nextSibling);
+    }
+    if (data.total_pages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    var html = '';
+    if (data.page > 1) {
+        html += '<a href="#" onclick="ajaxFilterRecords(' + (data.page-1) + '); return false;">&#x2192;</a>';
+    }
+    for (var p = 1; p <= data.total_pages; p++) {
+        if (p === data.page) {
+            html += '<span class="active">' + p + '</span>';
+        } else if (p <= 3 || p >= data.total_pages - 2 || (p >= data.page - 2 && p <= data.page + 2)) {
+            html += '<a href="#" onclick="ajaxFilterRecords(' + p + '); return false;">' + p + '</a>';
+        } else if (p === 4 || p === data.total_pages - 3) {
+            html += '<span>...</span>';
+        }
+    }
+    if (data.page < data.total_pages) {
+        html += '<a href="#" onclick="ajaxFilterRecords(' + (data.page+1) + '); return false;">&#x2190;</a>';
+    }
+    container.innerHTML = html;
+}
+
+// Intercept filter form submission for AJAX
+document.getElementById('filterForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    ajaxCurrentPage = 1;
+    ajaxFilterRecords();
+});
+
+// Debounce text inputs for live search
+document.querySelectorAll('#filterForm input[type="text"], #filterForm input[type="number"]').forEach(function(input) {
+    input.addEventListener('input', function() {
+        clearTimeout(ajaxDebounceTimer);
+        ajaxDebounceTimer = setTimeout(function() {
+            ajaxCurrentPage = 1;
+            ajaxFilterRecords();
+        }, 300);
+    });
+});
+
+// AJAX on select/checkbox change
+document.querySelectorAll('#filterForm select, #filterForm input[type="checkbox"], #filterForm input[type="date"]').forEach(function(el) {
+    el.addEventListener('change', function() {
+        ajaxCurrentPage = 1;
+        ajaxFilterRecords();
+    });
+});
+
+// Handle browser back/forward
+window.addEventListener('popstate', function() {
+    location.reload();
+});
 </script>
 {% endblock %}

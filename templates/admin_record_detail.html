@@ -8,6 +8,7 @@
         {% if record.phone or record.reporter_phone %}
         <button type="button" class="btn btn-outline btn-sm" onclick="openSmsModal()" style="border-color: #22c55e; color: #22c55e;">&#x1F4F1; إرسال SMS</button>
         {% endif %}
+        <a href="{{ url_for('admin_record_history', record_id=record.id) }}" class="btn btn-outline btn-sm" style="border-color: #8b5cf6; color: #8b5cf6;">&#x1F4DC; سجل التغييرات</a>
         <a href="{{ url_for('record_pdf', record_id=record.id) }}" class="btn btn-primary btn-sm" target="_blank">&#x1F4C4; تصدير PDF</a>
         <a href="{{ url_for('admin_record_edit', record_id=record.id) }}" class="btn btn-outline btn-sm">&#x270F;&#xFE0F; تعديل</a>
         <form method="POST" action="{{ url_for('admin_record_delete', record_id=record.id) }}" style="display:inline" onsubmit="return confirm('هل أنت متأكد من حذف هذا السجل؟')">
@@ -45,6 +46,14 @@
                 <span>&#x1F4CD; {{ record.province }}</span>
                 <span>&#x1F4CB; رقم السجل: {{ record.id }}</span>
                 {% if record.national_id %}<span>&#x1F194; {{ record.national_id }}</span>{% endif %}
+                {% set rs = record.record_status or 'draft' %}
+                <span style="padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;
+                    {% if rs == 'locked' %}background: #dc2626; color: white;
+                    {% elif rs == 'verified' %}background: #22c55e; color: white;
+                    {% elif rs == 'reviewed' %}background: #3b82f6; color: white;
+                    {% else %}background: #e5e7eb; color: #6b7280;{% endif %}">
+                    {% if rs == 'draft' %}مسودة{% elif rs == 'reviewed' %}مراجَع{% elif rs == 'verified' %}موثّق{% elif rs == 'locked' %}مقفل{% endif %}
+                </span>
             </div>
         </div>
     </div>
@@ -515,6 +524,198 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Verification Workflow -->
+<div class="card" style="margin-top: 1rem;">
+    <div class="card-header">
+        <div class="card-icon">&#x2705;</div>
+        <h3>حالة التحقق والقفل</h3>
+    </div>
+    {% set rs = record.record_status or 'draft' %}
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 0.5rem 0;">
+        <div style="font-size: 0.92rem;">الحالة الحالية:
+            <strong style="padding: 2px 10px; border-radius: 4px;
+                {% if rs == 'locked' %}background: #dc2626; color: white;
+                {% elif rs == 'verified' %}background: #22c55e; color: white;
+                {% elif rs == 'reviewed' %}background: #3b82f6; color: white;
+                {% else %}background: #e5e7eb; color: #6b7280;{% endif %}">
+                {% if rs == 'draft' %}مسودة{% elif rs == 'reviewed' %}مراجَع{% elif rs == 'verified' %}موثّق{% elif rs == 'locked' %}مقفل{% endif %}
+            </strong>
+        </div>
+        <form method="POST" action="{{ url_for('admin_record_verify', record_id=record.id) }}" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            {% if rs == 'draft' %}
+            <button type="submit" name="record_status" value="reviewed" class="btn btn-sm" style="background: #3b82f6; color: white; border: none;">&#x2192; مراجَع</button>
+            {% endif %}
+            {% if rs in ('draft', 'reviewed') %}
+            <button type="submit" name="record_status" value="verified" class="btn btn-sm" style="background: #22c55e; color: white; border: none;">&#x2192; موثّق</button>
+            {% endif %}
+            {% if rs in ('draft', 'reviewed', 'verified') %}
+            <button type="submit" name="record_status" value="locked" class="btn btn-sm" style="background: #dc2626; color: white; border: none;" onclick="return confirm('هل تريد قفل السجل؟ لن يمكن التعديل بسهولة بعد القفل.')">&#x1F512; قفل</button>
+            {% endif %}
+            {% if rs != 'draft' %}
+            <button type="submit" name="record_status" value="draft" class="btn btn-outline btn-sm">&#x1F504; إعادة لمسودة</button>
+            {% endif %}
+        </form>
+    </div>
+    {% if rs == 'locked' %}
+    <div style="padding: 0.5rem; background: #fef2f2; border-radius: 6px; color: #991b1b; font-size: 0.88rem; margin-top: 0.5rem;">
+        &#x26A0; هذا السجل مقفل. يجب إلغاء القفل أولاً لتعديله.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Linked Records -->
+<div class="card" style="margin-top: 1rem;">
+    <div class="card-header">
+        <div class="card-icon">&#x1F517;</div>
+        <h3>السجلات المرتبطة</h3>
+    </div>
+    {% if linked_records %}
+    <div style="margin-bottom: 1rem;">
+        {% for lr in linked_records %}
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.4rem;">
+            <div>
+                <a href="{{ url_for('admin_record_detail', record_id=lr.record.id) }}" style="font-weight: 600; color: var(--primary);">
+                    {{ lr.record.first_name }} {{ lr.record.father_name }} {{ lr.record.last_name }}
+                </a>
+                <span style="font-size: 0.8rem; color: var(--text-light); margin-right: 0.5rem;">
+                    ({{ lr.record.province }})
+                </span>
+                <span style="font-size: 0.78rem; padding: 1px 6px; border-radius: 3px; background: #e5e7eb; color: #374151;">
+                    {% if lr.link_type == 'spouse' %}زوج/ة
+                    {% elif lr.link_type == 'parent' %}والد/ة
+                    {% elif lr.link_type == 'child' %}ابن/ة
+                    {% elif lr.link_type == 'sibling' %}أخ/أخت
+                    {% elif lr.link_type == 'witness' %}شاهد
+                    {% else %}مرتبط{% endif %}
+                </span>
+                {% if lr.notes %}<span style="font-size: 0.78rem; color: var(--text-light);">- {{ lr.notes }}</span>{% endif %}
+            </div>
+            <form method="POST" action="{{ url_for('admin_record_unlink', record_id=record.id, link_id=lr.link_id) }}" style="display:inline" onsubmit="return confirm('إزالة الربط؟')">
+                <button type="submit" class="btn btn-outline btn-sm" style="color: #dc2626; border-color: #dc2626; padding: 2px 8px;">&times;</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1rem;">لا توجد سجلات مرتبطة</p>
+    {% endif %}
+
+    <!-- Add Link Form -->
+    <div style="padding: 0.8rem; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">&#x2795; ربط سجل جديد</div>
+        <form method="POST" action="{{ url_for('admin_record_link', record_id=record.id) }}" id="linkForm">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
+                <div style="flex: 2; min-width: 200px;">
+                    <label style="font-size: 0.82rem; color: var(--text-light);">بحث باسم الشخص</label>
+                    <input type="text" id="linkSearchInput" placeholder="اكتب اسم الشخص..." autocomplete="off"
+                        style="width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px;">
+                    <input type="hidden" name="linked_id" id="linkRecordId">
+                    <div id="linkSearchResults" style="display: none; position: absolute; z-index: 100; background: var(--card); border: 1px solid var(--border); border-radius: 4px; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 300px;"></div>
+                </div>
+                <div style="min-width: 120px;">
+                    <label style="font-size: 0.82rem; color: var(--text-light);">نوع العلاقة</label>
+                    <select name="link_type" style="width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px;">
+                        <option value="related">مرتبط</option>
+                        <option value="spouse">زوج/ة</option>
+                        <option value="parent">والد/ة</option>
+                        <option value="child">ابن/ة</option>
+                        <option value="sibling">أخ/أخت</option>
+                        <option value="witness">شاهد</option>
+                    </select>
+                </div>
+                <div style="min-width: 150px;">
+                    <label style="font-size: 0.82rem; color: var(--text-light);">ملاحظة (اختياري)</label>
+                    <input type="text" name="notes" placeholder="ملاحظة..." style="width: 100%; padding: 0.4rem; border: 1px solid var(--border); border-radius: 4px;">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">&#x1F517; ربط</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Recent Changes -->
+{% if changes %}
+<div class="card" style="margin-top: 1rem;">
+    <div class="card-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="card-icon">&#x1F4DC;</div>
+            <h3>آخر التغييرات</h3>
+        </div>
+        <a href="{{ url_for('admin_record_history', record_id=record.id) }}" class="btn btn-outline btn-sm" style="font-size: 0.8rem;">عرض الكل</a>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>الحقل</th>
+                    <th>القديم</th>
+                    <th>الجديد</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in changes[:10] %}
+                <tr>
+                    <td style="white-space: nowrap; font-size: 0.82rem;">{{ c.changed_at }}</td>
+                    <td style="font-weight: 600; font-size: 0.85rem;">{{ c.field_name }}</td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-size: 0.82rem; color: #dc2626;">{{ (c.old_value or '-')[:60] }}</td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-size: 0.82rem; color: #16a34a;">{{ (c.new_value or '-')[:60] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<script>
+// Link search
+var linkSearchTimer = null;
+var linkSearchInput = document.getElementById('linkSearchInput');
+var linkSearchResults = document.getElementById('linkSearchResults');
+var linkRecordId = document.getElementById('linkRecordId');
+
+if (linkSearchInput) {
+    linkSearchInput.addEventListener('input', function() {
+        clearTimeout(linkSearchTimer);
+        var q = this.value.trim();
+        if (q.length < 2) { linkSearchResults.style.display = 'none'; return; }
+        linkSearchTimer = setTimeout(function() {
+            fetch('/api/search_records?q=' + encodeURIComponent(q) + '&exclude={{ record.id }}')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.length) {
+                    linkSearchResults.innerHTML = '<div style="padding:0.5rem; color:var(--text-light); font-size:0.85rem;">لا نتائج</div>';
+                } else {
+                    var html = '';
+                    for (var i = 0; i < data.length; i++) {
+                        var r = data[i];
+                        html += '<div style="padding:0.4rem 0.6rem; cursor:pointer; border-bottom:1px solid var(--border); font-size:0.88rem;" '
+                            + 'onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'" '
+                            + 'onclick="selectLinkRecord(' + r.id + ', \'' + r.name.replace(/'/g, "\\'") + '\')">'
+                            + r.name + ' <span style="font-size:0.75rem; color:var(--text-light);">(' + (r.province||'') + ')</span></div>';
+                    }
+                    linkSearchResults.innerHTML = html;
+                }
+                linkSearchResults.style.display = 'block';
+            });
+        }, 300);
+    });
+}
+
+function selectLinkRecord(id, name) {
+    linkRecordId.value = id;
+    linkSearchInput.value = name;
+    linkSearchResults.style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+    if (!linkSearchInput.contains(e.target) && !linkSearchResults.contains(e.target)) {
+        linkSearchResults.style.display = 'none';
+    }
+});
+</script>
 
 <!-- SMS via KDE Connect Modal -->
 {% if record.phone or record.reporter_phone %}

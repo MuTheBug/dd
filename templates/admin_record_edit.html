@@ -7,7 +7,18 @@
     <h1 style="font-size: 1.3rem; color: var(--primary-dark);">تعديل سجل #{{ record.id }}</h1>
 </div>
 
-<form method="POST" enctype="multipart/form-data">
+{% if record.record_status == 'locked' %}
+<div style="padding: 1rem; background: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; margin-bottom: 1rem; color: #991b1b;">
+    <strong>&#x26A0; تحذير:</strong> هذا السجل <strong>مقفل</strong>. يجب إلغاء القفل من صفحة التفاصيل قبل التعديل.
+    <a href="{{ url_for('admin_record_detail', record_id=record.id) }}" style="color: #1d4ed8; font-weight: 600;">العودة للتفاصيل</a>
+</div>
+{% elif record.record_status == 'verified' %}
+<div style="padding: 0.8rem; background: #f0fdf4; border: 1px solid #22c55e; border-radius: 8px; margin-bottom: 1rem; color: #166534;">
+    &#x2139; هذا السجل <strong>موثّق</strong>. أي تعديل سيتم تسجيله في سجل التغييرات.
+</div>
+{% endif %}
+
+<form method="POST" enctype="multipart/form-data" {% if record.record_status == 'locked' %}onsubmit="return confirm('هذا السجل مقفل! هل أنت متأكد من التعديل؟')"{% endif %}>
 
 <!-- Classification & Reporter -->
 <div class="form-section">

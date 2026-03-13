@@ -5,16 +5,16 @@
 <style>
 @page {
     size: A4 landscape;
-    margin: 1.2cm 1.5cm;
+    margin: 0.9cm 1cm;
     @top-center {
         content: "حقنا — {{ clist.name }}";
-        font-size: 8pt;
+        font-size: 9pt;
         color: #a0aec0;
         font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     }
     @bottom-left {
         content: "صفحة " counter(page) " من " counter(pages);
-        font-size: 8pt;
+        font-size: 9pt;
         color: #a0aec0;
         font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     }
@@ -23,7 +23,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
     font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-    font-size: 10pt;
+    font-size: 13pt;
     line-height: 1.5;
     color: #2d3748;
     direction: rtl;
@@ -32,48 +32,48 @@ body {
 .header-band {
     background: #1a365d;
     color: white;
-    padding: 12px 18px;
-    margin: -1.2cm -1.5cm 0 -1.5cm;
-    margin-bottom: 10px;
+    padding: 14px 20px;
+    margin: -0.9cm -1cm 0 -1cm;
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
 }
 .logo {
-    width: 40px; height: 40px;
+    width: 48px; height: 48px;
     border-radius: 50%;
     border: 2px solid rgba(255,255,255,0.5);
 }
-.header-band h1 { font-size: 16pt; font-weight: 800; }
-.header-band .subtitle { font-size: 9pt; opacity: 0.85; }
+.header-band h1 { font-size: 20pt; font-weight: 800; }
+.header-band .subtitle { font-size: 10pt; opacity: 0.85; }
 
 .list-info {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 6px 0 10px 0;
+    padding: 8px 0 12px 0;
     border-bottom: 2px solid #e2e8f0;
-    margin-bottom: 10px;
-    font-size: 9pt;
+    margin-bottom: 12px;
+    font-size: 11pt;
     color: #718096;
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 9pt;
+    font-size: 11pt;
 }
 thead th {
     background: #1a365d;
     color: white;
-    padding: 6px 6px;
+    padding: 8px 8px;
     text-align: right;
     font-weight: 700;
-    font-size: 8pt;
+    font-size: 10pt;
     white-space: nowrap;
 }
 tbody td {
-    padding: 5px 6px;
+    padding: 7px 8px;
     border-bottom: 1px solid #e2e8f0;
     vertical-align: top;
 }
@@ -81,9 +81,9 @@ tbody tr:nth-child(even) { background: #f7fafc; }
 
 .badge {
     display: inline-block;
-    padding: 1px 6px;
+    padding: 2px 8px;
     border-radius: 8px;
-    font-size: 8pt;
+    font-size: 10pt;
     font-weight: 700;
     color: white;
     white-space: nowrap;
@@ -92,8 +92,8 @@ tbody tr:nth-child(even) { background: #f7fafc; }
 .badge-enforced { background: #dd6b20; }
 .badge-deceased { background: #e53e3e; }
 
-.phone-label { font-size: 7pt; color: #a0aec0; }
-.note-text { font-size: 8pt; color: #718096; }
+.phone-label { font-size: 9pt; color: #a0aec0; }
+.note-text { font-size: 10pt; color: #718096; }
 </style>
 </head>
 <body>
@@ -177,7 +177,7 @@ tbody tr:nth-child(even) { background: #f7fafc; }
                     {% elif r.status == 'deceased' %}<span class="badge badge-deceased">متوفى</span>
                     {% else %}-{% endif %}
                     {% if r.marital == 'married' and r.gender == 'male' and r.status in ('deceased', 'enforced') %}
-                    <br><span style="font-size:7pt; color:#92400e;">{% if r.status == 'deceased' %}زوجته أرملة{% else %}زوجة مغيّب{% endif %}</span>
+                    <br><span style="font-size:9pt; color:#92400e;">{% if r.status == 'deceased' %}زوجته أرملة{% else %}زوجة مغيّب{% endif %}</span>
                     {% endif %}
                 {% elif col_key == 'gender' %}
                     {{ 'ذكر' if r.gender == 'male' else 'أنثى' if r.gender == 'female' else '-' }}

@@ -3022,20 +3022,29 @@ def records_list_pdf():
     conditions, params, pdf_status_list = build_pdf_filter_conditions(args)
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+    # Check if post-filtering is needed
+    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
+    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
+    pdf_kids_max_age = int(args['kids_max_age']) if args.get('kids_max_age') else None
+    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+    needs_post_filter = (pdf_kids_age_from is not None or pdf_kids_age_to is not None
+                         or pdf_kids_max_age is not None
+                         or (args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18))
+
+    # When post-filtering is needed, fetch all records (no LIMIT) so the post-filter
+    # sees the full result set, then apply LIMIT afterwards
+    sql_limit = "" if needs_post_filter else " LIMIT 500"
     records = db.execute(
-        f"SELECT * FROM records{where} ORDER BY id DESC LIMIT 500", params
+        f"SELECT * FROM records{where} ORDER BY id DESC{sql_limit}", params
     ).fetchall()
 
     # Post-filter by kids age range if specified
-    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
-    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
     if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
         records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
-    pdf_kids_max_age = int(args['kids_max_age']) if args.get('kids_max_age') else None
     if pdf_kids_max_age is not None:
         records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_kids_max_age)]
     # Post-filter for custom minor age threshold
-    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
     if args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18:
         if args['has_kids_under_18'] == 'yes':
             records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]
@@ -3278,19 +3287,26 @@ def records_list_excel():
 
     conditions, params, pdf_status_list = build_pdf_filter_conditions(args)
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+    # Check if post-filtering is needed (same logic as PDF route)
+    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
+    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
+    pdf_kids_max_age = int(args['kids_max_age']) if args.get('kids_max_age') else None
+    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+    needs_post_filter = (pdf_kids_age_from is not None or pdf_kids_age_to is not None
+                         or pdf_kids_max_age is not None
+                         or (args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18))
+
+    sql_limit = "" if needs_post_filter else " LIMIT 500"
     records = db.execute(
-        f"SELECT * FROM records{where} ORDER BY id DESC LIMIT 500", params
+        f"SELECT * FROM records{where} ORDER BY id DESC{sql_limit}", params
     ).fetchall()
 
     # Post-filters (same as PDF)
-    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
-    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
     if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
         records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
-    pdf_kids_max_age = int(args['kids_max_age']) if args.get('kids_max_age') else None
     if pdf_kids_max_age is not None:
         records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_kids_max_age)]
-    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
     if args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18:
         if args['has_kids_under_18'] == 'yes':
             records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]
@@ -3386,19 +3402,26 @@ def records_export_vcf():
 
     conditions, params, pdf_status_list = build_pdf_filter_conditions(args)
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+    # Check if post-filtering is needed (same logic as PDF/Excel routes)
+    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
+    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
+    pdf_kids_max_age = int(args['kids_max_age']) if args.get('kids_max_age') else None
+    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+    needs_post_filter = (pdf_kids_age_from is not None or pdf_kids_age_to is not None
+                         or pdf_kids_max_age is not None
+                         or (args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18))
+
+    sql_limit = "" if needs_post_filter else " LIMIT 500"
     records = db.execute(
-        f"SELECT * FROM records{where} ORDER BY id DESC LIMIT 500", params
+        f"SELECT * FROM records{where} ORDER BY id DESC{sql_limit}", params
     ).fetchall()
 
     # Post-filters (same as PDF/Excel)
-    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
-    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
     if pdf_kids_age_from is not None or pdf_kids_age_to is not None:
         records = [r for r in records if record_has_child_in_age_range(r, pdf_kids_age_from, pdf_kids_age_to)]
-    pdf_kids_max_age = int(args['kids_max_age']) if args.get('kids_max_age') else None
     if pdf_kids_max_age is not None:
         records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_kids_max_age)]
-    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
     if args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18:
         if args['has_kids_under_18'] == 'yes':
             records = [r for r in records if record_has_child_in_age_range(r, 0, pdf_minor_threshold - 1)]

@@ -4828,11 +4828,36 @@ def api_export_to_list():
         db = get_db()
         conditions, params = _build_record_filter_conditions(filters)
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
-        sql = f"SELECT id FROM records{where} ORDER BY id DESC"
-        if limit and int(limit) > 0:
-            sql += f" LIMIT {int(limit)}"
-        rows = db.execute(sql, params).fetchall()
-        record_ids = [row['id'] for row in rows]
+
+        # Check if post-filtering is needed (kids age range, custom minor threshold)
+        kids_age_from = int(filters['kids_age_from']) if filters.get('kids_age_from') else None
+        kids_age_to = int(filters['kids_age_to']) if filters.get('kids_age_to') else None
+        kids_max_age = int(filters['kids_max_age']) if filters.get('kids_max_age') else None
+        minor_threshold = int(filters['minor_age_threshold']) if filters.get('minor_age_threshold') else 18
+        needs_kids_post = kids_age_from is not None or kids_age_to is not None or kids_max_age is not None
+        needs_minor_post = filters.get('has_kids_under_18') in ('yes', 'no') and minor_threshold != 18
+
+        if needs_kids_post or needs_minor_post:
+            # Fetch full records for post-filtering
+            rows = db.execute(f"SELECT * FROM records{where} ORDER BY id DESC", params).fetchall()
+            if kids_age_from is not None or kids_age_to is not None:
+                rows = [r for r in rows if record_has_child_in_age_range(r, kids_age_from, kids_age_to)]
+            if kids_max_age is not None:
+                rows = [r for r in rows if record_has_child_in_age_range(r, 0, kids_max_age)]
+            if needs_minor_post:
+                if filters.get('has_kids_under_18') == 'yes':
+                    rows = [r for r in rows if record_has_child_in_age_range(r, 0, minor_threshold - 1)]
+                elif filters.get('has_kids_under_18') == 'no':
+                    rows = [r for r in rows if not record_has_child_in_age_range(r, 0, minor_threshold - 1)]
+            if limit and int(limit) > 0:
+                rows = rows[:int(limit)]
+            record_ids = [row['id'] for row in rows]
+        else:
+            sql = f"SELECT id FROM records{where} ORDER BY id DESC"
+            if limit and int(limit) > 0:
+                sql += f" LIMIT {int(limit)}"
+            rows = db.execute(sql, params).fetchall()
+            record_ids = [row['id'] for row in rows]
 
     if not record_ids:
         return jsonify({'error': 'لا توجد سجلات'}), 400

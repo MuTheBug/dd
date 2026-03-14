@@ -1575,17 +1575,19 @@ function doExportToList() {
 
     var limit = getEtlLimit();
 
-    // Build filter object from current page filters
+    // Build filter object from current form state (not stale filterParams)
     var filters = {};
-    // Status checkboxes
-    var statuses = [];
-    document.querySelectorAll('input[name="status"]:checked').forEach(function(cb) {
-        statuses.push(cb.value);
-    });
-    if (statuses.length > 0) filters.status = statuses;
-    // Other filter params from the page (skip status — already handled from checkboxes)
-    for (var key in filterParams) {
-        if (filterParams[key] && key !== 'status') filters[key] = filterParams[key];
+    var form = document.getElementById('filterForm');
+    var fd = new FormData(form);
+    for (var pair of fd.entries()) {
+        if (pair[1]) {
+            if (pair[0] === 'status') {
+                if (!filters.status) filters.status = [];
+                filters.status.push(pair[1]);
+            } else {
+                filters[pair[0]] = pair[1];
+            }
+        }
     }
 
     var body = { filters: filters, limit: limit };

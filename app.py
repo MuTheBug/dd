@@ -1659,13 +1659,9 @@ def admin_records():
         else:
             pass  # post-filter will handle this
     if filters['kids_max_age']:
-        # Children born after (current_year - max_age) are under that age
-        current_year = datetime.now().year
-        min_birth_year = current_year - int(filters['kids_max_age'])
-        # Check children_data JSON for children with birth year >= min_birth_year
-        # Since children_data is JSON, we check kids_under_18_count as proxy
-        # and also filter by the age threshold using birth year calculation
-        conditions.append("kids_under_18_count > 0")
+        # Will be handled by post-filter using record_has_child_in_age_range
+        # Pre-filter: just ensure children exist
+        conditions.append("(children_data IS NOT NULL AND children_data != '' AND children_data != '[]')")
     if filters['has_photo'] == 'yes':
         conditions.append("photo_path IS NOT NULL AND photo_path != ''")
     elif filters['has_photo'] == 'no':
@@ -1877,7 +1873,8 @@ def admin_records():
     # For kids age filtering, we need post-filter since children_data is JSON
     kids_age_from = int(filters['kids_age_from']) if filters['kids_age_from'] else None
     kids_age_to = int(filters['kids_age_to']) if filters['kids_age_to'] else None
-    needs_kids_age_filter = kids_age_from is not None or kids_age_to is not None
+    kids_max_age = int(filters['kids_max_age']) if filters.get('kids_max_age') else None
+    needs_kids_age_filter = kids_age_from is not None or kids_age_to is not None or kids_max_age is not None
     # Custom minor age threshold also needs post-filter
     needs_minor_threshold_filter = filters['has_kids_under_18'] in ('yes', 'no') and minor_threshold != 18
 
@@ -1903,8 +1900,10 @@ def admin_records():
         all_records = db.execute(
             f"SELECT * FROM records{where} ORDER BY {sort_by} {sort_dir}", params
         ).fetchall()
-        if needs_kids_age_filter:
+        if kids_age_from is not None or kids_age_to is not None:
             all_records = [r for r in all_records if record_has_child_in_age_range(r, kids_age_from, kids_age_to)]
+        if kids_max_age is not None:
+            all_records = [r for r in all_records if record_has_child_in_age_range(r, 0, kids_max_age)]
         if needs_minor_threshold_filter:
             if filters['has_kids_under_18'] == 'yes':
                 all_records = [r for r in all_records if record_has_child_in_age_range(r, 0, minor_threshold - 1)]

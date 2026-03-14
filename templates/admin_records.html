@@ -1385,12 +1385,11 @@ function exportPdf() {
         form.appendChild(inp);
     }
 
-    // Filter params
-    document.querySelectorAll('input[name="status"]:checked').forEach(function(cb) {
-        addField('status', cb.value);
-    });
-    for (var key in filterParams) {
-        if (filterParams[key]) addField(key, filterParams[key]);
+    // Filter params from current form state
+    var filterForm = document.getElementById('filterForm');
+    var filterFd = new FormData(filterForm);
+    for (var pair of filterFd.entries()) {
+        if (pair[1]) addField(pair[0], pair[1]);
     }
     // Preset overrides
     if (presetOverrides) {
@@ -1438,11 +1437,11 @@ function exportExcel() {
         form.appendChild(inp);
     }
 
-    document.querySelectorAll('input[name="status"]:checked').forEach(function(cb) {
-        addField('status', cb.value);
-    });
-    for (var key in filterParams) {
-        if (filterParams[key]) addField(key, filterParams[key]);
+    // Filter params from current form state
+    var filterForm = document.getElementById('filterForm');
+    var filterFd = new FormData(filterForm);
+    for (var pair of filterFd.entries()) {
+        if (pair[1]) addField(pair[0], pair[1]);
     }
     if (presetOverrides) {
         for (var pk in presetOverrides) addField(pk, presetOverrides[pk]);
@@ -1474,11 +1473,11 @@ function exportVcf() {
         form.appendChild(inp);
     }
 
-    document.querySelectorAll('input[name="status"]:checked').forEach(function(cb) {
-        addField('status', cb.value);
-    });
-    for (var key in filterParams) {
-        if (filterParams[key]) addField(key, filterParams[key]);
+    // Filter params from current form state
+    var filterForm = document.getElementById('filterForm');
+    var filterFd = new FormData(filterForm);
+    for (var pair of filterFd.entries()) {
+        if (pair[1]) addField(pair[0], pair[1]);
     }
     if (presetOverrides) {
         for (var pk in presetOverrides) addField(pk, presetOverrides[pk]);

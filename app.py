@@ -1463,6 +1463,321 @@ def compute_need_score(record):
     return score
 
 
+def _build_record_filter_conditions(filters):
+    """Build SQL conditions and params from a filters dict.
+
+    Used by admin_records, api_export_to_list, and other endpoints that
+    need to filter the records table with the same logic.
+
+    Args:
+        filters: dict with filter keys and string values.
+                 Uses .get() so missing keys are safe.
+    Returns:
+        (conditions, params) - lists for building WHERE clause.
+    """
+    conditions = []
+    params = []
+
+    status_list = filters.get('status_list') or []
+    if not status_list and filters.get('status'):
+        raw = filters['status']
+        if isinstance(raw, list):
+            status_list = raw
+        elif isinstance(raw, str) and ',' in raw:
+            status_list = [s.strip() for s in raw.split(',') if s.strip()]
+        elif raw:
+            status_list = [raw]
+
+    if filters.get('record_status'):
+        conditions.append("record_status = ?")
+        params.append(filters['record_status'])
+    if status_list:
+        if len(status_list) == 1:
+            conditions.append("status = ?")
+            params.append(status_list[0])
+        else:
+            placeholders = ','.join(['?'] * len(status_list))
+            conditions.append(f"status IN ({placeholders})")
+            params.extend(status_list)
+    if filters.get('province'):
+        conditions.append("province = ?")
+        params.append(filters['province'])
+    if filters.get('gender'):
+        conditions.append("gender = ?")
+        params.append(filters['gender'])
+    if filters.get('arrest_authority'):
+        matching_keywords = None
+        for canonical, keywords in AUTHORITY_GROUPS.items():
+            if filters['arrest_authority'] == canonical:
+                matching_keywords = keywords
+                break
+            for kw in keywords:
+                if kw in filters['arrest_authority']:
+                    matching_keywords = keywords
+                    break
+            if matching_keywords:
+                break
+        if matching_keywords:
+            or_clauses = ' OR '.join(['arrest_authority LIKE ?' for _ in matching_keywords])
+            conditions.append(f"({or_clauses})")
+            params.extend([f"%{kw}%" for kw in matching_keywords])
+        else:
+            conditions.append("arrest_authority LIKE ?")
+            params.append(f"%{filters['arrest_authority']}%")
+    if filters.get('arrest_place'):
+        conditions.append("arrest_place LIKE ?")
+        params.append(f"%{filters['arrest_place']}%")
+    if filters.get('arrest_year_from'):
+        conditions.append("arrest_year >= ?")
+        params.append(int(filters['arrest_year_from']))
+    if filters.get('arrest_year_to'):
+        conditions.append("arrest_year <= ?")
+        params.append(int(filters['arrest_year_to']))
+    if filters.get('birth_year_from'):
+        conditions.append("birth_year >= ?")
+        params.append(int(filters['birth_year_from']))
+    if filters.get('birth_year_to'):
+        conditions.append("birth_year <= ?")
+        params.append(int(filters['birth_year_to']))
+    if filters.get('marital'):
+        conditions.append("marital = ?")
+        params.append(filters['marital'])
+    if filters.get('education'):
+        conditions.append("education = ?")
+        params.append(filters['education'])
+    if filters.get('education_max'):
+        edu_order = ['أمّي', 'ابتدائية', 'إعدادية', 'ثانوية', 'معهد', 'بكالوريوس', 'ماجستير', 'دكتوراه']
+        try:
+            max_idx = edu_order.index(filters['education_max'])
+            included = edu_order[:max_idx + 1]
+            placeholders = ','.join(['?'] * len(included))
+            conditions.append(f"education IN ({placeholders})")
+            params.extend(included)
+        except ValueError:
+            pass
+    if filters.get('housing_type'):
+        conditions.append("housing_type = ?")
+        params.append(filters['housing_type'])
+    if filters.get('blood_type'):
+        conditions.append("blood_type = ?")
+        params.append(filters['blood_type'])
+    if filters.get('has_kids') == 'yes':
+        conditions.append("has_kids = 'yes'")
+    elif filters.get('has_kids') == 'no':
+        conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
+    minor_threshold = int(filters['minor_age_threshold']) if filters.get('minor_age_threshold') else 18
+    if filters.get('has_kids_under_18') == 'yes':
+        if minor_threshold == 18:
+            conditions.append("kids_under_18_count > 0")
+        else:
+            conditions.append("(children_data IS NOT NULL AND children_data != '' AND children_data != '[]')")
+    elif filters.get('has_kids_under_18') == 'no':
+        if minor_threshold == 18:
+            conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
+    if filters.get('kids_max_age'):
+        conditions.append("(children_data IS NOT NULL AND children_data != '' AND children_data != '[]')")
+    if filters.get('has_photo') == 'yes':
+        conditions.append("photo_path IS NOT NULL AND photo_path != ''")
+    elif filters.get('has_photo') == 'no':
+        conditions.append("(photo_path IS NULL OR photo_path = '')")
+    if filters.get('has_document') == 'yes':
+        conditions.append("document_path IS NOT NULL AND document_path != ''")
+    elif filters.get('has_document') == 'no':
+        conditions.append("(document_path IS NULL OR document_path = '')")
+    if filters.get('case_type'):
+        conditions.append("case_type = ?")
+        params.append(filters['case_type'])
+    if filters.get('evidence_level'):
+        conditions.append("evidence_level = ?")
+        params.append(filters['evidence_level'])
+    if filters.get('verification_status'):
+        conditions.append("verification_status = ?")
+        params.append(filters['verification_status'])
+    if filters.get('civil_registry_status'):
+        conditions.append("civil_registry_status = ?")
+        params.append(filters['civil_registry_status'])
+    if filters.get('digital_evidence_type'):
+        conditions.append("digital_evidence_type = ?")
+        params.append(filters['digital_evidence_type'])
+    if filters.get('has_conflicting_info') == '1':
+        conditions.append("has_conflicting_info = 1")
+    if filters.get('has_special_needs') == '1':
+        conditions.append("has_special_needs = 1")
+    if filters.get('chronic') == 'yes':
+        conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
+    if filters.get('breadwinner'):
+        conditions.append("breadwinner LIKE ?")
+        params.append(f"%{filters['breadwinner']}%")
+    if filters.get('has_hypertension') == '1':
+        conditions.append("has_hypertension = 1")
+    if filters.get('has_diabetes') == '1':
+        conditions.append("has_diabetes = 1")
+    if filters.get('is_registered') == '1':
+        conditions.append("is_officially_registered = 1")
+    elif filters.get('is_registered') == '0':
+        conditions.append("(is_officially_registered = 0 OR is_officially_registered IS NULL)")
+    if filters.get('has_legal') == 'yes':
+        conditions.append("legal = 'نعم'")
+    if filters.get('has_assoc') == 'yes':
+        conditions.append("assoc = 'yes'")
+    elif filters.get('has_assoc') == 'no':
+        conditions.append("(assoc != 'yes' OR assoc IS NULL OR assoc = '')")
+    if filters.get('reporter_relation'):
+        conditions.append("reporter_relation = ?")
+        params.append(filters['reporter_relation'])
+    if filters.get('widows_filter') == 'widows_deceased':
+        conditions.append("status IN ('deceased') AND gender = 'male' AND marital = 'married'")
+    elif filters.get('widows_filter') == 'widows_enforced':
+        conditions.append("status = 'enforced' AND gender = 'male' AND marital = 'married'")
+    elif filters.get('widows_filter') == 'widows_all':
+        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married'")
+    elif filters.get('widows_filter') == 'widows_with_minors':
+        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married' AND kids_under_18_count > 0")
+    if filters.get('spouse_search'):
+        conditions.append("spouse_name LIKE ?")
+        params.append(f"%{filters['spouse_search']}%")
+    if filters.get('child_name_search'):
+        conditions.append("children_data LIKE ?")
+        params.append(f"%{filters['child_name_search']}%")
+    if filters.get('child_education'):
+        conditions.append("children_data LIKE ?")
+        params.append(f"%{filters['child_education']}%")
+    if filters.get('employment'):
+        conditions.append("employment LIKE ?")
+        params.append(f"%{filters['employment']}%")
+    if filters.get('profession'):
+        conditions.append("profession LIKE ?")
+        params.append(f"%{filters['profession']}%")
+    if filters.get('address_search'):
+        conditions.append("address LIKE ?")
+        params.append(f"%{filters['address_search']}%")
+    if filters.get('arrest_reason'):
+        conditions.append("arrest_reason LIKE ?")
+        params.append(f"%{filters['arrest_reason']}%")
+    if filters.get('death_year_from'):
+        conditions.append("death_year >= ?")
+        params.append(int(filters['death_year_from']))
+    if filters.get('death_year_to'):
+        conditions.append("death_year <= ?")
+        params.append(int(filters['death_year_to']))
+    if filters.get('release_year_from'):
+        conditions.append("release_year >= ?")
+        params.append(int(filters['release_year_from']))
+    if filters.get('release_year_to'):
+        conditions.append("release_year <= ?")
+        params.append(int(filters['release_year_to']))
+    if filters.get('notes_search'):
+        conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
+        params.extend([f"%{filters['notes_search']}%"] * 2)
+    if filters.get('employer'):
+        conditions.append("employer LIKE ?")
+        params.append(f"%{filters['employer']}%")
+    if filters.get('breadwinner_relation'):
+        conditions.append("breadwinner_relation = ?")
+        params.append(filters['breadwinner_relation'])
+    if filters.get('age_from'):
+        current_year = datetime.now().year
+        max_birth_year = current_year - int(filters['age_from'])
+        conditions.append("birth_year <= ? AND birth_year > 0")
+        params.append(max_birth_year)
+    if filters.get('age_to'):
+        current_year = datetime.now().year
+        min_birth_year = current_year - int(filters['age_to'])
+        conditions.append("birth_year >= ?")
+        params.append(min_birth_year)
+    if filters.get('has_guardian') == 'yes':
+        conditions.append("guardian_name IS NOT NULL AND guardian_name != ''")
+    elif filters.get('has_guardian') == 'no':
+        conditions.append("(guardian_name IS NULL OR guardian_name = '')")
+    if filters.get('digital_evidence_url_status'):
+        conditions.append("digital_evidence_url_status = ?")
+        params.append(filters['digital_evidence_url_status'])
+    if filters.get('collector_name'):
+        conditions.append("collector_name = ?")
+        params.append(filters['collector_name'])
+    if filters.get('created_from'):
+        conditions.append("created_at >= ?")
+        params.append(filters['created_from'])
+    if filters.get('created_to'):
+        conditions.append("created_at <= ?")
+        params.append(filters['created_to'] + ' 23:59:59')
+    if filters.get('collection_date_from'):
+        conditions.append("collection_date >= ?")
+        params.append(filters['collection_date_from'])
+    if filters.get('collection_date_to'):
+        conditions.append("collection_date <= ?")
+        params.append(filters['collection_date_to'])
+    if filters.get('source_type'):
+        conditions.append("source_type = ?")
+        params.append(filters['source_type'])
+    if filters.get('has_phone') == 'yes':
+        conditions.append("(phone IS NOT NULL AND phone != '')")
+    elif filters.get('has_phone') == 'no':
+        conditions.append("(phone IS NULL OR phone = '')")
+    if filters.get('family_book_number'):
+        conditions.append("family_book_number LIKE ?")
+        params.append(f"%{filters['family_book_number']}%")
+    if filters.get('national_id_search'):
+        conditions.append("national_id LIKE ?")
+        params.append(f"%{filters['national_id_search']}%")
+    if filters.get('has_rent') == 'yes':
+        conditions.append("rent_amount IS NOT NULL AND rent_amount != '' AND rent_amount != '0'")
+    elif filters.get('has_rent') == 'no':
+        conditions.append("(rent_amount IS NULL OR rent_amount = '' OR rent_amount = '0')")
+    if filters.get('detention_facility_search'):
+        conditions.append("detention_facilities_data LIKE ?")
+        params.append(f"%{filters['detention_facility_search']}%")
+    # Service filters (subqueries on record_services)
+    svc_mode = filters.get('service_filter_mode', '') or 'received'
+    if svc_mode == 'not_received' and filters.get('service_name'):
+        conditions.append(
+            "NOT EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
+        )
+        params.append(filters['service_name'])
+    elif filters.get('service_name') and filters.get('service_count_min'):
+        conditions.append(
+            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?) >= ?"
+        )
+        params.append(filters['service_name'])
+        params.append(int(filters['service_count_min']))
+    elif filters.get('service_name'):
+        conditions.append(
+            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
+        )
+        params.append(filters['service_name'])
+    elif filters.get('service_count_min'):
+        conditions.append(
+            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id) >= ?"
+        )
+        params.append(int(filters['service_count_min']))
+    if filters.get('service_provider'):
+        conditions.append(
+            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.provider = ?)"
+        )
+        params.append(filters['service_provider'])
+    if filters.get('last_service_from'):
+        conditions.append(
+            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_date >= ?)"
+        )
+        params.append(filters['last_service_from'])
+    if filters.get('last_service_to'):
+        conditions.append(
+            "(SELECT MAX(rs.service_date) FROM record_services rs WHERE rs.record_id = records.id) <= ?"
+        )
+        params.append(filters['last_service_to'])
+    if filters.get('search'):
+        search_term = f"%{filters['search']}%"
+        conditions.append("""(
+            first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
+            OR mother_name LIKE ? OR national_id LIKE ? OR phone LIKE ?
+            OR address LIKE ? OR notes LIKE ? OR reporter_name LIKE ?
+            OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
+        )""")
+        params.extend([search_term] * 10)
+
+    return conditions, params
+
+
 @app.route('/admin/records')
 @admin_required
 def admin_records():
@@ -1565,308 +1880,7 @@ def admin_records():
         'service_filter_mode': request.args.get('service_filter_mode', ''),
     }
 
-    # Record verification status filter
-    if filters['record_status']:
-        conditions.append("record_status = ?")
-        params.append(filters['record_status'])
-
-    if status_list:
-        if len(status_list) == 1:
-            conditions.append("status = ?")
-            params.append(status_list[0])
-        else:
-            placeholders = ','.join(['?'] * len(status_list))
-            conditions.append(f"status IN ({placeholders})")
-            params.extend(status_list)
-    if filters['province']:
-        conditions.append("province = ?")
-        params.append(filters['province'])
-    if filters['gender']:
-        conditions.append("gender = ?")
-        params.append(filters['gender'])
-    if filters['arrest_authority']:
-        # Find which keyword group this authority belongs to
-        matching_keywords = None
-        for canonical, keywords in AUTHORITY_GROUPS.items():
-            if filters['arrest_authority'] == canonical:
-                matching_keywords = keywords
-                break
-            for kw in keywords:
-                if kw in filters['arrest_authority']:
-                    matching_keywords = keywords
-                    break
-            if matching_keywords:
-                break
-        if matching_keywords:
-            or_clauses = ' OR '.join(['arrest_authority LIKE ?' for _ in matching_keywords])
-            conditions.append(f"({or_clauses})")
-            params.extend([f"%{kw}%" for kw in matching_keywords])
-        else:
-            conditions.append("arrest_authority LIKE ?")
-            params.append(f"%{filters['arrest_authority']}%")
-    if filters['arrest_place']:
-        conditions.append("arrest_place LIKE ?")
-        params.append(f"%{filters['arrest_place']}%")
-    if filters['arrest_year_from']:
-        conditions.append("arrest_year >= ?")
-        params.append(int(filters['arrest_year_from']))
-    if filters['arrest_year_to']:
-        conditions.append("arrest_year <= ?")
-        params.append(int(filters['arrest_year_to']))
-    if filters['birth_year_from']:
-        conditions.append("birth_year >= ?")
-        params.append(int(filters['birth_year_from']))
-    if filters['birth_year_to']:
-        conditions.append("birth_year <= ?")
-        params.append(int(filters['birth_year_to']))
-    if filters['marital']:
-        conditions.append("marital = ?")
-        params.append(filters['marital'])
-    if filters['education']:
-        conditions.append("education = ?")
-        params.append(filters['education'])
-    if filters['education_max']:
-        # Education levels ordered from lowest to highest
-        edu_order = ['أمّي', 'ابتدائية', 'إعدادية', 'ثانوية', 'معهد', 'بكالوريوس', 'ماجستير', 'دكتوراه']
-        try:
-            max_idx = edu_order.index(filters['education_max'])
-            included = edu_order[:max_idx + 1]
-            placeholders = ','.join(['?'] * len(included))
-            conditions.append(f"education IN ({placeholders})")
-            params.extend(included)
-        except ValueError:
-            pass
-    if filters['housing_type']:
-        conditions.append("housing_type = ?")
-        params.append(filters['housing_type'])
-    if filters['blood_type']:
-        conditions.append("blood_type = ?")
-        params.append(filters['blood_type'])
-    if filters['has_kids'] == 'yes':
-        conditions.append("has_kids = 'yes'")
-    elif filters['has_kids'] == 'no':
-        conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
-    minor_threshold = int(filters['minor_age_threshold']) if filters.get('minor_age_threshold') else 18
-    if filters['has_kids_under_18'] == 'yes':
-        if minor_threshold == 18:
-            conditions.append("kids_under_18_count > 0")
-        else:
-            # Custom threshold - need post-filter via children_data
-            conditions.append("(children_data IS NOT NULL AND children_data != '' AND children_data != '[]')")
-    elif filters['has_kids_under_18'] == 'no':
-        if minor_threshold == 18:
-            conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
-        else:
-            pass  # post-filter will handle this
-    if filters['kids_max_age']:
-        # Will be handled by post-filter using record_has_child_in_age_range
-        # Pre-filter: just ensure children exist
-        conditions.append("(children_data IS NOT NULL AND children_data != '' AND children_data != '[]')")
-    if filters['has_photo'] == 'yes':
-        conditions.append("photo_path IS NOT NULL AND photo_path != ''")
-    elif filters['has_photo'] == 'no':
-        conditions.append("(photo_path IS NULL OR photo_path = '')")
-    if filters['has_document'] == 'yes':
-        conditions.append("document_path IS NOT NULL AND document_path != ''")
-    elif filters['has_document'] == 'no':
-        conditions.append("(document_path IS NULL OR document_path = '')")
-    if filters['case_type']:
-        conditions.append("case_type = ?")
-        params.append(filters['case_type'])
-    if filters['evidence_level']:
-        conditions.append("evidence_level = ?")
-        params.append(filters['evidence_level'])
-    if filters['verification_status']:
-        conditions.append("verification_status = ?")
-        params.append(filters['verification_status'])
-    if filters['civil_registry_status']:
-        conditions.append("civil_registry_status = ?")
-        params.append(filters['civil_registry_status'])
-    if filters['digital_evidence_type']:
-        conditions.append("digital_evidence_type = ?")
-        params.append(filters['digital_evidence_type'])
-    if filters['has_conflicting_info'] == '1':
-        conditions.append("has_conflicting_info = 1")
-    if filters['has_special_needs'] == '1':
-        conditions.append("has_special_needs = 1")
-    if filters['chronic'] == 'yes':
-        conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
-    if filters['breadwinner']:
-        conditions.append("breadwinner LIKE ?")
-        params.append(f"%{filters['breadwinner']}%")
-    if filters['has_hypertension'] == '1':
-        conditions.append("has_hypertension = 1")
-    if filters['has_diabetes'] == '1':
-        conditions.append("has_diabetes = 1")
-    if filters['is_registered'] == '1':
-        conditions.append("is_officially_registered = 1")
-    elif filters['is_registered'] == '0':
-        conditions.append("(is_officially_registered = 0 OR is_officially_registered IS NULL)")
-    if filters['has_legal'] == 'yes':
-        conditions.append("legal = 'نعم'")
-    if filters['has_assoc'] == 'yes':
-        conditions.append("assoc = 'yes'")
-    elif filters['has_assoc'] == 'no':
-        conditions.append("(assoc != 'yes' OR assoc IS NULL OR assoc = '')")
-    if filters['reporter_relation']:
-        conditions.append("reporter_relation = ?")
-        params.append(filters['reporter_relation'])
-    if filters['widows_filter'] == 'widows_deceased':
-        # Widows of deceased detainees: male detainee died + was married
-        conditions.append("status IN ('deceased') AND gender = 'male' AND marital = 'married'")
-    elif filters['widows_filter'] == 'widows_enforced':
-        # Wives of forcibly disappeared: male detainee enforced + married
-        conditions.append("status = 'enforced' AND gender = 'male' AND marital = 'married'")
-    elif filters['widows_filter'] == 'widows_all':
-        # All widows (deceased or enforced, married males)
-        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married'")
-    elif filters['widows_filter'] == 'widows_with_minors':
-        # Widows with minor children
-        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married' AND kids_under_18_count > 0")
-    if filters['spouse_search']:
-        conditions.append("spouse_name LIKE ?")
-        params.append(f"%{filters['spouse_search']}%")
-    if filters['child_name_search']:
-        conditions.append("children_data LIKE ?")
-        params.append(f"%{filters['child_name_search']}%")
-    if filters['child_education']:
-        conditions.append("children_data LIKE ?")
-        params.append(f"%{filters['child_education']}%")
-    if filters['employment']:
-        conditions.append("employment LIKE ?")
-        params.append(f"%{filters['employment']}%")
-    if filters['profession']:
-        conditions.append("profession LIKE ?")
-        params.append(f"%{filters['profession']}%")
-    if filters['address_search']:
-        conditions.append("address LIKE ?")
-        params.append(f"%{filters['address_search']}%")
-    if filters['arrest_reason']:
-        conditions.append("arrest_reason LIKE ?")
-        params.append(f"%{filters['arrest_reason']}%")
-    if filters['death_year_from']:
-        conditions.append("death_year >= ?")
-        params.append(int(filters['death_year_from']))
-    if filters['death_year_to']:
-        conditions.append("death_year <= ?")
-        params.append(int(filters['death_year_to']))
-    if filters['release_year_from']:
-        conditions.append("release_year >= ?")
-        params.append(int(filters['release_year_from']))
-    if filters['release_year_to']:
-        conditions.append("release_year <= ?")
-        params.append(int(filters['release_year_to']))
-    if filters['notes_search']:
-        conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
-        params.extend([f"%{filters['notes_search']}%"] * 2)
-    if filters['employer']:
-        conditions.append("employer LIKE ?")
-        params.append(f"%{filters['employer']}%")
-    if filters['breadwinner_relation']:
-        conditions.append("breadwinner_relation = ?")
-        params.append(filters['breadwinner_relation'])
-    if filters['age_from']:
-        current_year = datetime.now().year
-        max_birth_year = current_year - int(filters['age_from'])
-        conditions.append("birth_year <= ? AND birth_year > 0")
-        params.append(max_birth_year)
-    if filters['age_to']:
-        current_year = datetime.now().year
-        min_birth_year = current_year - int(filters['age_to'])
-        conditions.append("birth_year >= ?")
-        params.append(min_birth_year)
-    if filters['has_guardian'] == 'yes':
-        conditions.append("guardian_name IS NOT NULL AND guardian_name != ''")
-    elif filters['has_guardian'] == 'no':
-        conditions.append("(guardian_name IS NULL OR guardian_name = '')")
-    if filters['digital_evidence_url_status']:
-        conditions.append("digital_evidence_url_status = ?")
-        params.append(filters['digital_evidence_url_status'])
-    if filters['collector_name']:
-        conditions.append("collector_name = ?")
-        params.append(filters['collector_name'])
-    # Data entry date range (created_at is TEXT like '2024-01-15 10:30:00')
-    if filters['created_from']:
-        conditions.append("created_at >= ?")
-        params.append(filters['created_from'])
-    if filters['created_to']:
-        conditions.append("created_at <= ?")
-        params.append(filters['created_to'] + ' 23:59:59')
-    # Collection date range
-    if filters['collection_date_from']:
-        conditions.append("collection_date >= ?")
-        params.append(filters['collection_date_from'])
-    if filters['collection_date_to']:
-        conditions.append("collection_date <= ?")
-        params.append(filters['collection_date_to'])
-    if filters['source_type']:
-        conditions.append("source_type = ?")
-        params.append(filters['source_type'])
-    if filters['has_phone'] == 'yes':
-        conditions.append("(phone IS NOT NULL AND phone != '')")
-    elif filters['has_phone'] == 'no':
-        conditions.append("(phone IS NULL OR phone = '')")
-    if filters['family_book_number']:
-        conditions.append("family_book_number LIKE ?")
-        params.append(f"%{filters['family_book_number']}%")
-    if filters['national_id_search']:
-        conditions.append("national_id LIKE ?")
-        params.append(f"%{filters['national_id_search']}%")
-    if filters['has_rent'] == 'yes':
-        conditions.append("rent_amount IS NOT NULL AND rent_amount != '' AND rent_amount != '0'")
-    elif filters['has_rent'] == 'no':
-        conditions.append("(rent_amount IS NULL OR rent_amount = '' OR rent_amount = '0')")
-    if filters['detention_facility_search']:
-        conditions.append("detention_facilities_data LIKE ?")
-        params.append(f"%{filters['detention_facility_search']}%")
-    # Service filters (subqueries on record_services)
-    svc_mode = filters.get('service_filter_mode', '') or 'received'
-    if svc_mode == 'not_received' and filters['service_name']:
-        # Never received this specific service
-        conditions.append(
-            "NOT EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
-        )
-        params.append(filters['service_name'])
-    elif filters['service_name'] and filters['service_count_min']:
-        conditions.append(
-            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?) >= ?"
-        )
-        params.append(filters['service_name'])
-        params.append(int(filters['service_count_min']))
-    elif filters['service_name']:
-        conditions.append(
-            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
-        )
-        params.append(filters['service_name'])
-    elif filters['service_count_min']:
-        conditions.append(
-            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id) >= ?"
-        )
-        params.append(int(filters['service_count_min']))
-    if filters['service_provider']:
-        conditions.append(
-            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.provider = ?)"
-        )
-        params.append(filters['service_provider'])
-    if filters['last_service_from']:
-        conditions.append(
-            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_date >= ?)"
-        )
-        params.append(filters['last_service_from'])
-    if filters['last_service_to']:
-        conditions.append(
-            "(SELECT MAX(rs.service_date) FROM record_services rs WHERE rs.record_id = records.id) <= ?"
-        )
-        params.append(filters['last_service_to'])
-    if filters['search']:
-        search_term = f"%{filters['search']}%"
-        conditions.append("""(
-            first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
-            OR mother_name LIKE ? OR national_id LIKE ? OR phone LIKE ?
-            OR address LIKE ? OR notes LIKE ? OR reporter_name LIKE ?
-            OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
-        )""")
-        params.extend([search_term] * 10)
+    conditions, params = _build_record_filter_conditions(filters)
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -2259,9 +2273,10 @@ def admin_record_detail(record_id):
         else:
             comp_data['linked_record'] = None
         companions_with_links.append(comp_data)
+    return_to = request.args.get('return_to', '')
     return render_template('admin_record_detail.html', record=record, services=services,
                            linked_records=linked_records, changes=changes,
-                           companions=companions_with_links)
+                           companions=companions_with_links, return_to=return_to)
 
 
 @app.route('/admin/record/<int:record_id>/edit', methods=['GET', 'POST'])
@@ -4811,100 +4826,9 @@ def api_export_to_list():
         if filters is None:
             filters = {}
         db = get_db()
-        where_clauses = ["1=1"]
-        params = []
-        if filters.get('status'):
-            raw = filters['status']
-            if isinstance(raw, list):
-                statuses = raw
-            elif isinstance(raw, str) and ',' in raw:
-                statuses = [s.strip() for s in raw.split(',') if s.strip()]
-            else:
-                statuses = [raw]
-            placeholders = ','.join(['?'] * len(statuses))
-            where_clauses.append(f"r.status IN ({placeholders})")
-            params.extend(statuses)
-        if filters.get('province'):
-            where_clauses.append("r.province = ?")
-            params.append(filters['province'])
-        if filters.get('gender'):
-            where_clauses.append("r.gender = ?")
-            params.append(filters['gender'])
-        if filters.get('search'):
-            s = f"%{filters['search']}%"
-            where_clauses.append("(r.first_name LIKE ? OR r.last_name LIKE ? OR r.father_name LIKE ? OR r.national_id LIKE ? OR r.phone LIKE ?)")
-            params.extend([s, s, s, s, s])
-        if filters.get('arrest_authority'):
-            where_clauses.append("r.arrest_authority = ?")
-            params.append(filters['arrest_authority'])
-        if filters.get('has_special_needs'):
-            where_clauses.append("r.has_special_needs = 1")
-        if filters.get('widows_filter'):
-            where_clauses.append("r.marital = 'married' AND r.gender = 'male' AND r.status IN ('deceased', 'enforced')")
-        if filters.get('education_max'):
-            edu_order = ['أمّي', 'ابتدائية', 'إعدادية', 'ثانوية', 'معهد', 'بكالوريوس', 'ماجستير', 'دكتوراه']
-            try:
-                max_idx = edu_order.index(filters['education_max'])
-                included = edu_order[:max_idx + 1]
-                ph = ','.join(['?'] * len(included))
-                where_clauses.append(f"r.education IN ({ph})")
-                params.extend(included)
-            except ValueError:
-                where_clauses.append("r.education IN ('none','primary','middle')")
-        if filters.get('created_from'):
-            where_clauses.append("r.created_at >= ?")
-            params.append(filters['created_from'])
-        if filters.get('created_to'):
-            where_clauses.append("r.created_at <= ?")
-            params.append(filters['created_to'] + ' 23:59:59')
-        if filters.get('collection_date_from'):
-            where_clauses.append("r.collection_date >= ?")
-            params.append(filters['collection_date_from'])
-        if filters.get('collection_date_to'):
-            where_clauses.append("r.collection_date <= ?")
-            params.append(filters['collection_date_to'])
-        if filters.get('source_type'):
-            where_clauses.append("r.source_type = ?")
-            params.append(filters['source_type'])
-        if filters.get('has_phone') == 'yes':
-            where_clauses.append("(r.phone IS NOT NULL AND r.phone != '')")
-        elif filters.get('has_phone') == 'no':
-            where_clauses.append("(r.phone IS NULL OR r.phone = '')")
-        if filters.get('family_book_number'):
-            where_clauses.append("r.family_book_number LIKE ?")
-            params.append(f"%{filters['family_book_number']}%")
-        if filters.get('national_id_search'):
-            where_clauses.append("r.national_id LIKE ?")
-            params.append(f"%{filters['national_id_search']}%")
-        if filters.get('marital'):
-            where_clauses.append("r.marital = ?")
-            params.append(filters['marital'])
-        if filters.get('arrest_place'):
-            where_clauses.append("r.arrest_place LIKE ?")
-            params.append(f"%{filters['arrest_place']}%")
-        if filters.get('arrest_year_from'):
-            where_clauses.append("r.arrest_year >= ?")
-            params.append(int(filters['arrest_year_from']))
-        if filters.get('arrest_year_to'):
-            where_clauses.append("r.arrest_year <= ?")
-            params.append(int(filters['arrest_year_to']))
-        if filters.get('collector_name'):
-            where_clauses.append("r.collector_name = ?")
-            params.append(filters['collector_name'])
-        if filters.get('has_rent') == 'yes':
-            where_clauses.append("r.rent_amount IS NOT NULL AND r.rent_amount != '' AND r.rent_amount != '0'")
-        elif filters.get('has_rent') == 'no':
-            where_clauses.append("(r.rent_amount IS NULL OR r.rent_amount = '' OR r.rent_amount = '0')")
-        if filters.get('detention_facility_search'):
-            where_clauses.append("r.detention_facilities_data LIKE ?")
-            params.append(f"%{filters['detention_facility_search']}%")
-        if filters.get('chronic') == 'yes':
-            where_clauses.append("(r.chronic = 'نعم' OR r.has_hypertension = 1 OR r.has_diabetes = 1)")
-        if filters.get('housing_type'):
-            where_clauses.append("r.housing_type = ?")
-            params.append(filters['housing_type'])
-
-        sql = f"SELECT r.id FROM records r WHERE {' AND '.join(where_clauses)} ORDER BY r.id DESC"
+        conditions, params = _build_record_filter_conditions(filters)
+        where = " WHERE " + " AND ".join(conditions) if conditions else ""
+        sql = f"SELECT id FROM records{where} ORDER BY id DESC"
         if limit and int(limit) > 0:
             sql += f" LIMIT {int(limit)}"
         rows = db.execute(sql, params).fetchall()

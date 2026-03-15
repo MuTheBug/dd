@@ -457,7 +457,7 @@ table {
     border-collapse: collapse;
     font-size: 0.9rem;
 }
-thead { background: var(--primary); color: white; }
+thead { background: var(--primary); color: white; position: sticky; top: 0; z-index: 10; }
 th {
     padding: 0.65rem 0.75rem;
     text-align: right;

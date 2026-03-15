@@ -444,6 +444,10 @@ function searchForList(q) {
                 }
                 box.innerHTML = html;
                 box.style.display = 'block';
+            })
+            .catch(function() {
+                box.innerHTML = '<div style="padding:1rem; text-align:center; color:#991b1b;">خطأ في الاتصال بالخادم</div>';
+                box.style.display = 'block';
             });
     }, 300);
 }
@@ -654,6 +658,16 @@ function doBulkSendSms() {
 // Close bulk SMS modal on outside click
 document.getElementById('bulkSmsModal').addEventListener('click', function(e) {
     if (e.target === this) this.style.display = 'none';
+});
+// Close modals on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var modals = ['clColModal', 'bulkSmsModal', 'waModal'];
+        for (var i = 0; i < modals.length; i++) {
+            var m = document.getElementById(modals[i]);
+            if (m && m.style.display !== 'none') m.style.display = 'none';
+        }
+    }
 });
 </script>
 {% endblock %}

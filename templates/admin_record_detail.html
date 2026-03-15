@@ -3,7 +3,16 @@
 
 {% block content %}
 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
-    <a href="{{ url_for('admin_records') }}" class="btn btn-outline btn-sm">&#x2192; العودة للسجلات</a>
+    <div style="display: flex; align-items: center; gap: 0.3rem;">
+        <a href="{{ url_for('admin_records') }}" class="btn btn-outline btn-sm">&#x2192; العودة للسجلات</a>
+        {% if prev_id %}
+        <a href="{{ url_for('admin_record_detail', record_id=prev_id) }}" class="btn btn-outline btn-sm" title="السجل السابق">&#x2190;</a>
+        {% endif %}
+        {% if next_id %}
+        <a href="{{ url_for('admin_record_detail', record_id=next_id) }}" class="btn btn-outline btn-sm" title="السجل التالي">&#x2192;</a>
+        {% endif %}
+        <span style="font-size: 0.8rem; color: var(--text-light);">#{{ record.id }}</span>
+    </div>
     <div class="btn-group">
         {% if record.phone or record.reporter_phone %}
         <button type="button" class="btn btn-outline btn-sm" onclick="openSmsModal()" style="border-color: #22c55e; color: #22c55e;">&#x1F4F1; إرسال SMS</button>
@@ -248,11 +257,20 @@
         {% if record.witnesses_data and record.witnesses_data != '[]' %}
         <div class="detail-field" style="margin-top: 0.8rem;">
             <div class="detail-field-label">الشهود</div>
-            {% set witnesses = record.witnesses_data | tojson %}
             <div class="detail-field-value" style="font-size: 0.82rem;">
-                {% for w in (record.witnesses_data | default('[]', true)) | safe | tojson %}
+                {% set witnesses = record.witnesses_data|from_json %}
+                {% if witnesses %}
+                {% for w in witnesses %}
+                <div style="padding: 0.4rem 0; {% if not loop.last %}border-bottom: 1px solid var(--border);{% endif %}">
+                    <strong>{{ w.name or '-' }}</strong>
+                    {% if w.relation %} ({{ w.relation }}){% endif %}
+                    {% if w.phone %} — {{ w.phone }}{% endif %}
+                    {% if w.notes %}<br><span style="color: var(--text-light);">{{ w.notes }}</span>{% endif %}
+                </div>
                 {% endfor %}
-                {{ record.witnesses_data }}
+                {% else %}
+                -
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -631,6 +649,10 @@ function doSendSms() {
 // Close modal on outside click
 document.getElementById('smsModal').addEventListener('click', function(e) {
     if (e.target === this) closeSmsModal();
+});
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeSmsModal();
 });
 </script>
 {% endif %}

@@ -695,7 +695,7 @@ function addChild(data) {
     var idx = container.children.length;
     var div = document.createElement('div');
     div.className = 'child-entry';
-    div.style.cssText = 'background: white; border: 1px solid #ddd; border-radius: 6px; padding: 0.6rem; margin-bottom: 0.5rem; position: relative;';
+    div.style.cssText = 'background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem; margin-bottom: 0.5rem; position: relative;';
 
     var eduOpts = '<option value="">--</option>';
     for (var i = 0; i < eduLevels.length; i++) {
@@ -789,5 +789,14 @@ function updateChildrenData() {
     document.getElementById('childrenContainer').addEventListener('input', updateChildrenData);
     document.getElementById('childrenContainer').addEventListener('change', updateChildrenData);
 })();
+
+// Unsaved changes warning
+var formChanged = false;
+document.querySelector('form').addEventListener('input', function() { formChanged = true; });
+document.querySelector('form').addEventListener('change', function() { formChanged = true; });
+window.addEventListener('beforeunload', function(e) {
+    if (formChanged) { e.preventDefault(); e.returnValue = ''; }
+});
+document.querySelector('form').addEventListener('submit', function() { formChanged = false; });
 </script>
 {% endblock %}

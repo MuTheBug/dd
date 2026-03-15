@@ -1105,6 +1105,8 @@ function loadFilteredRecords() {
         orderedRecords = data;
         recordsLoaded = true;
         renderRecordsList();
+    }).catch(function() {
+        document.getElementById('recordsTableWrap').innerHTML = '<p style="text-align:center; padding:2rem; color:#991b1b;">خطأ في تحميل البيانات</p>';
     });
 }
 
@@ -1276,6 +1278,10 @@ function searchRecords() {
                     resultsDiv.appendChild(row);
                 })(data[i]);
             }
+            resultsDiv.style.display = 'block';
+        })
+        .catch(function() {
+            resultsDiv.innerHTML = '<p style="padding:8px; font-size:0.82rem; color:#991b1b; text-align:center;">خطأ في البحث</p>';
             resultsDiv.style.display = 'block';
         });
 }
@@ -1462,6 +1468,9 @@ function openExportToList() {
             for (var i = 0; i < lists.length; i++) {
                 sel.innerHTML += '<option value="' + lists[i].id + '">' + lists[i].name + ' (' + lists[i].count + ')</option>';
             }
+        })
+        .catch(function() {
+            sel.innerHTML = '<option value="">خطأ في تحميل القوائم</option>';
         });
     modal.style.display = 'flex';
 }
@@ -1539,7 +1548,26 @@ function doExportToList() {
             resultEl.innerHTML = 'تم إضافة ' + data.added + ' سجل للقائمة. <a href="/admin/list/' + data.list_id + '" style="color:#065f46; font-weight:700;">فتح القائمة</a>';
         }
         resultEl.style.display = 'block';
+    })
+    .catch(function() {
+        resultEl.style.background = '#fee2e2';
+        resultEl.style.color = '#991b1b';
+        resultEl.textContent = 'خطأ في الاتصال بالخادم';
+        resultEl.style.display = 'block';
     });
 }
+
+/* ── Escape key to close modals ────────────────────── */
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var modals = ['pdfColModal', 'exportToListModal'];
+        for (var i = 0; i < modals.length; i++) {
+            var m = document.getElementById(modals[i]);
+            if (m && m.style.display !== 'none') {
+                m.style.display = 'none';
+            }
+        }
+    }
+});
 </script>
 {% endblock %}

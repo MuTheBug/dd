@@ -1525,7 +1525,12 @@ def admin_record_detail(record_id):
     services = db.execute(
         "SELECT * FROM record_services WHERE record_id=? ORDER BY created_at DESC", (record_id,)
     ).fetchall()
-    return render_template('admin_record_detail.html', record=record, services=services)
+    # Get previous/next record IDs for navigation
+    prev_record = db.execute("SELECT id FROM records WHERE id < ? ORDER BY id DESC LIMIT 1", (record_id,)).fetchone()
+    next_record = db.execute("SELECT id FROM records WHERE id > ? ORDER BY id ASC LIMIT 1", (record_id,)).fetchone()
+    return render_template('admin_record_detail.html', record=record, services=services,
+                           prev_id=prev_record['id'] if prev_record else None,
+                           next_id=next_record['id'] if next_record else None)
 
 
 @app.route('/admin/record/<int:record_id>/edit', methods=['GET', 'POST'])

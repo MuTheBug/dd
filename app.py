@@ -24,6 +24,7 @@ from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     jsonify, send_file, session, g, make_response, send_from_directory
 )
+from werkzeug.datastructures import MultiDict
 
 # ---------------------------------------------------------------------------
 # App configuration
@@ -669,6 +670,7 @@ def save_upload(file_obj, subfolder='documents'):
 @app.context_processor
 def inject_constants():
     return {
+        'current_year': datetime.now().year,
         'PROVINCES': PROVINCES,
         'ARREST_AUTHORITIES': ARREST_AUTHORITIES,
         'DETENTION_FACILITIES': DETENTION_FACILITIES,
@@ -1288,7 +1290,7 @@ def admin_records():
     if filters['has_special_needs'] == '1':
         conditions.append("has_special_needs = 1")
     if filters['chronic'] == 'yes':
-        conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
+        conditions.append("((chronic IS NOT NULL AND chronic != '' AND chronic != 'لا') OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
     if filters['breadwinner']:
         conditions.append("breadwinner LIKE ?")
         params.append(f"%{filters['breadwinner']}%")
@@ -1875,7 +1877,7 @@ def build_pdf_filter_conditions(args):
     if args.get('has_special_needs') == '1':
         conditions.append("has_special_needs = 1")
     if args.get('chronic') == 'yes':
-        conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
+        conditions.append("((chronic IS NOT NULL AND chronic != '' AND chronic != 'لا') OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
     if args.get('has_hypertension') == '1':
         conditions.append("has_hypertension = 1")
     if args.get('has_diabetes') == '1':
@@ -3456,7 +3458,7 @@ def admin_custom_list_pdf(lid):
 
     # Logo
     logo_b64 = ''
-    logo_path = os.path.join(BASE_DIR, 'static', 'img', 'logo.jpg')
+    logo_path = os.path.join(BASE_DIR, 'logo.jpg')
     if os.path.exists(logo_path):
         with open(logo_path, 'rb') as f:
             logo_b64 = base64.b64encode(f.read()).decode()
@@ -3804,100 +3806,20 @@ def api_export_to_list():
         if filters is None:
             filters = {}
         db = get_db()
-        where_clauses = ["1=1"]
-        params = []
-        if filters.get('status'):
-            raw = filters['status']
-            if isinstance(raw, list):
-                statuses = raw
-            elif isinstance(raw, str) and ',' in raw:
-                statuses = [s.strip() for s in raw.split(',') if s.strip()]
-            else:
-                statuses = [raw]
-            placeholders = ','.join(['?'] * len(statuses))
-            where_clauses.append(f"r.status IN ({placeholders})")
-            params.extend(statuses)
-        if filters.get('province'):
-            where_clauses.append("r.province = ?")
-            params.append(filters['province'])
-        if filters.get('gender'):
-            where_clauses.append("r.gender = ?")
-            params.append(filters['gender'])
-        if filters.get('search'):
-            s = f"%{filters['search']}%"
-            where_clauses.append("(r.first_name LIKE ? OR r.last_name LIKE ? OR r.father_name LIKE ? OR r.national_id LIKE ? OR r.phone LIKE ?)")
-            params.extend([s, s, s, s, s])
-        if filters.get('arrest_authority'):
-            where_clauses.append("r.arrest_authority = ?")
-            params.append(filters['arrest_authority'])
-        if filters.get('has_special_needs'):
-            where_clauses.append("r.has_special_needs = 1")
-        if filters.get('widows_filter'):
-            where_clauses.append("r.marital = 'married' AND r.gender = 'male' AND r.status IN ('deceased', 'enforced')")
-        if filters.get('education_max'):
-            edu_order = ['أمّي', 'ابتدائية', 'إعدادية', 'ثانوية', 'معهد', 'بكالوريوس', 'ماجستير', 'دكتوراه']
-            try:
-                max_idx = edu_order.index(filters['education_max'])
-                included = edu_order[:max_idx + 1]
-                ph = ','.join(['?'] * len(included))
-                where_clauses.append(f"r.education IN ({ph})")
-                params.extend(included)
-            except ValueError:
-                where_clauses.append("r.education IN ('none','primary','middle')")
-        if filters.get('created_from'):
-            where_clauses.append("r.created_at >= ?")
-            params.append(filters['created_from'])
-        if filters.get('created_to'):
-            where_clauses.append("r.created_at <= ?")
-            params.append(filters['created_to'] + ' 23:59:59')
-        if filters.get('collection_date_from'):
-            where_clauses.append("r.collection_date >= ?")
-            params.append(filters['collection_date_from'])
-        if filters.get('collection_date_to'):
-            where_clauses.append("r.collection_date <= ?")
-            params.append(filters['collection_date_to'])
-        if filters.get('source_type'):
-            where_clauses.append("r.source_type = ?")
-            params.append(filters['source_type'])
-        if filters.get('has_phone') == 'yes':
-            where_clauses.append("(r.phone IS NOT NULL AND r.phone != '')")
-        elif filters.get('has_phone') == 'no':
-            where_clauses.append("(r.phone IS NULL OR r.phone = '')")
-        if filters.get('family_book_number'):
-            where_clauses.append("r.family_book_number LIKE ?")
-            params.append(f"%{filters['family_book_number']}%")
-        if filters.get('national_id_search'):
-            where_clauses.append("r.national_id LIKE ?")
-            params.append(f"%{filters['national_id_search']}%")
-        if filters.get('marital'):
-            where_clauses.append("r.marital = ?")
-            params.append(filters['marital'])
-        if filters.get('arrest_place'):
-            where_clauses.append("r.arrest_place LIKE ?")
-            params.append(f"%{filters['arrest_place']}%")
-        if filters.get('arrest_year_from'):
-            where_clauses.append("r.arrest_year >= ?")
-            params.append(int(filters['arrest_year_from']))
-        if filters.get('arrest_year_to'):
-            where_clauses.append("r.arrest_year <= ?")
-            params.append(int(filters['arrest_year_to']))
-        if filters.get('collector_name'):
-            where_clauses.append("r.collector_name = ?")
-            params.append(filters['collector_name'])
-        if filters.get('has_rent') == 'yes':
-            where_clauses.append("r.rent_amount IS NOT NULL AND r.rent_amount != '' AND r.rent_amount != '0'")
-        elif filters.get('has_rent') == 'no':
-            where_clauses.append("(r.rent_amount IS NULL OR r.rent_amount = '' OR r.rent_amount = '0')")
-        if filters.get('detention_facility_search'):
-            where_clauses.append("r.detention_facilities_data LIKE ?")
-            params.append(f"%{filters['detention_facility_search']}%")
-        if filters.get('chronic') == 'yes':
-            where_clauses.append("(r.chronic = 'نعم' OR r.has_hypertension = 1 OR r.has_diabetes = 1)")
-        if filters.get('housing_type'):
-            where_clauses.append("r.housing_type = ?")
-            params.append(filters['housing_type'])
 
-        sql = f"SELECT r.id FROM records r WHERE {' AND '.join(where_clauses)} ORDER BY r.id DESC"
+        # Adapt the dict-based filters to a MultiDict-like object for build_pdf_filter_conditions
+        args_dict = MultiDict()
+        for k, v in filters.items():
+            if isinstance(v, list):
+                for item in v:
+                    args_dict.add(k, str(item))
+            elif v is not None and v != '':
+                args_dict[k] = str(v)
+
+        conditions, params, _ = build_pdf_filter_conditions(args_dict)
+        where = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+        sql = f"SELECT id FROM records{where} ORDER BY id DESC"
         if limit and int(limit) > 0:
             sql += f" LIMIT {int(limit)}"
         rows = db.execute(sql, params).fetchall()

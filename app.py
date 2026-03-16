@@ -29,6 +29,16 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
+
+def safe_int(value, default=None):
+    """Safely convert a value to int, returning default if conversion fails."""
+    if value is None or value == '':
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
 # ---------------------------------------------------------------------------
 # App configuration
 # ---------------------------------------------------------------------------
@@ -1527,18 +1537,18 @@ def _build_record_filter_conditions(filters):
     if filters.get('arrest_place'):
         conditions.append("arrest_place LIKE ?")
         params.append(f"%{filters['arrest_place']}%")
-    if filters.get('arrest_year_from'):
+    if filters.get('arrest_year_from') and safe_int(filters['arrest_year_from']) is not None:
         conditions.append("arrest_year >= ?")
-        params.append(int(filters['arrest_year_from']))
-    if filters.get('arrest_year_to'):
+        params.append(safe_int(filters['arrest_year_from']))
+    if filters.get('arrest_year_to') and safe_int(filters['arrest_year_to']) is not None:
         conditions.append("arrest_year <= ?")
-        params.append(int(filters['arrest_year_to']))
-    if filters.get('birth_year_from'):
+        params.append(safe_int(filters['arrest_year_to']))
+    if filters.get('birth_year_from') and safe_int(filters['birth_year_from']) is not None:
         conditions.append("birth_year >= ?")
-        params.append(int(filters['birth_year_from']))
-    if filters.get('birth_year_to'):
+        params.append(safe_int(filters['birth_year_from']))
+    if filters.get('birth_year_to') and safe_int(filters['birth_year_to']) is not None:
         conditions.append("birth_year <= ?")
-        params.append(int(filters['birth_year_to']))
+        params.append(safe_int(filters['birth_year_to']))
     if filters.get('marital'):
         conditions.append("marital = ?")
         params.append(filters['marital'])
@@ -1565,7 +1575,7 @@ def _build_record_filter_conditions(filters):
         conditions.append("has_kids = 'yes'")
     elif filters.get('has_kids') == 'no':
         conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
-    minor_threshold = int(filters['minor_age_threshold']) if filters.get('minor_age_threshold') else 18
+    minor_threshold = safe_int(filters.get('minor_age_threshold'), 18)
     if filters.get('has_kids_under_18') == 'yes':
         if minor_threshold == 18:
             conditions.append("kids_under_18_count > 0")
@@ -1654,18 +1664,18 @@ def _build_record_filter_conditions(filters):
     if filters.get('arrest_reason'):
         conditions.append("arrest_reason LIKE ?")
         params.append(f"%{filters['arrest_reason']}%")
-    if filters.get('death_year_from'):
+    if filters.get('death_year_from') and safe_int(filters['death_year_from']) is not None:
         conditions.append("death_year >= ?")
-        params.append(int(filters['death_year_from']))
-    if filters.get('death_year_to'):
+        params.append(safe_int(filters['death_year_from']))
+    if filters.get('death_year_to') and safe_int(filters['death_year_to']) is not None:
         conditions.append("death_year <= ?")
-        params.append(int(filters['death_year_to']))
-    if filters.get('release_year_from'):
+        params.append(safe_int(filters['death_year_to']))
+    if filters.get('release_year_from') and safe_int(filters['release_year_from']) is not None:
         conditions.append("release_year >= ?")
-        params.append(int(filters['release_year_from']))
-    if filters.get('release_year_to'):
+        params.append(safe_int(filters['release_year_from']))
+    if filters.get('release_year_to') and safe_int(filters['release_year_to']) is not None:
         conditions.append("release_year <= ?")
-        params.append(int(filters['release_year_to']))
+        params.append(safe_int(filters['release_year_to']))
     if filters.get('notes_search'):
         conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
         params.extend([f"%{filters['notes_search']}%"] * 2)
@@ -1675,14 +1685,14 @@ def _build_record_filter_conditions(filters):
     if filters.get('breadwinner_relation'):
         conditions.append("breadwinner_relation = ?")
         params.append(filters['breadwinner_relation'])
-    if filters.get('age_from'):
+    if filters.get('age_from') and safe_int(filters['age_from']) is not None:
         current_year = datetime.now().year
-        max_birth_year = current_year - int(filters['age_from'])
+        max_birth_year = current_year - safe_int(filters['age_from'])
         conditions.append("birth_year <= ? AND birth_year > 0")
         params.append(max_birth_year)
-    if filters.get('age_to'):
+    if filters.get('age_to') and safe_int(filters['age_to']) is not None:
         current_year = datetime.now().year
-        min_birth_year = current_year - int(filters['age_to'])
+        min_birth_year = current_year - safe_int(filters['age_to'])
         conditions.append("birth_year >= ?")
         params.append(min_birth_year)
     if filters.get('has_guardian') == 'yes':
@@ -1739,7 +1749,7 @@ def _build_record_filter_conditions(filters):
             "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?) >= ?"
         )
         params.append(filters['service_name'])
-        params.append(int(filters['service_count_min']))
+        params.append(safe_int(filters['service_count_min'], 1))
     elif filters.get('service_name'):
         conditions.append(
             "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
@@ -1749,7 +1759,7 @@ def _build_record_filter_conditions(filters):
         conditions.append(
             "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id) >= ?"
         )
-        params.append(int(filters['service_count_min']))
+        params.append(safe_int(filters['service_count_min'], 1))
     if filters.get('service_provider'):
         conditions.append(
             "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.provider = ?)"
@@ -1782,8 +1792,8 @@ def _build_record_filter_conditions(filters):
 @admin_required
 def admin_records():
     db = get_db()
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 25))
+    page = safe_int(request.args.get('page'), 1)
+    per_page = safe_int(request.args.get('per_page'), 25)
 
     # Build filter query
     conditions = []
@@ -1885,9 +1895,9 @@ def admin_records():
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
     # For kids age filtering, we need post-filter since children_data is JSON
-    kids_age_from = int(filters['kids_age_from']) if filters['kids_age_from'] else None
-    kids_age_to = int(filters['kids_age_to']) if filters['kids_age_to'] else None
-    kids_max_age = int(filters['kids_max_age']) if filters.get('kids_max_age') else None
+    kids_age_from = safe_int(filters.get('kids_age_from'))
+    kids_age_to = safe_int(filters.get('kids_age_to'))
+    kids_max_age = safe_int(filters.get('kids_max_age'))
     needs_kids_age_filter = kids_age_from is not None or kids_age_to is not None or kids_max_age is not None
     # Custom minor age threshold also needs post-filter
     needs_minor_threshold_filter = filters['has_kids_under_18'] in ('yes', 'no') and minor_threshold != 18
@@ -1985,8 +1995,8 @@ def admin_records():
 def api_records():
     """AJAX endpoint for filtering records without full page reload."""
     db = get_db()
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 25))
+    page = safe_int(request.args.get('page'), 1)
+    per_page = safe_int(request.args.get('per_page'), 25)
 
     # Reuse the same filter logic as admin_records
     conditions = []
@@ -2152,14 +2162,14 @@ def api_records():
         params.extend([search_term] * 10)
 
     # Age range
-    if request.args.get('age_from'):
+    if request.args.get('age_from') and safe_int(request.args['age_from']) is not None:
         current_year = datetime.now().year
-        max_birth_year = current_year - int(request.args['age_from'])
+        max_birth_year = current_year - safe_int(request.args['age_from'])
         conditions.append("birth_year <= ? AND birth_year > 0")
         params.append(max_birth_year)
-    if request.args.get('age_to'):
+    if request.args.get('age_to') and safe_int(request.args['age_to']) is not None:
         current_year = datetime.now().year
-        min_birth_year = current_year - int(request.args['age_to'])
+        min_birth_year = current_year - safe_int(request.args['age_to'])
         conditions.append("birth_year >= ?")
         params.append(min_birth_year)
 
@@ -2659,7 +2669,7 @@ def api_companion_cross_ref(record_id):
 def api_search_records_for_link():
     """Search records by name for linking UI."""
     q = request.args.get('q', '').strip()
-    exclude_id = int(request.args.get('exclude', 0))
+    exclude_id = safe_int(request.args.get('exclude'), 0)
     if len(q) < 2:
         return jsonify([])
     db = get_db()
@@ -2826,23 +2836,23 @@ def build_pdf_filter_conditions(args):
             OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
         )""")
         params.extend([s] * 10)
-    if args.get('arrest_year_from'):
+    if args.get('arrest_year_from') and safe_int(args['arrest_year_from']) is not None:
         conditions.append("arrest_year >= ?")
-        params.append(int(args['arrest_year_from']))
-    if args.get('arrest_year_to'):
+        params.append(safe_int(args['arrest_year_from']))
+    if args.get('arrest_year_to') and safe_int(args['arrest_year_to']) is not None:
         conditions.append("arrest_year <= ?")
-        params.append(int(args['arrest_year_to']))
-    if args.get('birth_year_from'):
+        params.append(safe_int(args['arrest_year_to']))
+    if args.get('birth_year_from') and safe_int(args['birth_year_from']) is not None:
         conditions.append("birth_year >= ?")
-        params.append(int(args['birth_year_from']))
-    if args.get('birth_year_to'):
+        params.append(safe_int(args['birth_year_from']))
+    if args.get('birth_year_to') and safe_int(args['birth_year_to']) is not None:
         conditions.append("birth_year <= ?")
-        params.append(int(args['birth_year_to']))
+        params.append(safe_int(args['birth_year_to']))
     if args.get('has_kids') == 'yes':
         conditions.append("has_kids = 'yes'")
     elif args.get('has_kids') == 'no':
         conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
-    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+    pdf_minor_threshold = safe_int(args.get('minor_age_threshold'), 18)
     if args.get('has_kids_under_18') == 'yes':
         if pdf_minor_threshold == 18:
             conditions.append("kids_under_18_count > 0")
@@ -2932,18 +2942,18 @@ def build_pdf_filter_conditions(args):
     if args.get('arrest_reason'):
         conditions.append("arrest_reason LIKE ?")
         params.append(f"%{args['arrest_reason']}%")
-    if args.get('death_year_from'):
+    if args.get('death_year_from') and safe_int(args['death_year_from']) is not None:
         conditions.append("death_year >= ?")
-        params.append(int(args['death_year_from']))
-    if args.get('death_year_to'):
+        params.append(safe_int(args['death_year_from']))
+    if args.get('death_year_to') and safe_int(args['death_year_to']) is not None:
         conditions.append("death_year <= ?")
-        params.append(int(args['death_year_to']))
-    if args.get('release_year_from'):
+        params.append(safe_int(args['death_year_to']))
+    if args.get('release_year_from') and safe_int(args['release_year_from']) is not None:
         conditions.append("release_year >= ?")
-        params.append(int(args['release_year_from']))
-    if args.get('release_year_to'):
+        params.append(safe_int(args['release_year_from']))
+    if args.get('release_year_to') and safe_int(args['release_year_to']) is not None:
         conditions.append("release_year <= ?")
-        params.append(int(args['release_year_to']))
+        params.append(safe_int(args['release_year_to']))
     if args.get('notes_search'):
         conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
         params.extend([f"%{args['notes_search']}%"] * 2)
@@ -2953,14 +2963,14 @@ def build_pdf_filter_conditions(args):
     if args.get('breadwinner_relation'):
         conditions.append("breadwinner_relation = ?")
         params.append(args['breadwinner_relation'])
-    if args.get('age_from'):
+    if args.get('age_from') and safe_int(args['age_from']) is not None:
         current_year = datetime.now().year
-        max_birth_year = current_year - int(args['age_from'])
+        max_birth_year = current_year - safe_int(args['age_from'])
         conditions.append("birth_year <= ? AND birth_year > 0")
         params.append(max_birth_year)
-    if args.get('age_to'):
+    if args.get('age_to') and safe_int(args['age_to']) is not None:
         current_year = datetime.now().year
-        min_birth_year = current_year - int(args['age_to'])
+        min_birth_year = current_year - safe_int(args['age_to'])
         conditions.append("birth_year >= ?")
         params.append(min_birth_year)
     if args.get('has_guardian') == 'yes':
@@ -3007,6 +3017,44 @@ def build_pdf_filter_conditions(args):
     if args.get('detention_facility_search'):
         conditions.append("detention_facilities_data LIKE ?")
         params.append(f"%{args['detention_facility_search']}%")
+    # Service filters (subqueries on record_services) - match _build_record_filter_conditions
+    svc_mode = args.get('service_filter_mode', '') or 'received'
+    if svc_mode == 'not_received' and args.get('service_name'):
+        conditions.append(
+            "NOT EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
+        )
+        params.append(args['service_name'])
+    elif args.get('service_name') and args.get('service_count_min'):
+        conditions.append(
+            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?) >= ?"
+        )
+        params.append(args['service_name'])
+        params.append(safe_int(args['service_count_min'], 1))
+    elif args.get('service_name'):
+        conditions.append(
+            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
+        )
+        params.append(args['service_name'])
+    elif args.get('service_count_min'):
+        conditions.append(
+            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id) >= ?"
+        )
+        params.append(safe_int(args['service_count_min'], 1))
+    if args.get('service_provider'):
+        conditions.append(
+            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.provider = ?)"
+        )
+        params.append(args['service_provider'])
+    if args.get('last_service_from'):
+        conditions.append(
+            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_date >= ?)"
+        )
+        params.append(args['last_service_from'])
+    if args.get('last_service_to'):
+        conditions.append(
+            "(SELECT MAX(rs.service_date) FROM record_services rs WHERE rs.record_id = records.id) <= ?"
+        )
+        params.append(args['last_service_to'])
 
     return conditions, params, pdf_status_list
 
@@ -3024,10 +3072,10 @@ def records_list_pdf():
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
     # Check if post-filtering is needed
-    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
-    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
-    pdf_kids_max_age = int(args['kids_max_age']) if args.get('kids_max_age') else None
-    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+    pdf_kids_age_from = safe_int(args.get('kids_age_from'))
+    pdf_kids_age_to = safe_int(args.get('kids_age_to'))
+    pdf_kids_max_age = safe_int(args.get('kids_max_age'))
+    pdf_minor_threshold = safe_int(args.get('minor_age_threshold'), 18)
     needs_post_filter = (pdf_kids_age_from is not None or pdf_kids_age_to is not None
                          or pdf_kids_max_age is not None
                          or (args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18))
@@ -3104,10 +3152,10 @@ def records_list_pdf():
         edu_val = args.get('education') or f"حتى {args.get('education_max')}"
         filter_desc.append(f"التحصيل العلمي: {edu_val}")
     if args.get('has_kids_under_18') == 'yes':
-        _mt = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+        _mt = safe_int(args.get('minor_age_threshold'), 18)
         filter_desc.append(f"لديه أطفال قاصرين (تحت {_mt})")
     elif args.get('has_kids_under_18') == 'no':
-        _mt = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+        _mt = safe_int(args.get('minor_age_threshold'), 18)
         filter_desc.append(f"بدون أطفال قاصرين (تحت {_mt})")
     if args.get('has_special_needs') == '1':
         filter_desc.append("ذوي احتياجات خاصة")
@@ -3289,10 +3337,10 @@ def records_list_excel():
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
     # Check if post-filtering is needed (same logic as PDF route)
-    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
-    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
-    pdf_kids_max_age = int(args['kids_max_age']) if args.get('kids_max_age') else None
-    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+    pdf_kids_age_from = safe_int(args.get('kids_age_from'))
+    pdf_kids_age_to = safe_int(args.get('kids_age_to'))
+    pdf_kids_max_age = safe_int(args.get('kids_max_age'))
+    pdf_minor_threshold = safe_int(args.get('minor_age_threshold'), 18)
     needs_post_filter = (pdf_kids_age_from is not None or pdf_kids_age_to is not None
                          or pdf_kids_max_age is not None
                          or (args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18))
@@ -3404,10 +3452,10 @@ def records_export_vcf():
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
     # Check if post-filtering is needed (same logic as PDF/Excel routes)
-    pdf_kids_age_from = int(args['kids_age_from']) if args.get('kids_age_from') else None
-    pdf_kids_age_to = int(args['kids_age_to']) if args.get('kids_age_to') else None
-    pdf_kids_max_age = int(args['kids_max_age']) if args.get('kids_max_age') else None
-    pdf_minor_threshold = int(args['minor_age_threshold']) if args.get('minor_age_threshold') else 18
+    pdf_kids_age_from = safe_int(args.get('kids_age_from'))
+    pdf_kids_age_to = safe_int(args.get('kids_age_to'))
+    pdf_kids_max_age = safe_int(args.get('kids_max_age'))
+    pdf_minor_threshold = safe_int(args.get('minor_age_threshold'), 18)
     needs_post_filter = (pdf_kids_age_from is not None or pdf_kids_age_to is not None
                          or pdf_kids_max_age is not None
                          or (args.get('has_kids_under_18') in ('yes', 'no') and pdf_minor_threshold != 18))
@@ -3776,12 +3824,12 @@ def api_filtered_record_ids():
 
     # Post-filter by kids age range if specified
     if request.args.get('kids_age_from') or request.args.get('kids_age_to'):
-        age_from = int(request.args['kids_age_from']) if request.args.get('kids_age_from') else None
-        age_to = int(request.args['kids_age_to']) if request.args.get('kids_age_to') else None
+        age_from = safe_int(request.args.get('kids_age_from'))
+        age_to = safe_int(request.args.get('kids_age_to'))
         rows = [r for r in rows if record_has_child_in_age_range(r, age_from, age_to)]
 
     # Post-filter for custom minor age threshold
-    api_minor_threshold = int(request.args['minor_age_threshold']) if request.args.get('minor_age_threshold') else 18
+    api_minor_threshold = safe_int(request.args.get('minor_age_threshold'), 18)
     if request.args.get('has_kids_under_18') in ('yes', 'no') and api_minor_threshold != 18:
         if request.args['has_kids_under_18'] == 'yes':
             rows = [r for r in rows if record_has_child_in_age_range(r, 0, api_minor_threshold - 1)]
@@ -4862,10 +4910,10 @@ def api_export_to_list():
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
         # Check if post-filtering is needed (kids age range, custom minor threshold)
-        kids_age_from = int(filters['kids_age_from']) if filters.get('kids_age_from') else None
-        kids_age_to = int(filters['kids_age_to']) if filters.get('kids_age_to') else None
-        kids_max_age = int(filters['kids_max_age']) if filters.get('kids_max_age') else None
-        minor_threshold = int(filters['minor_age_threshold']) if filters.get('minor_age_threshold') else 18
+        kids_age_from = safe_int(filters.get('kids_age_from'))
+        kids_age_to = safe_int(filters.get('kids_age_to'))
+        kids_max_age = safe_int(filters.get('kids_max_age'))
+        minor_threshold = safe_int(filters.get('minor_age_threshold'), 18)
         needs_kids_post = kids_age_from is not None or kids_age_to is not None or kids_max_age is not None
         needs_minor_post = filters.get('has_kids_under_18') in ('yes', 'no') and minor_threshold != 18
 
@@ -5309,9 +5357,8 @@ def save_server_config(cfg):
 
 
 @app.route('/admin/server-config', methods=['GET', 'POST'])
+@admin_required
 def admin_server_config():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
     cfg = load_server_config()
     if request.method == 'POST':
         cfg['fixed_ip'] = request.form.get('fixed_ip', '').strip()
@@ -5642,7 +5689,7 @@ def admin_missing_details_excel():
 @admin_required
 def admin_audit_log():
     db = get_db()
-    page = int(request.args.get('page', 1))
+    page = safe_int(request.args.get('page'), 1)
     per_page = 50
     entity_type = request.args.get('entity_type', '')
     date_from = request.args.get('date_from', '')
@@ -5718,6 +5765,11 @@ def admin_backup_create():
 @app.route('/admin/backup/download/<filename>')
 @admin_required
 def admin_backup_download(filename):
+    # Validate path to prevent directory traversal
+    fp = os.path.join(BACKUP_DIR, filename)
+    if not os.path.commonpath([BACKUP_DIR, os.path.realpath(fp)]) == BACKUP_DIR:
+        flash('ملف غير صالح', 'error')
+        return redirect(url_for('admin_backup'))
     return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
 
 
@@ -5739,7 +5791,8 @@ def admin_backup_delete(filename):
 def admin_backup_restore():
     backup_file = request.form.get('filename', '')
     fp = os.path.join(BACKUP_DIR, backup_file)
-    if not os.path.exists(fp) or not backup_file.endswith('.db'):
+    if not os.path.exists(fp) or not backup_file.endswith('.db') or \
+       os.path.commonpath([BACKUP_DIR, os.path.realpath(fp)]) != BACKUP_DIR:
         flash('ملف النسخة الاحتياطية غير صالح', 'error')
         return redirect(url_for('admin_backup'))
 

@@ -5380,19 +5380,51 @@ def uploaded_file(filename):
 # Main
 # ---------------------------------------------------------------------------
 def get_lan_ip():
-    """Detect the actual LAN IP address so other devices can connect."""
+    """Detect the actual LAN IP address so other devices can connect.
+
+    Works offline by trying multiple methods: UDP socket trick (works even
+    without internet if a default gateway is configured), hostname -I,
+    ip route, and hostname resolution.
+    """
+    # Method 1: UDP socket trick - connect to a non-routable address.
+    # Works on most systems even without internet; only needs a default route.
+    for target in ("10.255.255.255", "8.8.8.8"):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(2)
+            s.connect((target, 1))
+            ip = s.getsockname()[0]
+            s.close()
+            if ip and not ip.startswith("127."):
+                return ip
+        except Exception:
+            pass
+
+    # Method 2: hostname -I (Linux)
     try:
-        # Create a UDP socket and connect to an external address
-        # This doesn't actually send data, just determines the local IP
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(2)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
+        result = subprocess.run(['hostname', '-I'], capture_output=True, text=True, timeout=5)
+        ips = result.stdout.strip().split()
+        for ip in ips:
+            if not ip.startswith("127.") and ':' not in ip:  # skip IPv6
+                return ip
     except Exception:
         pass
-    # Fallback: try hostname resolution
+
+    # Method 3: ip route (Linux)
+    try:
+        result = subprocess.run(['ip', 'route', 'get', '1'], capture_output=True, text=True, timeout=5)
+        for part in result.stdout.split():
+            if part.count('.') == 3:
+                try:
+                    socket.inet_aton(part)
+                    if not part.startswith("127."):
+                        return part
+                except socket.error:
+                    continue
+    except Exception:
+        pass
+
+    # Method 4: hostname resolution
     try:
         hostname = socket.gethostname()
         ip = socket.gethostbyname(hostname)
@@ -5400,16 +5432,7 @@ def get_lan_ip():
             return ip
     except Exception:
         pass
-    # Last fallback: scan network interfaces
-    try:
-        import subprocess
-        result = subprocess.run(['hostname', '-I'], capture_output=True, text=True, timeout=5)
-        ips = result.stdout.strip().split()
-        for ip in ips:
-            if not ip.startswith("127."):
-                return ip
-    except Exception:
-        pass
+
     return "0.0.0.0"
 
 

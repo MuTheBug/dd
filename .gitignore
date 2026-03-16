@@ -13,3 +13,4 @@ uploads/screenshots/*
 node_modules/
 .wa_session_wjs/
 package-lock.json
+*.hash

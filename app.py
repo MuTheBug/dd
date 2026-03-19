@@ -5462,7 +5462,11 @@ AREA_GROUPS_FILE = os.path.join(BASE_DIR, 'area_groups.json')
 
 
 def load_area_groups():
-    """Load saved area groups from JSON file."""
+    """Load saved area groups from JSON file.
+
+    Structure: [{"name": "قنينص", "sub_addresses": ["شارع الثورة", "حي النور", ...]}, ...]
+    Each group is a main area with sub-addresses classified under it.
+    """
     if os.path.exists(AREA_GROUPS_FILE):
         try:
             with open(AREA_GROUPS_FILE, 'r', encoding='utf-8') as f:
@@ -5490,9 +5494,8 @@ def admin_location_report():
     if data_source == 'volunteers':
         base_q = "SELECT province, address FROM volunteers WHERE 1=1"
         params = []
-        status_col = 'status'
         if status_filter:
-            base_q += f" AND {status_col} = ?"
+            base_q += " AND status = ?"
             params.append(status_filter)
     elif data_source == 'members':
         base_q = "SELECT province, address FROM members WHERE 1=1"
@@ -5519,29 +5522,34 @@ def admin_location_report():
         if addr:
             address_counts[addr] = address_counts.get(addr, 0) + 1
 
-    # Sort by count descending
     province_sorted = sorted(province_counts.items(), key=lambda x: x[1], reverse=True)
-    address_sorted = sorted(address_counts.items(), key=lambda x: x[1], reverse=True)[:50]
+    address_sorted = sorted(address_counts.items(), key=lambda x: x[1], reverse=True)
 
-    # Load saved area groups and compute their totals
+    # Load area groups and compute totals
     area_groups = load_area_groups()
+    classified_addresses = set()
     group_data = []
-    grouped_provinces = set()
     for grp in area_groups:
-        total = sum(province_counts.get(p, 0) for p in grp.get('provinces', []))
-        addr_total = sum(address_counts.get(a, 0) for a in grp.get('addresses', []))
+        subs = grp.get('sub_addresses', [])
+        sub_details = []
+        grp_total = 0
+        for addr in subs:
+            cnt = address_counts.get(addr, 0)
+            grp_total += cnt
+            sub_details.append({'address': addr, 'count': cnt})
+            classified_addresses.add(addr)
         group_data.append({
             'name': grp['name'],
-            'provinces': grp.get('provinces', []),
-            'addresses': grp.get('addresses', []),
-            'total': total + addr_total,
+            'sub_addresses': sub_details,
+            'total': grp_total,
         })
-        grouped_provinces.update(grp.get('provinces', []))
 
-    # Ungrouped provinces (not in any area group)
-    ungrouped = [(p, c) for p, c in province_sorted if p not in grouped_provinces]
+    group_data_sorted = sorted(group_data, key=lambda x: x['total'], reverse=True)
 
-    # Available statuses for the filter
+    # Unclassified addresses (not assigned to any area)
+    unclassified = [(a, c) for a, c in address_sorted if a not in classified_addresses]
+
+    # Available statuses
     if data_source == 'volunteers':
         statuses = [r[0] for r in db.execute("SELECT DISTINCT status FROM volunteers WHERE status IS NOT NULL AND status != ''").fetchall()]
     elif data_source == 'members':
@@ -5555,9 +5563,9 @@ def admin_location_report():
                            statuses=statuses,
                            province_data=province_sorted,
                            address_data=address_sorted,
-                           group_data=group_data,
+                           group_data=group_data_sorted,
                            area_groups=area_groups,
-                           ungrouped=ungrouped,
+                           unclassified=unclassified,
                            total=len(rows),
                            PROVINCES=PROVINCES)
 
@@ -5565,7 +5573,7 @@ def admin_location_report():
 @app.route('/api/area-groups', methods=['GET', 'POST', 'DELETE'])
 @admin_required
 def api_area_groups():
-    """CRUD API for area groups."""
+    """CRUD API for area groups (main areas with sub-addresses)."""
     if request.method == 'GET':
         return jsonify(load_area_groups())
 
@@ -5574,19 +5582,16 @@ def api_area_groups():
         name = (data.get('name') or '').strip()
         if not name:
             return jsonify({'error': 'اسم المنطقة مطلوب'}), 400
-        provinces = data.get('provinces', [])
-        addresses = data.get('addresses', [])
-        if not provinces and not addresses:
-            return jsonify({'error': 'يجب اختيار محافظة أو عنوان واحد على الأقل'}), 400
+        sub_addresses = data.get('sub_addresses', [])
+        if not sub_addresses:
+            return jsonify({'error': 'يجب إضافة عنوان فرعي واحد على الأقل'}), 400
 
         groups = load_area_groups()
-        # Update existing or add new
         existing = next((g for g in groups if g['name'] == name), None)
         if existing:
-            existing['provinces'] = provinces
-            existing['addresses'] = addresses
+            existing['sub_addresses'] = sub_addresses
         else:
-            groups.append({'name': name, 'provinces': provinces, 'addresses': addresses})
+            groups.append({'name': name, 'sub_addresses': sub_addresses})
         save_area_groups(groups)
         return jsonify({'ok': True, 'groups': groups})
 

@@ -44,7 +44,7 @@
     </div>
     <div class="stat-card" style="background: #e3f2fd; border-right: 4px solid #1976d2;">
         <div class="stat-number" style="color: #1565c0;">{{ group_data|length }}</div>
-        <div class="stat-label">مجموعات مناطق</div>
+        <div class="stat-label">مناطق رئيسية</div>
     </div>
     <div class="stat-card" style="background: #fff3e0; border-right: 4px solid #ff9800;">
         <div class="stat-number" style="color: #e65100;">{{ address_data|length }}</div>
@@ -52,13 +52,17 @@
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-    <!-- Province Chart -->
+<!-- ============================================================ -->
+<!-- SECTION 1: Province Distribution (Pie + Bar)                  -->
+<!-- ============================================================ -->
+<h2 style="font-size: 1.15rem; margin-bottom: 0.75rem; color: var(--primary-dark);">توزيع المحافظات</h2>
+<div style="display: grid; grid-template-columns: 280px 1fr; gap: 1rem; margin-bottom: 1.5rem;" class="loc-grid">
+    <!-- Province Pie Chart -->
+    <div class="card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem;">
+        <canvas id="provincePie" width="240" height="240"></canvas>
+    </div>
+    <!-- Province Bar Chart -->
     <div class="card">
-        <div class="card-header">
-            <div class="card-icon">&#x1F3D9;&#xFE0F;</div>
-            <h3>التوزيع حسب المحافظة</h3>
-        </div>
         <div class="chart-bar-container">
             {% set max_prov = province_data[0][1] if province_data else 1 %}
             {% for prov, count in province_data %}
@@ -77,19 +81,25 @@
             {% endif %}
         </div>
     </div>
+</div>
 
-    <!-- Area Groups Chart -->
+<!-- ============================================================ -->
+<!-- SECTION 2: Area Groups Distribution (Pie + Bar)               -->
+<!-- ============================================================ -->
+<h2 style="font-size: 1.15rem; margin-bottom: 0.75rem; color: var(--primary-dark);">توزيع المناطق الرئيسية</h2>
+{% if group_data %}
+<div style="display: grid; grid-template-columns: 280px 1fr; gap: 1rem; margin-bottom: 1rem;" class="loc-grid">
+    <!-- Area Groups Pie Chart -->
+    <div class="card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem;">
+        <canvas id="areaPie" width="240" height="240"></canvas>
+    </div>
+    <!-- Area Groups Bar Chart -->
     <div class="card">
-        <div class="card-header">
-            <div class="card-icon">&#x1F4CD;</div>
-            <h3>التوزيع حسب المناطق المجمّعة</h3>
-        </div>
-        {% if group_data %}
         <div class="chart-bar-container">
             {% set max_grp = (group_data|map(attribute='total')|max) or 1 %}
-            {% for grp in group_data|sort(attribute='total', reverse=True) %}
+            {% for grp in group_data %}
             <div class="chart-bar-item">
-                <span class="chart-bar-label" title="{{ grp.provinces|join('، ') }}">{{ grp.name }}</span>
+                <span class="chart-bar-label" title="{% for s in grp.sub_addresses %}{{ s.address }} ({{ s.count }}){% if not loop.last %}، {% endif %}{% endfor %}">{{ grp.name }}</span>
                 <div class="chart-bar-track">
                     <div class="chart-bar-fill" style="width: {{ (grp.total / max_grp * 100)|round(1) }}%; background: linear-gradient(90deg, #7c3aed, #a78bfa);">
                         {{ grp.total }}
@@ -99,166 +109,182 @@
             </div>
             {% endfor %}
         </div>
-        {% if ungrouped %}
-        <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
-            <div style="font-size: 0.82rem; color: var(--text-light); margin-bottom: 0.4rem; font-weight: 600;">غير مجمّعة:</div>
-            {% set max_ug = ungrouped[0][1] if ungrouped else 1 %}
-            <div class="chart-bar-container">
-                {% for prov, count in ungrouped %}
-                <div class="chart-bar-item">
-                    <span class="chart-bar-label">{{ prov }}</span>
-                    <div class="chart-bar-track">
-                        <div class="chart-bar-fill" style="width: {{ (count / max_ug * 100)|round(1) }}%; background: linear-gradient(90deg, #78909c, #b0bec5);">
-                            {{ count }}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
+        <!-- Sub-address breakdown -->
+        {% for grp in group_data %}
+        {% if grp.sub_addresses %}
+        <div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: var(--bg); border-radius: 6px; font-size: 0.82rem;">
+            <strong>{{ grp.name }}:</strong>
+            {% for s in grp.sub_addresses %}
+            <span style="display: inline-block; margin: 0.15rem 0.2rem; padding: 0.1rem 0.5rem; background: var(--card-bg, #fff); border: 1px solid var(--border); border-radius: 12px;">
+                {{ s.address }} <small style="color: var(--text-light);">({{ s.count }})</small>
+            </span>
+            {% endfor %}
         </div>
         {% endif %}
-        {% else %}
-        <p style="color: var(--text-light); text-align: center; padding: 2rem 0;">لم يتم إنشاء مجموعات مناطق بعد.<br>استخدم الأداة أدناه لتجميع المحافظات.</p>
-        {% endif %}
+        {% endfor %}
     </div>
 </div>
+{% else %}
+<div class="card" style="margin-bottom: 1rem;">
+    <p style="color: var(--text-light); text-align: center; padding: 1.5rem 0;">لم يتم إنشاء مناطق رئيسية بعد. استخدم أداة التصنيف أدناه لإنشاء مناطق وتصنيف العناوين.</p>
+</div>
+{% endif %}
 
-<!-- Top Addresses Table -->
+<!-- ============================================================ -->
+<!-- SECTION 3: Address Distribution (Pie + Table)                 -->
+<!-- ============================================================ -->
 {% if address_data %}
-<div class="card" style="margin-bottom: 1.5rem;">
-    <div class="card-header">
-        <div class="card-icon">&#x1F3E0;</div>
-        <h3>أكثر العناوين تكراراً</h3>
+<h2 style="font-size: 1.15rem; margin-bottom: 0.75rem; color: var(--primary-dark);">توزيع العناوين</h2>
+<div style="display: grid; grid-template-columns: 280px 1fr; gap: 1rem; margin-bottom: 1.5rem;" class="loc-grid">
+    <!-- Address Pie Chart (top 10) -->
+    <div class="card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem;">
+        <canvas id="addressPie" width="240" height="240"></canvas>
     </div>
-    <div style="overflow-x: auto;">
-        <table class="data-table" style="font-size: 0.88rem;">
-            <thead>
-                <tr>
-                    <th style="width: 40px;">#</th>
-                    <th>العنوان</th>
-                    <th style="width: 80px;">العدد</th>
-                    <th style="width: 80px;">النسبة</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for addr, count in address_data[:30] %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ addr }}</td>
-                    <td><strong>{{ count }}</strong></td>
-                    <td>{{ (count / total * 100)|round(1) if total else 0 }}%</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- Address Table -->
+    <div class="card">
+        <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+            <table class="data-table" style="font-size: 0.85rem;">
+                <thead>
+                    <tr>
+                        <th style="width: 35px;">#</th>
+                        <th>العنوان</th>
+                        <th style="width: 65px;">العدد</th>
+                        <th style="width: 65px;">النسبة</th>
+                        <th style="width: 100px;" class="no-print">المنطقة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for addr, count in address_data[:50] %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ addr }}</td>
+                        <td><strong>{{ count }}</strong></td>
+                        <td>{{ (count / total * 100)|round(1) if total else 0 }}%</td>
+                        <td class="no-print">
+                            {% set ns = namespace(found=false) %}
+                            {% for grp in area_groups %}
+                                {% if addr in grp.sub_addresses %}
+                                    <span style="font-size: 0.78rem; padding: 0.1rem 0.4rem; background: #ede9fe; color: #6d28d9; border-radius: 10px;">{{ grp.name }}</span>
+                                    {% set ns.found = true %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if not ns.found %}
+                            <span style="font-size: 0.78rem; color: var(--text-light);">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endif %}
 
-<!-- Area Grouping Tool -->
+<!-- ============================================================ -->
+<!-- SECTION 4: Area Grouping Tool                                 -->
+<!-- ============================================================ -->
 <div class="card no-print" style="margin-bottom: 1.5rem;">
     <div class="card-header">
         <div class="card-icon">&#x2699;&#xFE0F;</div>
-        <h3>أداة تجميع المناطق</h3>
+        <h3>أداة تصنيف المناطق</h3>
     </div>
     <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 1rem;">
-        أنشئ مجموعات مناطق لتجميع عدة محافظات أو عناوين تحت اسم واحد في التقرير.
+        أنشئ مناطق رئيسية (مثل: قنينص، الرمل الجنوبي) ثم صنّف العناوين الفرعية تحتها.
     </p>
 
     <!-- Existing Groups -->
-    <div id="existingGroups" style="margin-bottom: 1rem;">
+    {% if area_groups %}
+    <div style="margin-bottom: 1rem;">
+        <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">المناطق الحالية:</div>
         {% for grp in area_groups %}
-        <div class="area-group-tag" data-name="{{ grp.name }}">
-            <strong>{{ grp.name }}</strong>
-            <span style="font-size: 0.8rem; color: var(--text-light);">
-                ({{ grp.provinces|join('، ') }}{% if grp.addresses %} + {{ grp.addresses|length }} عنوان{% endif %})
-            </span>
-            <button onclick="editGroup('{{ grp.name }}')" class="btn btn-outline btn-sm" style="padding: 0.1rem 0.4rem; font-size: 0.75rem; margin-right: 0.3rem;">تعديل</button>
-            <button onclick="deleteGroup('{{ grp.name }}')" class="btn btn-danger btn-sm" style="padding: 0.1rem 0.4rem; font-size: 0.75rem;">حذف</button>
+        <div class="area-group-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.3rem;">
+                <strong style="font-size: 1rem;">{{ grp.name }}</strong>
+                <div>
+                    <button onclick="editGroup('{{ grp.name }}')" class="btn btn-outline btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">تعديل</button>
+                    <button onclick="deleteGroup('{{ grp.name }}')" class="btn btn-danger btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">حذف</button>
+                </div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
+                {% for addr in grp.sub_addresses %}
+                <span class="sub-addr-tag">{{ addr }}</span>
+                {% endfor %}
+                {% if not grp.sub_addresses %}
+                <span style="color: var(--text-light); font-size: 0.82rem;">لا توجد عناوين فرعية</span>
+                {% endif %}
+            </div>
         </div>
         {% endfor %}
     </div>
+    {% endif %}
 
-    <!-- New Group Form -->
+    <!-- Create / Edit Form -->
     <div style="background: var(--bg); border-radius: 8px; padding: 1rem; border: 1px solid var(--border);">
         <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;">
-            <label style="font-weight: 600; font-size: 0.9rem;">اسم المنطقة:</label>
-            <input type="text" id="groupName" placeholder="مثال: الساحل، الجنوب..." style="padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem; flex: 1; min-width: 180px;">
+            <label style="font-weight: 600; font-size: 0.9rem;">اسم المنطقة الرئيسية:</label>
+            <input type="text" id="groupName" placeholder="مثال: قنينص، الرمل الجنوبي..." style="padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem; flex: 1; min-width: 180px;">
         </div>
 
+        <!-- Sub-addresses selection -->
         <div style="margin-bottom: 0.75rem;">
-            <label style="font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 0.4rem;">اختر المحافظات:</label>
-            <div id="provinceCheckboxes" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-                {% for prov in PROVINCES %}
-                <label class="chip-checkbox">
-                    <input type="checkbox" name="group_province" value="{{ prov }}">
-                    <span class="chip-label">{{ prov }}
-                        {% if province_data %}
-                        <small style="opacity: 0.7;">({% for p, c in province_data %}{% if p == prov %}{{ c }}{% endif %}{% endfor %})</small>
-                        {% endif %}
-                    </span>
-                </label>
-                {% endfor %}
+            <label style="font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 0.4rem;">العناوين الفرعية:</label>
+
+            <!-- Manual entry -->
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <input type="text" id="manualAddr" placeholder="أضف عنوان يدوياً..." style="padding: 0.35rem 0.7rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; flex: 1;">
+                <button onclick="addManualAddr()" class="btn btn-outline btn-sm">إضافة</button>
             </div>
-        </div>
 
-        {% if address_data %}
-        <div style="margin-bottom: 0.75rem;">
-            <label style="font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 0.4rem;">اختر عناوين (اختياري):</label>
-            <div style="max-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem;">
-                <input type="text" id="addressSearch" placeholder="بحث في العناوين..." oninput="filterAddresses()" style="width: 100%; padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.4rem; font-size: 0.85rem;">
-                <div id="addressCheckboxes">
+            <!-- Selected sub-addresses -->
+            <div id="selectedAddrs" style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; min-height: 28px;"></div>
+
+            <!-- Pick from existing addresses -->
+            {% if address_data %}
+            <div style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem;">
+                <input type="text" id="addrSearchInput" placeholder="بحث في العناوين الموجودة..." oninput="filterExistingAddrs()" style="width: 100%; padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.4rem; font-size: 0.85rem;">
+                <div id="existingAddrList">
                     {% for addr, count in address_data %}
-                    <label class="addr-checkbox" style="display: flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0; font-size: 0.85rem; cursor: pointer;">
-                        <input type="checkbox" name="group_address" value="{{ addr }}">
+                    <label class="addr-pick-row" data-addr="{{ addr }}">
+                        <input type="checkbox" onchange="toggleExistingAddr(this, '{{ addr|e }}')" value="{{ addr }}">
                         <span>{{ addr }} <small style="color: var(--text-light);">({{ count }})</small></span>
                     </label>
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
 
         <div style="display: flex; gap: 0.5rem;">
-            <button onclick="saveGroup()" class="btn btn-primary btn-sm">حفظ المجموعة</button>
+            <button onclick="saveGroup()" class="btn btn-primary btn-sm">حفظ المنطقة</button>
             <button onclick="clearForm()" class="btn btn-outline btn-sm">مسح</button>
         </div>
     </div>
 </div>
 
-<!-- Province detail table (for print) -->
+<!-- Print-only detail tables -->
 <div class="card print-only" style="margin-bottom: 1rem;">
     <h3 style="margin-bottom: 0.5rem;">التوزيع التفصيلي حسب المحافظة</h3>
     <table class="data-table" style="font-size: 0.85rem;">
-        <thead>
-            <tr><th>#</th><th>المحافظة</th><th>العدد</th><th>النسبة</th></tr>
-        </thead>
+        <thead><tr><th>#</th><th>المحافظة</th><th>العدد</th><th>النسبة</th></tr></thead>
         <tbody>
             {% for prov, count in province_data %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ prov }}</td>
-                <td>{{ count }}</td>
-                <td>{{ (count / total * 100)|round(1) if total else 0 }}%</td>
-            </tr>
+            <tr><td>{{ loop.index }}</td><td>{{ prov }}</td><td>{{ count }}</td><td>{{ (count / total * 100)|round(1) if total else 0 }}%</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
-
 {% if group_data %}
 <div class="card print-only" style="margin-bottom: 1rem;">
-    <h3 style="margin-bottom: 0.5rem;">التوزيع حسب المناطق المجمّعة</h3>
+    <h3 style="margin-bottom: 0.5rem;">التوزيع حسب المناطق الرئيسية</h3>
     <table class="data-table" style="font-size: 0.85rem;">
-        <thead>
-            <tr><th>#</th><th>المنطقة</th><th>المحافظات</th><th>العدد</th><th>النسبة</th></tr>
-        </thead>
+        <thead><tr><th>#</th><th>المنطقة</th><th>العناوين الفرعية</th><th>العدد</th><th>النسبة</th></tr></thead>
         <tbody>
-            {% for grp in group_data|sort(attribute='total', reverse=True) %}
+            {% for grp in group_data %}
             <tr>
                 <td>{{ loop.index }}</td>
                 <td><strong>{{ grp.name }}</strong></td>
-                <td style="font-size: 0.8rem;">{{ grp.provinces|join('، ') }}</td>
+                <td style="font-size: 0.8rem;">{% for s in grp.sub_addresses %}{{ s.address }}{% if not loop.last %}، {% endif %}{% endfor %}</td>
                 <td>{{ grp.total }}</td>
                 <td>{{ (grp.total / total * 100)|round(1) if total else 0 }}%</td>
             </tr>
@@ -272,21 +298,57 @@
 
 {% block extra_css %}
 <style>
-    .area-group-tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
+    .area-group-card {
         background: var(--bg);
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 0.4rem 0.75rem;
-        margin: 0.2rem;
-        font-size: 0.88rem;
+        padding: 0.6rem 0.8rem;
+        margin-bottom: 0.5rem;
     }
-    .chip-checkbox {
+    .sub-addr-tag {
+        display: inline-block;
+        padding: 0.15rem 0.55rem;
+        background: #ede9fe;
+        color: #6d28d9;
+        border-radius: 12px;
+        font-size: 0.82rem;
+    }
+    [data-theme="dark"] .sub-addr-tag {
+        background: rgba(124,58,237,0.2);
+        color: #c4b5fd;
+    }
+    .selected-addr-chip {
         display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.2rem 0.55rem;
+        background: var(--primary);
+        color: #fff;
+        border-radius: 14px;
+        font-size: 0.82rem;
+        cursor: default;
+    }
+    .selected-addr-chip button {
+        background: none;
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        font-size: 0.9rem;
+        padding: 0;
+        line-height: 1;
+        opacity: 0.8;
+    }
+    .selected-addr-chip button:hover { opacity: 1; }
+    .addr-pick-row {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.2rem 0;
+        font-size: 0.85rem;
         cursor: pointer;
     }
+    .addr-pick-row:hover { background: var(--bg); }
+    .chip-checkbox { display: inline-flex; cursor: pointer; }
     .chip-checkbox input { display: none; }
     .chip-label {
         padding: 0.3rem 0.7rem;
@@ -301,26 +363,143 @@
         color: #fff;
         border-color: var(--primary);
     }
-    .chip-checkbox:hover .chip-label {
-        border-color: var(--primary);
-    }
+    .chip-checkbox:hover .chip-label { border-color: var(--primary); }
     .print-only { display: none; }
     @media print {
         .no-print { display: none !important; }
         .print-only { display: block !important; }
+        canvas { max-width: 200px; }
     }
-    @media (max-width: 600px) {
-        div[style*="grid-template-columns"] {
-            grid-template-columns: 1fr !important;
-        }
+    @media (max-width: 700px) {
+        .loc-grid { grid-template-columns: 1fr !important; }
     }
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
+/* ============================================================ */
+/* Data                                                          */
+/* ============================================================ */
 const areaGroups = {{ area_groups|tojson }};
+const provinceData = {{ province_data|tojson }};
+const addressData = {{ address_data|tojson }};
+const groupData = {{ group_data|tojson }};
+const totalRecords = {{ total }};
 
+/* Selected sub-addresses for the form */
+let selectedAddresses = [];
+
+/* ============================================================ */
+/* Pie Chart Renderer (pure Canvas, no dependencies)             */
+/* ============================================================ */
+const PIE_COLORS = [
+    '#2563eb','#dc2626','#16a34a','#ea580c','#7c3aed','#0891b2',
+    '#d946ef','#ca8a04','#4f46e5','#059669','#e11d48','#0d9488',
+    '#8b5cf6','#f59e0b','#6366f1','#84cc16','#f43f5e','#06b6d4'
+];
+
+function drawPie(canvasId, items, maxSlices) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !items.length) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H / 2, R = Math.min(cx, cy) - 8;
+
+    /* Aggregate small slices into "أخرى" */
+    let slices = items.slice(0, maxSlices || 12);
+    const shownTotal = slices.reduce((s, d) => s + d[1], 0);
+    const otherTotal = items.slice(maxSlices || 12).reduce((s, d) => s + d[1], 0);
+    if (otherTotal > 0) slices.push(['أخرى', otherTotal]);
+    const grandTotal = shownTotal + otherTotal;
+    if (grandTotal === 0) return;
+
+    ctx.clearRect(0, 0, W, H);
+    let angle = -Math.PI / 2;
+
+    slices.forEach((item, i) => {
+        const frac = item[1] / grandTotal;
+        const sweep = frac * 2 * Math.PI;
+        /* Slice */
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, R, angle, angle + sweep);
+        ctx.closePath();
+        ctx.fillStyle = PIE_COLORS[i % PIE_COLORS.length];
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        /* Label */
+        if (frac > 0.04) {
+            const mid = angle + sweep / 2;
+            const lx = cx + (R * 0.62) * Math.cos(mid);
+            const ly = cy + (R * 0.62) * Math.sin(mid);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(Math.round(frac * 100) + '%', lx, ly);
+        }
+        angle += sweep;
+    });
+
+    /* Legend below */
+    const legendY = H - 4;
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    let lx = W - 4, ly = legendY;
+    /* skip legend if too many */
+}
+
+/* ============================================================ */
+/* Draw all charts on load                                       */
+/* ============================================================ */
+document.addEventListener('DOMContentLoaded', function() {
+    /* Province pie */
+    drawPie('provincePie', provinceData, 10);
+
+    /* Area groups pie */
+    if (groupData.length) {
+        const areaItems = groupData.map(g => [g.name, g.total]);
+        drawPie('areaPie', areaItems, 10);
+    }
+
+    /* Address pie (top 10) */
+    if (addressData.length) {
+        drawPie('addressPie', addressData.slice(0, 10), 10);
+    }
+
+    /* Draw pie legends */
+    drawLegend('provincePie', provinceData, 10);
+    if (groupData.length) drawLegend('areaPie', groupData.map(g => [g.name, g.total]), 10);
+    if (addressData.length) drawLegend('addressPie', addressData.slice(0, 10), 10);
+});
+
+function drawLegend(canvasId, items, maxSlices) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    let container = canvas.parentElement.querySelector('.pie-legend');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'pie-legend';
+        container.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; justify-content: center; margin-top: 0.5rem; font-size: 0.78rem;';
+        canvas.parentElement.appendChild(container);
+    }
+    let slices = items.slice(0, maxSlices || 12);
+    const otherTotal = items.slice(maxSlices || 12).reduce((s, d) => s + d[1], 0);
+    if (otherTotal > 0) slices.push(['أخرى', otherTotal]);
+    container.innerHTML = slices.map((item, i) =>
+        '<span style="display:inline-flex;align-items:center;gap:0.2rem;">' +
+        '<span style="width:10px;height:10px;border-radius:50%;background:' + PIE_COLORS[i % PIE_COLORS.length] + ';display:inline-block;"></span>' +
+        item[0] + '</span>'
+    ).join('');
+}
+
+/* ============================================================ */
+/* Filters                                                       */
+/* ============================================================ */
 function applyFilters() {
     const source = document.getElementById('sourceSelect').value;
     const status = document.getElementById('statusSelect').value;
@@ -329,29 +508,74 @@ function applyFilters() {
     location.href = url;
 }
 
-function filterAddresses() {
-    const q = document.getElementById('addressSearch').value.toLowerCase();
-    document.querySelectorAll('.addr-checkbox').forEach(el => {
-        el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+/* ============================================================ */
+/* Area Group Management                                         */
+/* ============================================================ */
+function renderSelectedAddrs() {
+    const container = document.getElementById('selectedAddrs');
+    container.innerHTML = selectedAddresses.map(addr =>
+        '<span class="selected-addr-chip">' + addr +
+        ' <button onclick="removeAddr(\'' + addr.replace(/'/g, "\\'") + '\')">&times;</button></span>'
+    ).join('');
+    /* Sync checkboxes */
+    document.querySelectorAll('#existingAddrList input[type="checkbox"]').forEach(cb => {
+        cb.checked = selectedAddresses.includes(cb.value);
+    });
+}
+
+function addManualAddr() {
+    const input = document.getElementById('manualAddr');
+    const addr = input.value.trim();
+    if (addr && !selectedAddresses.includes(addr)) {
+        selectedAddresses.push(addr);
+        renderSelectedAddrs();
+    }
+    input.value = '';
+    input.focus();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const manualInput = document.getElementById('manualAddr');
+    if (manualInput) {
+        manualInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); addManualAddr(); }
+        });
+    }
+});
+
+function toggleExistingAddr(cb, addr) {
+    if (cb.checked && !selectedAddresses.includes(addr)) {
+        selectedAddresses.push(addr);
+    } else if (!cb.checked) {
+        selectedAddresses = selectedAddresses.filter(a => a !== addr);
+    }
+    renderSelectedAddrs();
+}
+
+function removeAddr(addr) {
+    selectedAddresses = selectedAddresses.filter(a => a !== addr);
+    renderSelectedAddrs();
+}
+
+function filterExistingAddrs() {
+    const q = document.getElementById('addrSearchInput').value.toLowerCase();
+    document.querySelectorAll('.addr-pick-row').forEach(el => {
+        el.style.display = el.dataset.addr.toLowerCase().includes(q) ? '' : 'none';
     });
 }
 
 function saveGroup() {
     const name = document.getElementById('groupName').value.trim();
     if (!name) { alert('يرجى إدخال اسم المنطقة'); return; }
-
-    const provinces = Array.from(document.querySelectorAll('input[name="group_province"]:checked')).map(cb => cb.value);
-    const addresses = Array.from(document.querySelectorAll('input[name="group_address"]:checked')).map(cb => cb.value);
-
-    if (!provinces.length && !addresses.length) {
-        alert('يرجى اختيار محافظة أو عنوان واحد على الأقل');
+    if (!selectedAddresses.length) {
+        alert('يرجى إضافة عنوان فرعي واحد على الأقل');
         return;
     }
 
     fetch('{{ url_for("api_area_groups") }}', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name, provinces, addresses})
+        body: JSON.stringify({name: name, sub_addresses: selectedAddresses})
     })
     .then(r => r.json())
     .then(data => {
@@ -361,11 +585,11 @@ function saveGroup() {
 }
 
 function deleteGroup(name) {
-    if (!confirm('حذف المجموعة "' + name + '"؟')) return;
+    if (!confirm('حذف المنطقة "' + name + '"؟')) return;
     fetch('{{ url_for("api_area_groups") }}', {
         method: 'DELETE',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name})
+        body: JSON.stringify({name: name})
     })
     .then(r => r.json())
     .then(data => { if (data.ok) location.reload(); });
@@ -375,20 +599,16 @@ function editGroup(name) {
     const grp = areaGroups.find(g => g.name === name);
     if (!grp) return;
     document.getElementById('groupName').value = grp.name;
-    // Check provinces
-    document.querySelectorAll('input[name="group_province"]').forEach(cb => {
-        cb.checked = grp.provinces.includes(cb.value);
-    });
-    // Check addresses
-    document.querySelectorAll('input[name="group_address"]').forEach(cb => {
-        cb.checked = (grp.addresses || []).includes(cb.value);
-    });
+    selectedAddresses = [...(grp.sub_addresses || [])];
+    renderSelectedAddrs();
+    document.getElementById('groupName').scrollIntoView({behavior: 'smooth', block: 'center'});
     document.getElementById('groupName').focus();
 }
 
 function clearForm() {
     document.getElementById('groupName').value = '';
-    document.querySelectorAll('input[name="group_province"], input[name="group_address"]').forEach(cb => cb.checked = false);
+    selectedAddresses = [];
+    renderSelectedAddrs();
 }
 </script>
 {% endblock %}

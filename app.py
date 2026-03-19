@@ -5567,7 +5567,8 @@ def admin_location_report():
                            area_groups=area_groups,
                            unclassified=unclassified,
                            total=len(rows),
-                           PROVINCES=PROVINCES)
+                           PROVINCES=PROVINCES,
+                           report_date=datetime.now().strftime('%Y-%m-%d'))
 
 
 @app.route('/api/area-groups', methods=['GET', 'POST', 'DELETE'])

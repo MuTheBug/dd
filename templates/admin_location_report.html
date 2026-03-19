@@ -262,37 +262,147 @@
     </div>
 </div>
 
-<!-- Print-only detail tables -->
-<div class="card print-only" style="margin-bottom: 1rem;">
-    <h3 style="margin-bottom: 0.5rem;">التوزيع التفصيلي حسب المحافظة</h3>
-    <table class="data-table" style="font-size: 0.85rem;">
-        <thead><tr><th>#</th><th>المحافظة</th><th>العدد</th><th>النسبة</th></tr></thead>
-        <tbody>
-            {% for prov, count in province_data %}
-            <tr><td>{{ loop.index }}</td><td>{{ prov }}</td><td>{{ count }}</td><td>{{ (count / total * 100)|round(1) if total else 0 }}%</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<!-- ============================================================ -->
+<!-- PRINT-ONLY: Report with pie charts + numbers + Berkeley desc  -->
+<!-- ============================================================ -->
+<div class="print-only" id="printReport">
+    <div style="text-align: center; margin-bottom: 1.5rem; border-bottom: 2px solid #333; padding-bottom: 1rem;">
+        <h1 style="font-size: 1.5rem; margin-bottom: 0.25rem;">تقرير التوزيع الجغرافي</h1>
+        <p style="font-size: 0.9rem; color: #555;">نظام حقنا - توثيق الضحايا وفق بروتوكول بيركلي</p>
+        <p style="font-size: 0.82rem; color: #777;">تاريخ التقرير: {{ report_date }}</p>
+        <p style="font-size: 0.95rem; margin-top: 0.5rem;">إجمالي السجلات: <strong>{{ total }}</strong></p>
+    </div>
+
+    <!-- Province Pie (print version - rendered to image) -->
+    <div style="page-break-inside: avoid; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.15rem; margin-bottom: 0.75rem; border-bottom: 1px solid #ddd; padding-bottom: 0.3rem;">توزيع المحافظات</h2>
+        <div style="display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap;">
+            <div style="flex-shrink: 0;">
+                <canvas id="provincePiePrint" width="280" height="280"></canvas>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #333;">
+                            <th style="text-align: right; padding: 0.3rem 0.5rem;">المحافظة</th>
+                            <th style="text-align: center; padding: 0.3rem 0.5rem; width: 60px;">العدد</th>
+                            <th style="text-align: center; padding: 0.3rem 0.5rem; width: 60px;">النسبة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prov, count in province_data %}
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 0.25rem 0.5rem;">
+                                <span class="print-color-dot" data-idx="{{ loop.index0 }}"></span>
+                                {{ prov }}
+                            </td>
+                            <td style="text-align: center; padding: 0.25rem 0.5rem; font-weight: 600;">{{ count }}</td>
+                            <td style="text-align: center; padding: 0.25rem 0.5rem;">{{ (count / total * 100)|round(1) if total else 0 }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Area Groups Pie (print version) -->
+    {% if group_data %}
+    <div style="page-break-inside: avoid; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.15rem; margin-bottom: 0.75rem; border-bottom: 1px solid #ddd; padding-bottom: 0.3rem;">توزيع المناطق الرئيسية</h2>
+        <div style="display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap;">
+            <div style="flex-shrink: 0;">
+                <canvas id="areaPiePrint" width="280" height="280"></canvas>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #333;">
+                            <th style="text-align: right; padding: 0.3rem 0.5rem;">المنطقة</th>
+                            <th style="text-align: center; padding: 0.3rem 0.5rem; width: 60px;">العدد</th>
+                            <th style="text-align: center; padding: 0.3rem 0.5rem; width: 60px;">النسبة</th>
+                            <th style="text-align: right; padding: 0.3rem 0.5rem;">العناوين الفرعية</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for grp in group_data %}
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 0.25rem 0.5rem; font-weight: 600;">
+                                <span class="print-color-dot" data-idx="{{ loop.index0 }}"></span>
+                                {{ grp.name }}
+                            </td>
+                            <td style="text-align: center; padding: 0.25rem 0.5rem; font-weight: 700;">{{ grp.total }}</td>
+                            <td style="text-align: center; padding: 0.25rem 0.5rem;">{{ (grp.total / total * 100)|round(1) if total else 0 }}%</td>
+                            <td style="padding: 0.25rem 0.5rem; font-size: 0.78rem; color: #555;">{% for s in grp.sub_addresses %}{{ s.address }}{% if not loop.last %}، {% endif %}{% endfor %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Address Pie (print version) -->
+    {% if address_data %}
+    <div style="page-break-inside: avoid; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.15rem; margin-bottom: 0.75rem; border-bottom: 1px solid #ddd; padding-bottom: 0.3rem;">توزيع العناوين (أعلى {{ [address_data|length, 15]|min }})</h2>
+        <div style="display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap;">
+            <div style="flex-shrink: 0;">
+                <canvas id="addressPiePrint" width="280" height="280"></canvas>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #333;">
+                            <th style="text-align: right; padding: 0.3rem 0.5rem;">العنوان</th>
+                            <th style="text-align: center; padding: 0.3rem 0.5rem; width: 60px;">العدد</th>
+                            <th style="text-align: center; padding: 0.3rem 0.5rem; width: 60px;">النسبة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for addr, count in address_data[:15] %}
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 0.25rem 0.5rem;">
+                                <span class="print-color-dot" data-idx="{{ loop.index0 }}"></span>
+                                {{ addr }}
+                            </td>
+                            <td style="text-align: center; padding: 0.25rem 0.5rem; font-weight: 600;">{{ count }}</td>
+                            <td style="text-align: center; padding: 0.25rem 0.5rem;">{{ (count / total * 100)|round(1) if total else 0 }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Berkeley Protocol Description -->
+    <div style="page-break-inside: avoid; margin-top: 2rem; border-top: 2px solid #333; padding-top: 1rem;">
+        <h2 style="font-size: 1.1rem; margin-bottom: 0.6rem;">حول منهجية التوثيق - بروتوكول بيركلي</h2>
+        <div style="font-size: 0.85rem; line-height: 1.7; color: #333;">
+            <p style="margin-bottom: 0.6rem;">
+                تم إعداد هذا التقرير وفق <strong>بروتوكول بيركلي للتحقيقات الرقمية مفتوحة المصدر</strong>
+                (Berkeley Protocol on Digital Open Source Investigations) الصادر عن مكتب الأمم المتحدة لحقوق الإنسان
+                ومركز حقوق الإنسان في كلية الحقوق بجامعة كاليفورنيا - بيركلي (2022).
+            </p>
+            <p style="margin-bottom: 0.6rem;">
+                يُحدد البروتوكول معايير مهنية وأخلاقية لجمع المعلومات الرقمية مفتوحة المصدر والتحقق منها وحفظها،
+                بما يضمن مقبوليتها كأدلة أمام آليات المساءلة الدولية. تشمل المبادئ الأساسية:
+            </p>
+            <ul style="margin: 0 1.5rem 0.6rem 0; padding: 0;">
+                <li style="margin-bottom: 0.3rem;"><strong>الدقة والتوثيق المنهجي:</strong> تسجيل كل حالة بمعلومات موحدة وقابلة للتحقق، بما في ذلك البيانات الشخصية والجغرافية والظروف المحيطة.</li>
+                <li style="margin-bottom: 0.3rem;"><strong>سلسلة الحفظ:</strong> ضمان سلامة البيانات من لحظة جمعها حتى استخدامها، مع تتبع كل تعديل وتوثيق مصدره.</li>
+                <li style="margin-bottom: 0.3rem;"><strong>حماية المصادر:</strong> عدم الكشف عن هوية الشهود والمبلغين، وتشفير البيانات الحساسة.</li>
+                <li style="margin-bottom: 0.3rem;"><strong>التحقق متعدد المصادر:</strong> مقاطعة المعلومات من مصادر مستقلة لتعزيز موثوقية التوثيق.</li>
+            </ul>
+            <p style="font-size: 0.8rem; color: #777; margin-top: 0.5rem;">
+                هذا التقرير هو جزء من نظام "حقنا" لتوثيق الضحايا - جميع البيانات محفوظة محلياً وغير متصلة بالإنترنت.
+            </p>
+        </div>
+    </div>
 </div>
-{% if group_data %}
-<div class="card print-only" style="margin-bottom: 1rem;">
-    <h3 style="margin-bottom: 0.5rem;">التوزيع حسب المناطق الرئيسية</h3>
-    <table class="data-table" style="font-size: 0.85rem;">
-        <thead><tr><th>#</th><th>المنطقة</th><th>العناوين الفرعية</th><th>العدد</th><th>النسبة</th></tr></thead>
-        <tbody>
-            {% for grp in group_data %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td><strong>{{ grp.name }}</strong></td>
-                <td style="font-size: 0.8rem;">{% for s in grp.sub_addresses %}{{ s.address }}{% if not loop.last %}، {% endif %}{% endfor %}</td>
-                <td>{{ grp.total }}</td>
-                <td>{{ (grp.total / total * 100)|round(1) if total else 0 }}%</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% endif %}
 
 {% endblock %}
 
@@ -365,10 +475,23 @@
     }
     .chip-checkbox:hover .chip-label { border-color: var(--primary); }
     .print-only { display: none; }
+    .print-color-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-left: 0.3rem;
+        vertical-align: middle;
+    }
     @media print {
         .no-print { display: none !important; }
         .print-only { display: block !important; }
-        canvas { max-width: 200px; }
+        /* Hide all screen-only sections */
+        .stats-grid, .loc-grid, h2:not(#printReport h2) { display: none !important; }
+        #printReport { display: block !important; }
+        #printReport canvas { max-width: 280px; }
+        body { font-size: 12pt; color: #000; }
+        .card { box-shadow: none; border: none; padding: 0; }
     }
     @media (max-width: 700px) {
         .loc-grid { grid-template-columns: 1fr !important; }
@@ -399,7 +522,7 @@ const PIE_COLORS = [
     '#8b5cf6','#f59e0b','#6366f1','#84cc16','#f43f5e','#06b6d4'
 ];
 
-function drawPie(canvasId, items, maxSlices) {
+function drawPie(canvasId, items, maxSlices, showCounts) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !items.length) return;
     const ctx = canvas.getContext('2d');
@@ -420,7 +543,6 @@ function drawPie(canvasId, items, maxSlices) {
     slices.forEach((item, i) => {
         const frac = item[1] / grandTotal;
         const sweep = frac * 2 * Math.PI;
-        /* Slice */
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.arc(cx, cy, R, angle, angle + sweep);
@@ -431,50 +553,63 @@ function drawPie(canvasId, items, maxSlices) {
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        /* Label */
+        /* Label inside slice */
         if (frac > 0.04) {
             const mid = angle + sweep / 2;
-            const lx = cx + (R * 0.62) * Math.cos(mid);
-            const ly = cy + (R * 0.62) * Math.sin(mid);
+            const labelR = showCounts ? R * 0.58 : R * 0.62;
+            const lx = cx + labelR * Math.cos(mid);
+            const ly = cy + labelR * Math.sin(mid);
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 11px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(Math.round(frac * 100) + '%', lx, ly);
+            if (showCounts && frac > 0.06) {
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(item[1].toString(), lx, ly - 7);
+                ctx.font = '10px sans-serif';
+                ctx.fillText(Math.round(frac * 100) + '%', lx, ly + 7);
+            } else {
+                ctx.font = 'bold 11px sans-serif';
+                ctx.fillText(Math.round(frac * 100) + '%', lx, ly);
+            }
         }
         angle += sweep;
     });
 
-    /* Legend below */
-    const legendY = H - 4;
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right';
-    let lx = W - 4, ly = legendY;
-    /* skip legend if too many */
+    return slices;
 }
 
 /* ============================================================ */
 /* Draw all charts on load                                       */
 /* ============================================================ */
 document.addEventListener('DOMContentLoaded', function() {
-    /* Province pie */
+    /* Screen pie charts */
     drawPie('provincePie', provinceData, 10);
-
-    /* Area groups pie */
     if (groupData.length) {
-        const areaItems = groupData.map(g => [g.name, g.total]);
-        drawPie('areaPie', areaItems, 10);
+        drawPie('areaPie', groupData.map(g => [g.name, g.total]), 10);
     }
-
-    /* Address pie (top 10) */
     if (addressData.length) {
         drawPie('addressPie', addressData.slice(0, 10), 10);
     }
 
-    /* Draw pie legends */
+    /* Screen legends */
     drawLegend('provincePie', provinceData, 10);
     if (groupData.length) drawLegend('areaPie', groupData.map(g => [g.name, g.total]), 10);
     if (addressData.length) drawLegend('addressPie', addressData.slice(0, 10), 10);
+
+    /* Print pie charts (with counts shown) */
+    drawPie('provincePiePrint', provinceData, 15, true);
+    if (groupData.length) {
+        drawPie('areaPiePrint', groupData.map(g => [g.name, g.total]), 15, true);
+    }
+    if (addressData.length) {
+        drawPie('addressPiePrint', addressData.slice(0, 15), 15, true);
+    }
+
+    /* Color the dots in print tables to match pie slices */
+    document.querySelectorAll('.print-color-dot').forEach(dot => {
+        const idx = parseInt(dot.dataset.idx);
+        dot.style.backgroundColor = PIE_COLORS[idx % PIE_COLORS.length];
+    });
 });
 
 function drawLegend(canvasId, items, maxSlices) {

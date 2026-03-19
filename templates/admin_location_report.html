@@ -84,7 +84,35 @@
 </div>
 
 <!-- ============================================================ -->
-<!-- SECTION 2: Area Groups Distribution (Pie + Bar)               -->
+<!-- SECTION 2: Area/Neighborhood Distribution (from DB field)     -->
+<!-- ============================================================ -->
+{% if area_data %}
+<h2 style="font-size: 1.15rem; margin-bottom: 0.75rem; color: var(--primary-dark);">توزيع المناطق / الأحياء</h2>
+<div style="display: grid; grid-template-columns: 280px 1fr; gap: 1rem; margin-bottom: 1.5rem;" class="loc-grid">
+    <div class="card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem;">
+        <canvas id="areaDbPie" width="240" height="240"></canvas>
+    </div>
+    <div class="card">
+        <div class="chart-bar-container">
+            {% set max_area = area_data[0][1] if area_data else 1 %}
+            {% for area, count in area_data %}
+            <div class="chart-bar-item">
+                <span class="chart-bar-label">{{ area }}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (count / max_area * 100)|round(1) }}%; background: linear-gradient(90deg, #7c3aed, #a78bfa);">
+                        {{ count }}
+                    </div>
+                </div>
+                <span style="font-size: 0.78rem; color: var(--text-light); min-width: 40px; text-align: left;">{{ (count / total * 100)|round(1) if total else 0 }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- SECTION 3: Area Groups Distribution (manual grouping)         -->
 <!-- ============================================================ -->
 <h2 style="font-size: 1.15rem; margin-bottom: 0.75rem; color: var(--primary-dark);">توزيع المناطق الرئيسية</h2>
 {% if group_data %}
@@ -306,6 +334,41 @@
         </div>
     </div>
 
+    <!-- Area/Neighborhood Pie (print version) -->
+    {% if area_data %}
+    <div style="page-break-inside: avoid; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.15rem; margin-bottom: 0.75rem; border-bottom: 1px solid #ddd; padding-bottom: 0.3rem;">توزيع المناطق / الأحياء</h2>
+        <div style="display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap;">
+            <div style="flex-shrink: 0;">
+                <canvas id="areaDbPiePrint" width="280" height="280"></canvas>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #333;">
+                            <th style="text-align: right; padding: 0.3rem 0.5rem;">المنطقة</th>
+                            <th style="text-align: center; padding: 0.3rem 0.5rem; width: 60px;">العدد</th>
+                            <th style="text-align: center; padding: 0.3rem 0.5rem; width: 60px;">النسبة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for area, count in area_data %}
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 0.25rem 0.5rem;">
+                                <span class="print-color-dot" data-idx="{{ loop.index0 }}"></span>
+                                {{ area }}
+                            </td>
+                            <td style="text-align: center; padding: 0.25rem 0.5rem; font-weight: 600;">{{ count }}</td>
+                            <td style="text-align: center; padding: 0.25rem 0.5rem;">{{ (count / total * 100)|round(1) if total else 0 }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Area Groups Pie (print version) -->
     {% if group_data %}
     <div style="page-break-inside: avoid; margin-bottom: 1.5rem;">
@@ -508,6 +571,7 @@ const areaGroups = {{ area_groups|tojson }};
 const provinceData = {{ province_data|tojson }};
 const addressData = {{ address_data|tojson }};
 const groupData = {{ group_data|tojson }};
+const areaDbData = {{ area_data|tojson }};
 const totalRecords = {{ total }};
 
 /* Selected sub-addresses for the form */
@@ -591,6 +655,12 @@ document.addEventListener('DOMContentLoaded', function() {
         drawPie('addressPie', addressData.slice(0, 10), 10);
     }
 
+    /* Area/neighborhood pie */
+    if (areaDbData.length) {
+        drawPie('areaDbPie', areaDbData, 12);
+        drawLegend('areaDbPie', areaDbData, 12);
+    }
+
     /* Screen legends */
     drawLegend('provincePie', provinceData, 10);
     if (groupData.length) drawLegend('areaPie', groupData.map(g => [g.name, g.total]), 10);
@@ -598,6 +668,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* Print pie charts (with counts shown) */
     drawPie('provincePiePrint', provinceData, 15, true);
+    if (areaDbData.length) {
+        drawPie('areaDbPiePrint', areaDbData, 15, true);
+    }
     if (groupData.length) {
         drawPie('areaPiePrint', groupData.map(g => [g.name, g.total]), 15, true);
     }

@@ -457,6 +457,15 @@
     <div class="form-section-title">&#x1F3E0; البيانات السكنية والاقتصادية</div>
     <div class="form-grid">
         <div class="form-group">
+            <label>المنطقة / الحي</label>
+            <select name="address_area">
+                <option value="">-- اختر المنطقة --</option>
+                {% for area in ADDRESS_AREAS %}
+                <option value="{{ area }}" {{ 'selected' if record.address_area == area }}>{{ area }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
             <label>العنوان</label>
             <input type="text" name="address" value="{{ record.address }}" required>
         </div>

@@ -718,8 +718,18 @@
         <div class="entry-section-title">&#x1F3E0; البيانات السكنية والاقتصادية</div>
         <div class="form-grid">
             <div class="form-group">
+                <label>المنطقة / الحي</label>
+                <select name="address_area" id="addressAreaSelect" onchange="onAreaChange()">
+                    <option value="">-- اختر المنطقة --</option>
+                    {% for area in ADDRESS_AREAS %}
+                    <option value="{{ area }}">{{ area }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
                 <label>العنوان الحالي <span class="required">*</span></label>
-                <input type="text" name="address" required placeholder="العنوان التفصيلي">
+                <input type="text" name="address" id="addressInput" required placeholder="العنوان التفصيلي" list="addressSuggestions" oninput="suggestArea()">
+                <datalist id="addressSuggestions"></datalist>
             </div>
             <div class="form-group">
                 <label>نوع السكن <span class="required">*</span></label>
@@ -1385,5 +1395,34 @@ function restoreMethodologyTags() {
 // Load draft on page load
 loadDraft();
 restoreMethodologyTags();
+
+/* ---- Address area auto-classification ---- */
+const ADDRESS_TO_AREA = {{ ADDRESS_TO_AREA|tojson }};
+const addressKeys = Object.keys(ADDRESS_TO_AREA);
+
+function suggestArea() {
+    const addr = document.getElementById('addressInput').value.trim();
+    const areaSelect = document.getElementById('addressAreaSelect');
+    if (!addr || areaSelect.value) return;
+    const match = ADDRESS_TO_AREA[addr];
+    if (match) {
+        areaSelect.value = match;
+    }
+}
+
+function onAreaChange() {
+    /* Build datalist suggestions based on selected area */
+    const area = document.getElementById('addressAreaSelect').value;
+    const dl = document.getElementById('addressSuggestions');
+    dl.innerHTML = '';
+    if (!area) return;
+    addressKeys.forEach(addr => {
+        if (ADDRESS_TO_AREA[addr] === area) {
+            const opt = document.createElement('option');
+            opt.value = addr;
+            dl.appendChild(opt);
+        }
+    });
+}
 </script>
 {% endblock %}

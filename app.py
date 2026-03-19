@@ -307,6 +307,58 @@ MARITAL_STATUSES = [
 
 HOUSING_TYPES = ['ملك', 'إيجار', 'رهن', 'مستضاف', 'أخرى']
 
+# Address area classifications (neighborhoods / districts)
+ADDRESS_AREAS = [
+    'الرمل الجنوبي', 'قنينص', 'الحفة', 'الصليبة', 'العوينة',
+    'الأشرفية', 'بستان الصيداوي', 'الطابيات', 'شيخ ضاهر',
+    'حي القصور', 'مرتقلا', 'شارع انطاكيا', 'حي السجن',
+    'مشروع القلعة', 'شارع ميسلون', 'سوق الداية', 'الريجي',
+    'شارع بور سعيد', 'حي الفاروس', 'طريق الحرش', 'خارج اللاذقية', 'أخرى'
+]
+
+# Map of known addresses to their area classification
+ADDRESS_TO_AREA = {
+    'اللاذقية -سوق التجار -بناء رومينزا': 'العوينة',
+    'جامع المشاطي': 'العوينة',
+    'اللاذقية': 'شيخ ضاهر',
+    'شارع هنانو': 'شيخ ضاهر',
+    '٨ اذار': 'شيخ ضاهر',
+    'ساحه حلوم': 'حي السجن',
+    'الرمل الشمالي': 'حي السجن',
+    'اوغاريت': 'الصليبة',
+    'ابي تمام': 'الصليبة',
+    'مشروع ب': 'الصليبة',
+    'الأشرفية': 'الصليبة',
+    'بستان الصيداوي': 'الصليبة',
+    ' بستان الصيداوي': 'الصليبة',
+    'اللاذقية خلف فرن الكرامة': 'الصليبة',
+    'طريق المستودعات': 'الصليبة',
+    'شارع الغافقي قرب جامع الجديد': 'الصليبة',
+    'قرب جامعة الشام': 'الصليبة',
+    'شارع بغداد - المشفى الوطني': 'الصليبة',
+    'جامع ياسين': 'الصليبة',
+    'ساحة اليمن': 'طريق الحرش',
+    'جامع خالد ابن الوليد': 'طريق الحرش',
+    'مقابل فندق ريفيرا': 'مشروع القلعة',
+    'مشروع السابع': 'قنينص',
+    'الرويسة بسنادا': 'قنينص',
+    'نزلة خالد ابن الوليد': 'الرمل الجنوبي',
+    'مشروع ب بجانب مدرسة الاشتراكية': 'الرمل الجنوبي',
+    'المشروع الثاني': 'الرمل الجنوبي',
+    'تركيا': 'خارج اللاذقية',
+    'صليب التركمان': 'خارج اللاذقية',
+    'ابن هاني': 'خارج اللاذقية',
+    'جبلة ، العمارة': 'خارج اللاذقية',
+    'البصه شيخ الحمى': 'خارج اللاذقية',
+    'مخيم سلمى ١ - خربة الجوز': 'خارج اللاذقية',
+    'البدروسية': 'خارج اللاذقية',
+    'سلمى': 'خارج اللاذقية',
+    'الحب والرويسة': 'خارج اللاذقية',
+    'دمشق / صهيا': 'خارج اللاذقية',
+    'تركيا - غازي عنتاب': 'خارج اللاذقية',
+    'وادي الشيخان': 'خارج اللاذقية',
+}
+
 CHRONIC_DISEASES = [
     'ضغط الدم', 'السكري', 'الربو', 'أمراض القلب', 'الكلى',
     'الكبد', 'السرطان', 'الصرع', 'الثلاسيميا', 'فقر الدم',
@@ -553,6 +605,7 @@ def migrate_db():
         'survivor_cv_text': "TEXT DEFAULT ''",
         'survivor_cv_photo_path': "TEXT DEFAULT ''",
         'family_book_number': "TEXT DEFAULT ''",
+        'address_area': "TEXT DEFAULT ''",
     }
 
     for col, typedef in new_columns.items():
@@ -964,6 +1017,8 @@ def inject_constants():
         'EDU_TYPES': EDU_TYPES,
         'MARITAL_STATUSES': MARITAL_STATUSES,
         'HOUSING_TYPES': HOUSING_TYPES,
+        'ADDRESS_AREAS': ADDRESS_AREAS,
+        'ADDRESS_TO_AREA': ADDRESS_TO_AREA,
         'CHRONIC_DISEASES': CHRONIC_DISEASES,
         'REPORTER_RELATIONS': REPORTER_RELATIONS,
         'PDF_COLUMNS': PDF_COLUMNS,
@@ -1187,7 +1242,8 @@ def entry_submit():
         source_type, collection_date, collector_name,
         verification_status, methodology_notes,
         record_slug, photo_hash, document_hash,
-        survivor_cv_path, survivor_cv_text, survivor_cv_photo_path
+        survivor_cv_path, survivor_cv_text, survivor_cv_photo_path,
+        address_area
     ) VALUES (
         ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?, ?,?,?,?,
         ?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?,?,
@@ -1195,7 +1251,7 @@ def entry_submit():
         ?,?, ?,?,?,?, ?,?, ?,?,?,?,?, ?,
         ?,?,?,?,?, ?,?, ?,?,?, ?,?, ?,?, ?,
         ?,?,?, ?,?, ?,?, ?,?, ?,
-        ?,?,?, ?,?, ?,?,?, ?,?,?
+        ?,?,?, ?,?, ?,?,?, ?,?,?,?
     )""", (
         form.get('first_name', ''), form.get('father_name', ''), form.get('last_name', ''),
         form.get('gender', ''), form.get('mother_name', ''),
@@ -1262,7 +1318,8 @@ def entry_submit():
         form.get('collector_name', ''),
         'Unverified', form.get('methodology_notes', ''),
         slug, photo_hash, doc_hash,
-        cv_path, form.get('survivor_cv_text', ''), cv_photo_path
+        cv_path, form.get('survivor_cv_text', ''), cv_photo_path,
+        form.get('address_area', '')
     ))
 
     # Use retry logic for concurrent access
@@ -2471,7 +2528,8 @@ def admin_record_edit(record_id):
             source_type=?, collection_date=?, collector_name=?,
             verification_status=?, methodology_notes=?,
             photo_hash=?, document_hash=?,
-            survivor_cv_path=?, survivor_cv_text=?, survivor_cv_photo_path=?
+            survivor_cv_path=?, survivor_cv_text=?, survivor_cv_photo_path=?,
+            address_area=?
         WHERE id=?""", (
             form.get('first_name', ''), form.get('father_name', ''), form.get('last_name', ''),
             form.get('gender', ''), form.get('mother_name', ''),
@@ -2540,6 +2598,7 @@ def admin_record_edit(record_id):
             form.get('methodology_notes', ''),
             photo_hash, doc_hash,
             cv_path, form.get('survivor_cv_text', ''), cv_photo_path,
+            form.get('address_area', ''),
             record_id
         ))
 
@@ -5491,6 +5550,7 @@ def admin_location_report():
     status_filter = request.args.get('status', '')
 
     # Build query based on source
+    has_area_col = False
     if data_source == 'volunteers':
         base_q = "SELECT province, address FROM volunteers WHERE 1=1"
         params = []
@@ -5504,7 +5564,8 @@ def admin_location_report():
             base_q += " AND status = ?"
             params.append(status_filter)
     else:
-        base_q = "SELECT province, address FROM records WHERE 1=1"
+        base_q = "SELECT province, address, address_area FROM records WHERE 1=1"
+        has_area_col = True
         params = []
         if status_filter:
             base_q += " AND status = ?"
@@ -5512,18 +5573,26 @@ def admin_location_report():
 
     rows = db.execute(base_q, params).fetchall()
 
-    # Province distribution
+    # Province distribution + area counts from DB
     province_counts = {}
     address_counts = {}
+    area_counts = {}
     for r in rows:
         prov = r['province'] or 'غير محدد'
         province_counts[prov] = province_counts.get(prov, 0) + 1
         addr = (r['address'] or '').strip()
         if addr:
             address_counts[addr] = address_counts.get(addr, 0) + 1
+        if has_area_col:
+            area = (r['address_area'] or '').strip()
+            if not area and addr:
+                area = ADDRESS_TO_AREA.get(addr, '')
+            if area:
+                area_counts[area] = area_counts.get(area, 0) + 1
 
     province_sorted = sorted(province_counts.items(), key=lambda x: x[1], reverse=True)
     address_sorted = sorted(address_counts.items(), key=lambda x: x[1], reverse=True)
+    area_sorted = sorted(area_counts.items(), key=lambda x: x[1], reverse=True)
 
     # Load area groups and compute totals
     area_groups = load_area_groups()
@@ -5568,6 +5637,8 @@ def admin_location_report():
                            unclassified=unclassified,
                            total=len(rows),
                            PROVINCES=PROVINCES,
+                           area_data=area_sorted,
+                           ADDRESS_TO_AREA=ADDRESS_TO_AREA,
                            report_date=datetime.now().strftime('%Y-%m-%d'))
 
 

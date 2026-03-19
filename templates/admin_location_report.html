@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+{% block title %}تقرير التوزيع الجغرافي - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">تقرير التوزيع الجغرافي</h1>
+    <div class="btn-group no-print">
+        <button onclick="window.print()" class="btn btn-primary btn-sm">طباعة</button>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline btn-sm">لوحة التحكم</a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card no-print" style="margin-bottom: 1rem; padding: 1rem;">
+    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <label style="font-weight: 600; font-size: 0.9rem;">مصدر البيانات:</label>
+        <select id="sourceSelect" onchange="applyFilters()" style="padding: 0.35rem 0.6rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem;">
+            <option value="records" {{ 'selected' if data_source=='records' }}>السجلات</option>
+            <option value="volunteers" {{ 'selected' if data_source=='volunteers' }}>المتطوعون</option>
+            <option value="members" {{ 'selected' if data_source=='members' }}>المنتسبون</option>
+        </select>
+        <label style="font-weight: 600; font-size: 0.9rem;">الحالة:</label>
+        <select id="statusSelect" onchange="applyFilters()" style="padding: 0.35rem 0.6rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem;">
+            <option value="">الكل</option>
+            {% for s in statuses %}
+            <option value="{{ s }}" {{ 'selected' if status_filter==s }}>
+                {% if s == 'survivor' %}ناجٍ{% elif s == 'enforced' %}مغيّب قسراً{% elif s == 'deceased' %}متوفى{% elif s == 'active' %}نشط{% elif s == 'inactive' %}غير نشط{% else %}{{ s }}{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+        <span style="font-size: 0.85rem; color: var(--text-light);">إجمالي: <strong>{{ total }}</strong></span>
+    </div>
+</div>
+
+<!-- Summary stat cards -->
+<div class="stats-grid" style="margin-bottom: 1rem;">
+    <div class="stat-card stat-total">
+        <div class="stat-number">{{ total }}</div>
+        <div class="stat-label">إجمالي</div>
+    </div>
+    <div class="stat-card" style="background: #e8f5e9; border-right: 4px solid #4caf50;">
+        <div class="stat-number" style="color: #2e7d32;">{{ province_data|length }}</div>
+        <div class="stat-label">محافظات</div>
+    </div>
+    <div class="stat-card" style="background: #e3f2fd; border-right: 4px solid #1976d2;">
+        <div class="stat-number" style="color: #1565c0;">{{ group_data|length }}</div>
+        <div class="stat-label">مجموعات مناطق</div>
+    </div>
+    <div class="stat-card" style="background: #fff3e0; border-right: 4px solid #ff9800;">
+        <div class="stat-number" style="color: #e65100;">{{ address_data|length }}</div>
+        <div class="stat-label">عناوين فريدة</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <!-- Province Chart -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F3D9;&#xFE0F;</div>
+            <h3>التوزيع حسب المحافظة</h3>
+        </div>
+        <div class="chart-bar-container">
+            {% set max_prov = province_data[0][1] if province_data else 1 %}
+            {% for prov, count in province_data %}
+            <div class="chart-bar-item">
+                <span class="chart-bar-label">{{ prov }}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (count / max_prov * 100)|round(1) }}%;">
+                        {{ count }}
+                    </div>
+                </div>
+                <span style="font-size: 0.78rem; color: var(--text-light); min-width: 40px; text-align: left;">{{ (count / total * 100)|round(1) if total else 0 }}%</span>
+            </div>
+            {% endfor %}
+            {% if not province_data %}
+            <p style="color: var(--text-light); text-align: center; padding: 2rem 0;">لا توجد بيانات</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Area Groups Chart -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-icon">&#x1F4CD;</div>
+            <h3>التوزيع حسب المناطق المجمّعة</h3>
+        </div>
+        {% if group_data %}
+        <div class="chart-bar-container">
+            {% set max_grp = (group_data|map(attribute='total')|max) or 1 %}
+            {% for grp in group_data|sort(attribute='total', reverse=True) %}
+            <div class="chart-bar-item">
+                <span class="chart-bar-label" title="{{ grp.provinces|join('، ') }}">{{ grp.name }}</span>
+                <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: {{ (grp.total / max_grp * 100)|round(1) }}%; background: linear-gradient(90deg, #7c3aed, #a78bfa);">
+                        {{ grp.total }}
+                    </div>
+                </div>
+                <span style="font-size: 0.78rem; color: var(--text-light); min-width: 40px; text-align: left;">{{ (grp.total / total * 100)|round(1) if total else 0 }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% if ungrouped %}
+        <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <div style="font-size: 0.82rem; color: var(--text-light); margin-bottom: 0.4rem; font-weight: 600;">غير مجمّعة:</div>
+            {% set max_ug = ungrouped[0][1] if ungrouped else 1 %}
+            <div class="chart-bar-container">
+                {% for prov, count in ungrouped %}
+                <div class="chart-bar-item">
+                    <span class="chart-bar-label">{{ prov }}</span>
+                    <div class="chart-bar-track">
+                        <div class="chart-bar-fill" style="width: {{ (count / max_ug * 100)|round(1) }}%; background: linear-gradient(90deg, #78909c, #b0bec5);">
+                            {{ count }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p style="color: var(--text-light); text-align: center; padding: 2rem 0;">لم يتم إنشاء مجموعات مناطق بعد.<br>استخدم الأداة أدناه لتجميع المحافظات.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Top Addresses Table -->
+{% if address_data %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <div class="card-icon">&#x1F3E0;</div>
+        <h3>أكثر العناوين تكراراً</h3>
+    </div>
+    <div style="overflow-x: auto;">
+        <table class="data-table" style="font-size: 0.88rem;">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>العنوان</th>
+                    <th style="width: 80px;">العدد</th>
+                    <th style="width: 80px;">النسبة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for addr, count in address_data[:30] %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ addr }}</td>
+                    <td><strong>{{ count }}</strong></td>
+                    <td>{{ (count / total * 100)|round(1) if total else 0 }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Area Grouping Tool -->
+<div class="card no-print" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <div class="card-icon">&#x2699;&#xFE0F;</div>
+        <h3>أداة تجميع المناطق</h3>
+    </div>
+    <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 1rem;">
+        أنشئ مجموعات مناطق لتجميع عدة محافظات أو عناوين تحت اسم واحد في التقرير.
+    </p>
+
+    <!-- Existing Groups -->
+    <div id="existingGroups" style="margin-bottom: 1rem;">
+        {% for grp in area_groups %}
+        <div class="area-group-tag" data-name="{{ grp.name }}">
+            <strong>{{ grp.name }}</strong>
+            <span style="font-size: 0.8rem; color: var(--text-light);">
+                ({{ grp.provinces|join('، ') }}{% if grp.addresses %} + {{ grp.addresses|length }} عنوان{% endif %})
+            </span>
+            <button onclick="editGroup('{{ grp.name }}')" class="btn btn-outline btn-sm" style="padding: 0.1rem 0.4rem; font-size: 0.75rem; margin-right: 0.3rem;">تعديل</button>
+            <button onclick="deleteGroup('{{ grp.name }}')" class="btn btn-danger btn-sm" style="padding: 0.1rem 0.4rem; font-size: 0.75rem;">حذف</button>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- New Group Form -->
+    <div style="background: var(--bg); border-radius: 8px; padding: 1rem; border: 1px solid var(--border);">
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;">
+            <label style="font-weight: 600; font-size: 0.9rem;">اسم المنطقة:</label>
+            <input type="text" id="groupName" placeholder="مثال: الساحل، الجنوب..." style="padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem; flex: 1; min-width: 180px;">
+        </div>
+
+        <div style="margin-bottom: 0.75rem;">
+            <label style="font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 0.4rem;">اختر المحافظات:</label>
+            <div id="provinceCheckboxes" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                {% for prov in PROVINCES %}
+                <label class="chip-checkbox">
+                    <input type="checkbox" name="group_province" value="{{ prov }}">
+                    <span class="chip-label">{{ prov }}
+                        {% if province_data %}
+                        <small style="opacity: 0.7;">({% for p, c in province_data %}{% if p == prov %}{{ c }}{% endif %}{% endfor %})</small>
+                        {% endif %}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if address_data %}
+        <div style="margin-bottom: 0.75rem;">
+            <label style="font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 0.4rem;">اختر عناوين (اختياري):</label>
+            <div style="max-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem;">
+                <input type="text" id="addressSearch" placeholder="بحث في العناوين..." oninput="filterAddresses()" style="width: 100%; padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.4rem; font-size: 0.85rem;">
+                <div id="addressCheckboxes">
+                    {% for addr, count in address_data %}
+                    <label class="addr-checkbox" style="display: flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0; font-size: 0.85rem; cursor: pointer;">
+                        <input type="checkbox" name="group_address" value="{{ addr }}">
+                        <span>{{ addr }} <small style="color: var(--text-light);">({{ count }})</small></span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div style="display: flex; gap: 0.5rem;">
+            <button onclick="saveGroup()" class="btn btn-primary btn-sm">حفظ المجموعة</button>
+            <button onclick="clearForm()" class="btn btn-outline btn-sm">مسح</button>
+        </div>
+    </div>
+</div>
+
+<!-- Province detail table (for print) -->
+<div class="card print-only" style="margin-bottom: 1rem;">
+    <h3 style="margin-bottom: 0.5rem;">التوزيع التفصيلي حسب المحافظة</h3>
+    <table class="data-table" style="font-size: 0.85rem;">
+        <thead>
+            <tr><th>#</th><th>المحافظة</th><th>العدد</th><th>النسبة</th></tr>
+        </thead>
+        <tbody>
+            {% for prov, count in province_data %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ prov }}</td>
+                <td>{{ count }}</td>
+                <td>{{ (count / total * 100)|round(1) if total else 0 }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if group_data %}
+<div class="card print-only" style="margin-bottom: 1rem;">
+    <h3 style="margin-bottom: 0.5rem;">التوزيع حسب المناطق المجمّعة</h3>
+    <table class="data-table" style="font-size: 0.85rem;">
+        <thead>
+            <tr><th>#</th><th>المنطقة</th><th>المحافظات</th><th>العدد</th><th>النسبة</th></tr>
+        </thead>
+        <tbody>
+            {% for grp in group_data|sort(attribute='total', reverse=True) %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><strong>{{ grp.name }}</strong></td>
+                <td style="font-size: 0.8rem;">{{ grp.provinces|join('، ') }}</td>
+                <td>{{ grp.total }}</td>
+                <td>{{ (grp.total / total * 100)|round(1) if total else 0 }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .area-group-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.4rem 0.75rem;
+        margin: 0.2rem;
+        font-size: 0.88rem;
+    }
+    .chip-checkbox {
+        display: inline-flex;
+        cursor: pointer;
+    }
+    .chip-checkbox input { display: none; }
+    .chip-label {
+        padding: 0.3rem 0.7rem;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        font-size: 0.85rem;
+        transition: all 0.15s;
+        user-select: none;
+    }
+    .chip-checkbox input:checked + .chip-label {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+    }
+    .chip-checkbox:hover .chip-label {
+        border-color: var(--primary);
+    }
+    .print-only { display: none; }
+    @media print {
+        .no-print { display: none !important; }
+        .print-only { display: block !important; }
+    }
+    @media (max-width: 600px) {
+        div[style*="grid-template-columns"] {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const areaGroups = {{ area_groups|tojson }};
+
+function applyFilters() {
+    const source = document.getElementById('sourceSelect').value;
+    const status = document.getElementById('statusSelect').value;
+    let url = '{{ url_for("admin_location_report") }}?source=' + source;
+    if (status) url += '&status=' + encodeURIComponent(status);
+    location.href = url;
+}
+
+function filterAddresses() {
+    const q = document.getElementById('addressSearch').value.toLowerCase();
+    document.querySelectorAll('.addr-checkbox').forEach(el => {
+        el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+function saveGroup() {
+    const name = document.getElementById('groupName').value.trim();
+    if (!name) { alert('يرجى إدخال اسم المنطقة'); return; }
+
+    const provinces = Array.from(document.querySelectorAll('input[name="group_province"]:checked')).map(cb => cb.value);
+    const addresses = Array.from(document.querySelectorAll('input[name="group_address"]:checked')).map(cb => cb.value);
+
+    if (!provinces.length && !addresses.length) {
+        alert('يرجى اختيار محافظة أو عنوان واحد على الأقل');
+        return;
+    }
+
+    fetch('{{ url_for("api_area_groups") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, provinces, addresses})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) location.reload();
+        else alert(data.error || 'حدث خطأ');
+    });
+}
+
+function deleteGroup(name) {
+    if (!confirm('حذف المجموعة "' + name + '"؟')) return;
+    fetch('{{ url_for("api_area_groups") }}', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name})
+    })
+    .then(r => r.json())
+    .then(data => { if (data.ok) location.reload(); });
+}
+
+function editGroup(name) {
+    const grp = areaGroups.find(g => g.name === name);
+    if (!grp) return;
+    document.getElementById('groupName').value = grp.name;
+    // Check provinces
+    document.querySelectorAll('input[name="group_province"]').forEach(cb => {
+        cb.checked = grp.provinces.includes(cb.value);
+    });
+    // Check addresses
+    document.querySelectorAll('input[name="group_address"]').forEach(cb => {
+        cb.checked = (grp.addresses || []).includes(cb.value);
+    });
+    document.getElementById('groupName').focus();
+}
+
+function clearForm() {
+    document.getElementById('groupName').value = '';
+    document.querySelectorAll('input[name="group_province"], input[name="group_address"]').forEach(cb => cb.checked = false);
+}
+</script>
+{% endblock %}

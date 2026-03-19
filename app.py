@@ -5458,6 +5458,147 @@ def save_server_config(cfg):
         json.dump(cfg, f, indent=2)
 
 
+AREA_GROUPS_FILE = os.path.join(BASE_DIR, 'area_groups.json')
+
+
+def load_area_groups():
+    """Load saved area groups from JSON file."""
+    if os.path.exists(AREA_GROUPS_FILE):
+        try:
+            with open(AREA_GROUPS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return []
+
+
+def save_area_groups(groups):
+    """Persist area groups to JSON file."""
+    with open(AREA_GROUPS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(groups, f, ensure_ascii=False, indent=2)
+
+
+@app.route('/admin/location-report')
+@admin_required
+def admin_location_report():
+    """Location report with geographic distribution charts and area grouping."""
+    db = get_db()
+    data_source = request.args.get('source', 'records')
+    status_filter = request.args.get('status', '')
+
+    # Build query based on source
+    if data_source == 'volunteers':
+        base_q = "SELECT province, address FROM volunteers WHERE 1=1"
+        params = []
+        status_col = 'status'
+        if status_filter:
+            base_q += f" AND {status_col} = ?"
+            params.append(status_filter)
+    elif data_source == 'members':
+        base_q = "SELECT province, address FROM members WHERE 1=1"
+        params = []
+        if status_filter:
+            base_q += " AND status = ?"
+            params.append(status_filter)
+    else:
+        base_q = "SELECT province, address FROM records WHERE 1=1"
+        params = []
+        if status_filter:
+            base_q += " AND status = ?"
+            params.append(status_filter)
+
+    rows = db.execute(base_q, params).fetchall()
+
+    # Province distribution
+    province_counts = {}
+    address_counts = {}
+    for r in rows:
+        prov = r['province'] or 'غير محدد'
+        province_counts[prov] = province_counts.get(prov, 0) + 1
+        addr = (r['address'] or '').strip()
+        if addr:
+            address_counts[addr] = address_counts.get(addr, 0) + 1
+
+    # Sort by count descending
+    province_sorted = sorted(province_counts.items(), key=lambda x: x[1], reverse=True)
+    address_sorted = sorted(address_counts.items(), key=lambda x: x[1], reverse=True)[:50]
+
+    # Load saved area groups and compute their totals
+    area_groups = load_area_groups()
+    group_data = []
+    grouped_provinces = set()
+    for grp in area_groups:
+        total = sum(province_counts.get(p, 0) for p in grp.get('provinces', []))
+        addr_total = sum(address_counts.get(a, 0) for a in grp.get('addresses', []))
+        group_data.append({
+            'name': grp['name'],
+            'provinces': grp.get('provinces', []),
+            'addresses': grp.get('addresses', []),
+            'total': total + addr_total,
+        })
+        grouped_provinces.update(grp.get('provinces', []))
+
+    # Ungrouped provinces (not in any area group)
+    ungrouped = [(p, c) for p, c in province_sorted if p not in grouped_provinces]
+
+    # Available statuses for the filter
+    if data_source == 'volunteers':
+        statuses = [r[0] for r in db.execute("SELECT DISTINCT status FROM volunteers WHERE status IS NOT NULL AND status != ''").fetchall()]
+    elif data_source == 'members':
+        statuses = [r[0] for r in db.execute("SELECT DISTINCT status FROM members WHERE status IS NOT NULL AND status != ''").fetchall()]
+    else:
+        statuses = ['survivor', 'enforced', 'deceased']
+
+    return render_template('admin_location_report.html',
+                           data_source=data_source,
+                           status_filter=status_filter,
+                           statuses=statuses,
+                           province_data=province_sorted,
+                           address_data=address_sorted,
+                           group_data=group_data,
+                           area_groups=area_groups,
+                           ungrouped=ungrouped,
+                           total=len(rows),
+                           PROVINCES=PROVINCES)
+
+
+@app.route('/api/area-groups', methods=['GET', 'POST', 'DELETE'])
+@admin_required
+def api_area_groups():
+    """CRUD API for area groups."""
+    if request.method == 'GET':
+        return jsonify(load_area_groups())
+
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'error': 'اسم المنطقة مطلوب'}), 400
+        provinces = data.get('provinces', [])
+        addresses = data.get('addresses', [])
+        if not provinces and not addresses:
+            return jsonify({'error': 'يجب اختيار محافظة أو عنوان واحد على الأقل'}), 400
+
+        groups = load_area_groups()
+        # Update existing or add new
+        existing = next((g for g in groups if g['name'] == name), None)
+        if existing:
+            existing['provinces'] = provinces
+            existing['addresses'] = addresses
+        else:
+            groups.append({'name': name, 'provinces': provinces, 'addresses': addresses})
+        save_area_groups(groups)
+        return jsonify({'ok': True, 'groups': groups})
+
+    if request.method == 'DELETE':
+        data = request.get_json(silent=True) or {}
+        name = data.get('name', '')
+        groups = load_area_groups()
+        groups = [g for g in groups if g['name'] != name]
+        save_area_groups(groups)
+        return jsonify({'ok': True, 'groups': groups})
+
+
 @app.route('/admin/server-config', methods=['GET', 'POST'])
 @admin_required
 def admin_server_config():

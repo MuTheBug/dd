@@ -128,6 +128,7 @@
         <div class="card-header">
             <div class="card-icon">&#x1F3D9;&#xFE0F;</div>
             <h3>التوزيع حسب المحافظة</h3>
+            <a href="{{ url_for('admin_location_report') }}" class="btn btn-outline btn-sm" style="font-size: 0.75rem;">تقرير مفصّل</a>
         </div>
         <div class="chart-bar-container">
             {% set max_prov = stats.province_stats[0][1] if stats.province_stats else 1 %}

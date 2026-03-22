@@ -356,6 +356,9 @@ function clExportPdf() {
     form.action = '{{ url_for("admin_custom_list_pdf", lid=clist.id) }}';
     form.target = '_blank';
     form.style.display = 'none';
+    var csrf = document.createElement('input');
+    csrf.type = 'hidden'; csrf.name = '_csrf_token'; csrf.value = '{{ csrf_token() }}';
+    form.appendChild(csrf);
     for (var i = 0; i < cols.length; i++) {
         var inp = document.createElement('input');
         inp.type = 'hidden'; inp.name = 'cols'; inp.value = cols[i];
@@ -374,6 +377,9 @@ function clExportExcel() {
     form.method = 'POST';
     form.action = '{{ url_for("admin_custom_list_excel", lid=clist.id) }}';
     form.style.display = 'none';
+    var csrf = document.createElement('input');
+    csrf.type = 'hidden'; csrf.name = '_csrf_token'; csrf.value = '{{ csrf_token() }}';
+    form.appendChild(csrf);
     for (var i = 0; i < cols.length; i++) {
         var inp = document.createElement('input');
         inp.type = 'hidden'; inp.name = 'cols'; inp.value = cols[i];

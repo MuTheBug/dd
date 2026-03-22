@@ -890,6 +890,7 @@
                         <div class="btn-group" style="flex-wrap: nowrap;">
                             <a href="{{ url_for('admin_record_detail', record_id=r.id, return_to=request.full_path) }}" class="btn btn-primary btn-sm" title="عرض">&#x1F441;</a>
                             <a href="{{ url_for('admin_record_edit', record_id=r.id, return_to=request.full_path) }}" class="btn btn-outline btn-sm" title="تعديل">&#x270F;&#xFE0F;</a>
+                            <button type="button" class="btn btn-outline btn-sm" title="إضافة لقائمة" onclick="openAddToListModal({{ r.id }}, '{{ r.first_name }} {{ r.father_name }} {{ r.last_name }}')" style="color:#7c3aed; border-color:#7c3aed;">&#x1F4CB;</button>
                         </div>
                     </td>
                 </tr>
@@ -1064,6 +1065,34 @@
         <p style="text-align:center; padding:2rem; color:var(--text-light); font-size:1rem;">اضغط "تحميل" لعرض السجلات</p>
     </div>
 </div>
+<!-- Add to List Modal -->
+<div id="addToListModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:var(--card-bg); border-radius:12px; padding:1.5rem; max-width:400px; width:90%; box-shadow:0 8px 30px rgba(0,0,0,0.3); position:relative;">
+        <button onclick="closeAddToListModal()" style="position:absolute; top:0.5rem; left:0.5rem; background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-light);">&times;</button>
+        <h3 style="margin-bottom:0.3rem; font-size:1.1rem; color:var(--primary-dark);">&#x1F4CB; إضافة لقائمة</h3>
+        <p id="addToListRecordName" style="font-size:0.85rem; color:var(--text-light); margin-bottom:1rem;"></p>
+        <input type="hidden" id="addToListRecordId">
+
+        <div style="margin-bottom:1rem;">
+            <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:0.3rem;">اختر قائمة:</label>
+            <select id="addToListSelect" style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:8px; font-size:0.95rem;">
+                <option value="">جاري التحميل...</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom:1rem; padding-top:0.8rem; border-top:1px dashed var(--border);">
+            <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:0.3rem;">أو إنشاء قائمة جديدة:</label>
+            <input type="text" id="addToListNewName" placeholder="اسم القائمة الجديدة" style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:8px; font-size:0.95rem; box-sizing:border-box;">
+        </div>
+
+        <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+            <button onclick="closeAddToListModal()" class="btn btn-outline btn-sm">إلغاء</button>
+            <button onclick="submitAddToList()" class="btn btn-primary btn-sm" id="addToListSubmitBtn">إضافة</button>
+        </div>
+        <div id="addToListMsg" style="margin-top:0.8rem; font-size:0.85rem; display:none;"></div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -1116,6 +1145,83 @@ function deleteSavedFilter() {
     });
 }
 document.addEventListener('DOMContentLoaded', loadSavedFiltersList);
+
+// Add to List Modal
+var _addToListCache = null;
+function openAddToListModal(recordId, recordName) {
+    document.getElementById('addToListRecordId').value = recordId;
+    document.getElementById('addToListRecordName').textContent = recordName + ' (#' + recordId + ')';
+    document.getElementById('addToListNewName').value = '';
+    document.getElementById('addToListMsg').style.display = 'none';
+    document.getElementById('addToListModal').style.display = 'flex';
+    // Load lists
+    var sel = document.getElementById('addToListSelect');
+    if (_addToListCache) {
+        _populateListSelect(sel, _addToListCache);
+    } else {
+        sel.innerHTML = '<option value="">جاري التحميل...</option>';
+        fetch('/api/custom_lists_json').then(function(r){return r.json();}).then(function(lists){
+            _addToListCache = lists;
+            _populateListSelect(sel, lists);
+        });
+    }
+}
+function _populateListSelect(sel, lists) {
+    sel.innerHTML = '<option value="">-- اختر قائمة --</option>';
+    lists.forEach(function(l) {
+        var opt = document.createElement('option');
+        opt.value = l.id;
+        opt.textContent = l.name + ' (' + l.count + ')';
+        sel.appendChild(opt);
+    });
+}
+function closeAddToListModal() {
+    document.getElementById('addToListModal').style.display = 'none';
+}
+function submitAddToList() {
+    var recordId = parseInt(document.getElementById('addToListRecordId').value);
+    var listId = document.getElementById('addToListSelect').value;
+    var newName = document.getElementById('addToListNewName').value.trim();
+    var msgEl = document.getElementById('addToListMsg');
+
+    if (!listId && !newName) {
+        msgEl.style.display = 'block';
+        msgEl.style.color = '#dc2626';
+        msgEl.textContent = 'اختر قائمة أو أدخل اسم قائمة جديدة';
+        return;
+    }
+
+    var body = { record_id: recordId };
+    if (newName) {
+        body.new_list_name = newName;
+    } else {
+        body.list_id = parseInt(listId);
+    }
+
+    document.getElementById('addToListSubmitBtn').disabled = true;
+    fetch('/api/add_record_to_list', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    }).then(function(r){return r.json();}).then(function(data){
+        document.getElementById('addToListSubmitBtn').disabled = false;
+        msgEl.style.display = 'block';
+        if (data.success) {
+            msgEl.style.color = '#059669';
+            msgEl.textContent = 'تم إضافة السجل إلى: ' + data.list_name;
+            _addToListCache = null; // invalidate cache
+            setTimeout(closeAddToListModal, 1200);
+        } else {
+            msgEl.style.color = '#dc2626';
+            msgEl.textContent = data.error || 'حدث خطأ';
+        }
+    }).catch(function(){
+        document.getElementById('addToListSubmitBtn').disabled = false;
+        msgEl.style.display = 'block';
+        msgEl.style.color = '#dc2626';
+        msgEl.textContent = 'خطأ في الاتصال';
+    });
+}
 
 // Record management state
 var orderedRecords = [];  // final ordered list [{id, first_name, father_name, last_name}, ...]

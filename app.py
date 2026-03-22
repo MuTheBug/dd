@@ -5007,6 +5007,39 @@ def api_custom_lists_json():
     return jsonify([{'id': l['id'], 'name': l['name'], 'count': l['item_count']} for l in lists])
 
 
+@app.route('/api/add_record_to_list', methods=['POST'])
+@admin_required
+def api_add_record_to_list():
+    """Add a single record to a custom list via AJAX."""
+    data = request.get_json()
+    record_id = data.get('record_id')
+    list_id = data.get('list_id')
+    new_list_name = (data.get('new_list_name') or '').strip()
+
+    if not record_id:
+        return jsonify({'success': False, 'error': 'سجل غير محدد'}), 400
+
+    db = get_db()
+
+    # Create new list if requested
+    if new_list_name:
+        cursor = db.execute("INSERT INTO custom_lists (name) VALUES (?)", (new_list_name,))
+        db.commit()
+        list_id = cursor.lastrowid
+    elif not list_id:
+        return jsonify({'success': False, 'error': 'قائمة غير محددة'}), 400
+
+    try:
+        db.execute("INSERT INTO custom_list_items (list_id, record_id) VALUES (?, ?)",
+                   (list_id, record_id))
+        db.commit()
+        list_name = db.execute("SELECT name FROM custom_lists WHERE id=?", (list_id,)).fetchone()
+        return jsonify({'success': True, 'list_name': list_name['name'] if list_name else '', 'list_id': list_id})
+    except sqlite3.IntegrityError:
+        list_name = db.execute("SELECT name FROM custom_lists WHERE id=?", (list_id,)).fetchone()
+        return jsonify({'success': False, 'error': 'السجل موجود مسبقاً في القائمة', 'list_name': list_name['name'] if list_name else ''})
+
+
 @app.route('/admin/list/<int:lid>/add', methods=['POST'])
 @admin_required
 def admin_list_add_record(lid):

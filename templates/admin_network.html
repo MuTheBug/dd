@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}شبكة العلاقات - حقنا{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+    <h2 style="font-size:1.3rem;">شبكة العلاقات والروابط</h2>
+    <div>
+        <span style="font-size:0.85rem; color:var(--text-light);" id="netInfo">جاري التحميل...</span>
+    </div>
+</div>
+<div style="background:var(--card-bg); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:relative;">
+    <canvas id="netCanvas" style="width:100%; height:600px; display:block;"></canvas>
+    <div id="tooltip" style="display:none; position:absolute; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; padding:0.5rem 0.8rem; font-size:0.85rem; box-shadow:0 2px 8px rgba(0,0,0,0.15); pointer-events:none; z-index:10;"></div>
+</div>
+<div style="margin-top:0.8rem; display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:var(--text-light);">
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#27ae60;vertical-align:middle;"></span> ناجٍ</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e67e22;vertical-align:middle;"></span> مغيّب</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e74c3c;vertical-align:middle;"></span> متوفى</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#95a5a6;vertical-align:middle;"></span> غير محدد</span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+    var canvas = document.getElementById('netCanvas');
+    var ctx = canvas.getContext('2d');
+    var tooltip = document.getElementById('tooltip');
+    var nodes = [], edges = [], nodeMap = {};
+    var W, H, dpr;
+    var dragging = null, offsetX = 0, offsetY = 0;
+    var hovered = null;
+
+    function resize() {
+        dpr = window.devicePixelRatio || 1;
+        W = canvas.clientWidth;
+        H = canvas.clientHeight;
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', function(){ resize(); draw(); });
+
+    var colors = {survivor:'#27ae60', enforced:'#e67e22', deceased:'#e74c3c'};
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+        // edges
+        ctx.lineWidth = 1.5;
+        edges.forEach(function(e){
+            var a = nodeMap[e.source], b = nodeMap[e.target];
+            if (!a || !b) return;
+            ctx.strokeStyle = e.type === 'companion' ? '#3b82f6' : '#94a3b8';
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            // label
+            var mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+            ctx.fillStyle = '#64748b'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(e.label.substring(0,15), mx, my - 4);
+        });
+        // nodes
+        nodes.forEach(function(n){
+            var r = hovered === n ? 10 : 7;
+            ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI*2);
+            ctx.fillStyle = colors[n.status] || '#95a5a6';
+            ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            // name
+            ctx.fillStyle = 'var(--text, #333)'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(n.name.substring(0, 20), n.x, n.y - 12);
+        });
+    }
+
+    // Simple force simulation
+    function simulate(iterations) {
+        for (var iter = 0; iter < iterations; iter++) {
+            // Repulsion between all nodes
+            for (var i = 0; i < nodes.length; i++) {
+                for (var j = i+1; j < nodes.length; j++) {
+                    var dx = nodes[j].x - nodes[i].x;
+                    var dy = nodes[j].y - nodes[i].y;
+                    var dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                    var force = 2000 / (dist * dist);
+                    var fx = dx/dist * force, fy = dy/dist * force;
+                    nodes[i].vx -= fx; nodes[i].vy -= fy;
+                    nodes[j].vx += fx; nodes[j].vy += fy;
+                }
+            }
+            // Attraction along edges
+            edges.forEach(function(e){
+                var a = nodeMap[e.source], b = nodeMap[e.target];
+                if (!a || !b) return;
+                var dx = b.x - a.x, dy = b.y - a.y;
+                var dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                var force = (dist - 120) * 0.01;
+                var fx = dx/dist * force, fy = dy/dist * force;
+                a.vx += fx; a.vy += fy;
+                b.vx -= fx; b.vy -= fy;
+            });
+            // Center gravity
+            nodes.forEach(function(n){
+                n.vx += (W/2 - n.x) * 0.001;
+                n.vy += (H/2 - n.y) * 0.001;
+                n.x += n.vx * 0.5;
+                n.y += n.vy * 0.5;
+                n.vx *= 0.9; n.vy *= 0.9;
+                n.x = Math.max(20, Math.min(W-20, n.x));
+                n.y = Math.max(20, Math.min(H-20, n.y));
+            });
+        }
+    }
+
+    function findNode(mx, my) {
+        for (var i = nodes.length-1; i >= 0; i--) {
+            var dx = nodes[i].x - mx, dy = nodes[i].y - my;
+            if (dx*dx + dy*dy < 144) return nodes[i];
+        }
+        return null;
+    }
+
+    canvas.addEventListener('mousedown', function(e){
+        var rect = canvas.getBoundingClientRect();
+        var n = findNode(e.clientX - rect.left, e.clientY - rect.top);
+        if (n) { dragging = n; offsetX = n.x - (e.clientX - rect.left); offsetY = n.y - (e.clientY - rect.top); }
+    });
+    canvas.addEventListener('mousemove', function(e){
+        var rect = canvas.getBoundingClientRect();
+        var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        if (dragging) {
+            dragging.x = mx + offsetX; dragging.y = my + offsetY;
+            draw();
+        } else {
+            var n = findNode(mx, my);
+            if (n !== hovered) { hovered = n; draw(); }
+            if (n) {
+                tooltip.style.display = 'block';
+                tooltip.style.left = (mx + 15) + 'px';
+                tooltip.style.top = (my + 15) + 'px';
+                tooltip.innerHTML = '<b>' + n.name + '</b><br>#' + n.id + ' - ' + (n.province || '') + '<br><a href="/admin/record/' + n.id + '" style="color:#2563eb;">عرض السجل</a>';
+            } else {
+                tooltip.style.display = 'none';
+            }
+        }
+    });
+    canvas.addEventListener('mouseup', function(){ dragging = null; });
+    canvas.addEventListener('dblclick', function(e){
+        var rect = canvas.getBoundingClientRect();
+        var n = findNode(e.clientX - rect.left, e.clientY - rect.top);
+        if (n) window.location.href = '/admin/record/' + n.id;
+    });
+
+    // Load data
+    fetch('/api/network').then(function(r){ return r.json(); }).then(function(data){
+        nodes = data.nodes;
+        edges = data.edges;
+        nodeMap = {};
+        nodes.forEach(function(n, i){
+            n.x = W/2 + (Math.random()-0.5) * W * 0.6;
+            n.y = H/2 + (Math.random()-0.5) * H * 0.6;
+            n.vx = 0; n.vy = 0;
+            nodeMap[n.id] = n;
+        });
+        document.getElementById('netInfo').textContent = nodes.length + ' سجل مرتبط، ' + edges.length + ' رابط';
+        if (nodes.length === 0) {
+            document.getElementById('netInfo').textContent = 'لا توجد روابط بين السجلات بعد';
+        }
+        simulate(200);
+        draw();
+    });
+})();
+</script>
+{% endblock %}

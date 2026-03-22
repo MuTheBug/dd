@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}سلة المحذوفات - حقنا{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2>سلة المحذوفات</h2>
+        {% if records %}
+        <form method="post" action="{{ url_for('admin_trash_empty') }}" onsubmit="return confirm('هل أنت متأكد من حذف جميع السجلات نهائياً؟ لا يمكن التراجع عن هذا الإجراء.')">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger">إفراغ سلة المحذوفات</button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if records %}
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>الاسم الكامل</th>
+                    <th>الحالة</th>
+                    <th>المحافظة</th>
+                    <th>تاريخ الحذف</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr>
+                    <td>{{ r.id }}</td>
+                    <td>{{ r.first_name }} {{ r.father_name }} {{ r.last_name }}</td>
+                    <td>{{ r.status }}</td>
+                    <td>{{ r.province }}</td>
+                    <td>{{ r.deleted_at }}</td>
+                    <td>
+                        <a href="{{ url_for('admin_record_restore', record_id=r.id) }}" class="btn btn-sm btn-success">استعادة</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>سلة المحذوفات فارغة</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

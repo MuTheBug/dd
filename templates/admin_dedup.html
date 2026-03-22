@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}فحص التكرار - حقنا{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>فحص التكرار <span style="font-size:0.9rem; color:var(--text-light);">({{ total_groups }} مجموعة مكررة)</span></h2>
+
+    {% if groups %}
+    {% for g in groups %}
+    <div style="margin-bottom:1.5rem; padding:1rem; background:var(--card-bg); border-radius:10px; border:1px solid var(--border);">
+        <div style="font-weight:600; margin-bottom:0.5rem; color:var(--primary);">
+            {{ g.match_type }}: {{ g.match_value }}
+        </div>
+        <table class="data-table" style="margin:0;">
+            <thead><tr><th>#</th><th>الاسم</th><th>الحالة</th><th>المحافظة</th><th>الهاتف</th><th>الرقم الوطني</th><th></th></tr></thead>
+            <tbody>
+            {% for r in g.records %}
+            <tr>
+                <td>{{ r.id }}</td>
+                <td>{{ r.first_name }} {{ r.father_name }} {{ r.last_name }}</td>
+                <td>{{ r.status }}</td>
+                <td>{{ r.province }}</td>
+                <td>{{ r.phone }}</td>
+                <td>{{ r.national_id }}</td>
+                <td><a href="{{ url_for('admin_record_detail', record_id=r.id) }}" class="btn btn-sm btn-outline">عرض</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state"><p>لم يتم العثور على سجلات مكررة</p></div>
+    {% endif %}
+</div>
+{% endblock %}

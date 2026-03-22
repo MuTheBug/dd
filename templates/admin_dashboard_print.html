@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تقرير إحصائي - حقنا</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; padding: 2rem; color: #333; font-size: 14px; }
+        h1 { text-align: center; margin-bottom: 0.5rem; font-size: 1.5rem; }
+        .date { text-align: center; color: #666; margin-bottom: 2rem; }
+        .section { margin-bottom: 1.5rem; }
+        .section h2 { font-size: 1.1rem; border-bottom: 2px solid #2563eb; padding-bottom: 0.3rem; margin-bottom: 0.8rem; color: #2563eb; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+        th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: right; }
+        th { background: #f0f4ff; font-weight: 600; }
+        .stats-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .stat-box { flex: 1; min-width: 100px; text-align: center; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px; }
+        .stat-box .num { font-size: 1.5rem; font-weight: 700; color: #2563eb; }
+        .stat-box .lbl { font-size: 0.85rem; color: #666; }
+        @media print { body { padding: 1rem; } .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="text-align:center; margin-bottom:1rem;">
+        <button onclick="window.print()" style="padding:0.5rem 2rem; font-size:1rem; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:8px;">طباعة / PDF</button>
+        <a href="{{ url_for('admin_dashboard') }}" style="margin-right:1rem;">العودة</a>
+    </div>
+
+    <h1>تقرير إحصائي - حقنا</h1>
+    <div class="date">{{ stats.date }}</div>
+
+    <div class="section">
+        <h2>الإحصائيات العامة</h2>
+        <div class="stats-row">
+            <div class="stat-box"><div class="num">{{ stats.total }}</div><div class="lbl">إجمالي</div></div>
+            <div class="stat-box"><div class="num">{{ stats.survivors }}</div><div class="lbl">ناجون</div></div>
+            <div class="stat-box"><div class="num">{{ stats.enforced }}</div><div class="lbl">مغيّبون</div></div>
+            <div class="stat-box"><div class="num">{{ stats.deceased }}</div><div class="lbl">متوفون</div></div>
+            <div class="stat-box"><div class="num">{{ stats.males }}</div><div class="lbl">ذكور</div></div>
+            <div class="stat-box"><div class="num">{{ stats.females }}</div><div class="lbl">إناث</div></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>التوزيع حسب المحافظة</h2>
+        <table>
+            <thead><tr><th>المحافظة</th><th>العدد</th><th>النسبة</th></tr></thead>
+            <tbody>
+            {% for p in stats.province_stats %}
+            <tr>
+                <td>{{ p[0] or 'غير محدد' }}</td>
+                <td>{{ p[1] }}</td>
+                <td>{{ '%.1f' % (p[1] / stats.total * 100 if stats.total else 0) }}%</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>الحالة الصحية</h2>
+        <table>
+            <thead><tr><th>الحالة</th><th>العدد</th></tr></thead>
+            <tbody>
+                <tr><td>أمراض مزمنة</td><td>{{ stats.health_stats.chronic }}</td></tr>
+                <tr><td>احتياجات خاصة</td><td>{{ stats.health_stats.special_needs }}</td></tr>
+                <tr><td>ضغط الدم</td><td>{{ stats.health_stats.hypertension }}</td></tr>
+                <tr><td>السكري</td><td>{{ stats.health_stats.diabetes }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>التوزيع حسب التعليم</h2>
+        <table>
+            <thead><tr><th>المستوى</th><th>العدد</th></tr></thead>
+            <tbody>
+            {% for e in stats.edu_stats %}
+            <tr><td>{{ e[0] }}</td><td>{{ e[1] }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>window.onload = function() { /* auto print if desired */ };</script>
+</body>
+</html>

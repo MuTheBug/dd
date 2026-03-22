@@ -6,8 +6,12 @@
     <div class="card">
         <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="حقنا" class="login-logo">
         <h1>دخول لوحة الإدارة</h1>
-        <p>أدخل كلمة المرور للوصول إلى لوحة التحكم</p>
+        <p>أدخل بيانات الدخول للوصول إلى لوحة التحكم</p>
         <form method="POST" action="{{ url_for('admin_login') }}">
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+                <input type="text" name="username" placeholder="اسم المستخدم (اختياري)"
+                       style="text-align: center; font-size: 1.1rem;">
+            </div>
             <div class="form-group" style="margin-bottom: 1rem;">
                 <input type="password" name="password" placeholder="كلمة المرور" required
                        style="text-align: center; font-size: 1.1rem;">

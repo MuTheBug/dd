@@ -14,3 +14,6 @@ node_modules/
 .wa_session_wjs/
 package-lock.json
 *.hash
+.secret_key
+area_groups.json
+server_config.json

@@ -57,6 +57,16 @@
                 </div>
             </div>
 
+            <!-- Saved Filters -->
+            <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--filter-preset-bg); border-radius: 8px; border: 1px solid var(--filter-preset-border); display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem;">
+                <span style="font-size:0.88rem; font-weight:600; color:var(--primary-light);">&#x1F4BE; فلاتر محفوظة:</span>
+                <select id="savedFilterSelect" onchange="loadSavedFilter()" style="padding:0.3rem 0.5rem; border-radius:6px; border:1px solid var(--border); font-size:0.85rem; min-width:150px;">
+                    <option value="">-- اختر --</option>
+                </select>
+                <button type="button" class="btn btn-outline btn-sm" onclick="saveCurrentFilter()" style="color:#059669; border-color:#059669;">حفظ الفلتر الحالي</button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="deleteSavedFilter()" style="color:#dc2626; border-color:#dc2626;">حذف</button>
+            </div>
+
             <div class="filter-grid">
                 <!-- Basic search & status -->
                 <div class="form-group">
@@ -1062,6 +1072,50 @@ var defaultCols = {{ DEFAULT_PDF_COLS | tojson }};
 var filterParams = {{ filter_params | tojson }};
 var allColumns = {{ PDF_COLUMNS | tojson }};
 var statusMap = {{ STATUS_MAP | tojson }};
+
+// Saved filters
+function loadSavedFiltersList() {
+    fetch('/api/saved_filters?entity_type=records').then(r=>r.json()).then(filters => {
+        var sel = document.getElementById('savedFilterSelect');
+        sel.innerHTML = '<option value="">-- اختر --</option>';
+        filters.forEach(f => {
+            var opt = document.createElement('option');
+            opt.value = JSON.stringify(f.filter_data);
+            opt.textContent = f.name;
+            opt.dataset.id = f.id;
+            sel.appendChild(opt);
+        });
+    });
+}
+function loadSavedFilter() {
+    var sel = document.getElementById('savedFilterSelect');
+    if (!sel.value) return;
+    var data = JSON.parse(sel.value);
+    var params = new URLSearchParams(data);
+    window.location.href = '{{ url_for("admin_records") }}?' + params.toString();
+}
+function saveCurrentFilter() {
+    var name = prompt('اسم الفلتر:');
+    if (!name) return;
+    fetch('/api/saved_filters', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, filter_data: filterParams, entity_type: 'records'})
+    }).then(r=>r.json()).then(d => {
+        if (d.success) { alert('تم الحفظ'); loadSavedFiltersList(); }
+        else alert(d.error || 'خطأ');
+    });
+}
+function deleteSavedFilter() {
+    var sel = document.getElementById('savedFilterSelect');
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.dataset.id) { alert('اختر فلتراً أولاً'); return; }
+    if (!confirm('حذف هذا الفلتر؟')) return;
+    fetch('/api/saved_filters/' + opt.dataset.id, {method:'DELETE'}).then(r=>r.json()).then(d => {
+        if (d.success) { loadSavedFiltersList(); }
+    });
+}
+document.addEventListener('DOMContentLoaded', loadSavedFiltersList);
 
 // Record management state
 var orderedRecords = [];  // final ordered list [{id, first_name, father_name, last_name}, ...]

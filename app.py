@@ -27,6 +27,7 @@ from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     jsonify, send_file, session, g, make_response, send_from_directory
 )
+from markupsafe import Markup
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -47,10 +48,60 @@ DB_PATH = os.path.join(BASE_DIR, 'registry.db')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)
+
+# Persist secret_key so sessions survive restarts
+SECRET_KEY_FILE = os.path.join(BASE_DIR, '.secret_key')
+if os.path.exists(SECRET_KEY_FILE):
+    with open(SECRET_KEY_FILE, 'r') as f:
+        app.secret_key = f.read().strip()
+else:
+    _generated_key = secrets.token_hex(32)
+    with open(SECRET_KEY_FILE, 'w') as f:
+        f.write(_generated_key)
+    try:
+        os.chmod(SECRET_KEY_FILE, 0o600)
+    except OSError:
+        pass
+    app.secret_key = _generated_key
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB per request
 app.permanent_session_lifetime = timedelta(hours=8)
+
+
+def generate_csrf_token():
+    """Generate or retrieve a CSRF token for the current session."""
+    if '_csrf_token' not in session:
+        session['_csrf_token'] = secrets.token_hex(32)
+    return session['_csrf_token']
+
+
+def validate_csrf_token():
+    """Validate CSRF token on state-changing requests.  Returns True if valid."""
+    if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        return True
+    # Skip CSRF for JSON API calls (they use X-Requested-With header)
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return True
+    token = request.form.get('_csrf_token') or request.headers.get('X-CSRF-Token')
+    return token and token == session.get('_csrf_token')
+
+
+@app.before_request
+def csrf_protect():
+    """Enforce CSRF protection on all POST/PUT/DELETE requests."""
+    if request.method in ('POST', 'PUT', 'DELETE'):
+        # Exempt the public entry form AJAX submissions and API endpoints
+        if request.endpoint and request.endpoint.startswith('api_'):
+            pass  # API endpoints use JSON / X-Requested-With
+        elif request.is_json:
+            pass
+        elif not validate_csrf_token():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from flask import abort
+                abort(403)
+            flash('انتهت صلاحية النموذج. يرجى المحاولة مرة أخرى.', 'error')
+            return redirect(request.referrer or url_for('index'))
 
 
 @app.before_request
@@ -61,6 +112,29 @@ def check_session_timeout():
             session.clear()
             flash('انتهت الجلسة، يرجى تسجيل الدخول مجدداً', 'error')
             return redirect(url_for('admin_login'))
+
+
+@app.before_request
+def enforce_role_permissions():
+    """Restrict viewer role from write operations."""
+    if not session.get('is_admin'):
+        return
+    role = session.get('user_role', 'admin')
+    if role == 'admin':
+        return
+    # Viewer can only GET
+    if role == 'viewer' and request.method != 'GET':
+        if request.endpoint and request.endpoint not in ('admin_login', 'admin_logout'):
+            flash('ليس لديك صلاحية لتنفيذ هذا الإجراء', 'error')
+            return redirect(request.referrer or url_for('admin_dashboard'))
+    # data_entry can't access admin-only routes
+    if role == 'data_entry':
+        admin_only = ('admin_users', 'admin_user_add', 'admin_user_toggle', 'admin_user_reset_password',
+                      'admin_backup', 'admin_backup_create', 'admin_backup_restore', 'admin_backup_delete',
+                      'admin_trash_empty', 'admin_import')
+        if request.endpoint in admin_only:
+            flash('ليس لديك صلاحية للوصول لهذه الصفحة', 'error')
+            return redirect(url_for('admin_dashboard'))
 
 ADMIN_PASSWORD_FILE = os.path.join(BASE_DIR, 'admin_password.hash')
 BACKUP_DIR = os.path.join(BASE_DIR, 'backups')
@@ -606,6 +680,7 @@ def migrate_db():
         'survivor_cv_photo_path': "TEXT DEFAULT ''",
         'family_book_number': "TEXT DEFAULT ''",
         'address_area': "TEXT DEFAULT ''",
+        'deleted_at': "TEXT DEFAULT NULL",
     }
 
     for col, typedef in new_columns.items():
@@ -884,6 +959,31 @@ def migrate_db():
         except sqlite3.OperationalError:
             pass
 
+    # -- Users table (multi-user with roles) --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            display_name TEXT DEFAULT '',
+            role TEXT NOT NULL DEFAULT 'viewer',
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            last_login TEXT
+        )
+    """)
+
+    # -- Saved search filters table --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS saved_filters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            filter_data TEXT NOT NULL DEFAULT '{}',
+            entity_type TEXT NOT NULL DEFAULT 'records',
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
+
     # -- Database indexes for performance --
     index_statements = [
         "CREATE INDEX IF NOT EXISTS idx_records_status ON records(status)",
@@ -905,6 +1005,7 @@ def migrate_db():
         "CREATE INDEX IF NOT EXISTS idx_records_record_status ON records(record_status)",
         "CREATE INDEX IF NOT EXISTS idx_records_status_province ON records(status, province)",
         "CREATE INDEX IF NOT EXISTS idx_records_name ON records(first_name, father_name, last_name)",
+        "CREATE INDEX IF NOT EXISTS idx_records_deleted_at ON records(deleted_at)",
         "CREATE INDEX IF NOT EXISTS idx_volunteers_status ON volunteers(status)",
         "CREATE INDEX IF NOT EXISTS idx_volunteers_full_name ON volunteers(full_name)",
         "CREATE INDEX IF NOT EXISTS idx_members_status ON members(status)",
@@ -917,6 +1018,11 @@ def migrate_db():
         "CREATE INDEX IF NOT EXISTS idx_record_changes_record_id ON record_changes(record_id)",
         "CREATE INDEX IF NOT EXISTS idx_record_links_a ON record_links(record_id_a)",
         "CREATE INDEX IF NOT EXISTS idx_record_links_b ON record_links(record_id_b)",
+        "CREATE INDEX IF NOT EXISTS idx_records_address_area ON records(address_area)",
+        "CREATE INDEX IF NOT EXISTS idx_records_status_gender_marital ON records(status, gender, marital)",
+        "CREATE INDEX IF NOT EXISTS idx_record_companions_record_id ON record_companions(record_id)",
+        "CREATE INDEX IF NOT EXISTS idx_record_services_record_id ON record_services(record_id)",
+        "CREATE INDEX IF NOT EXISTS idx_records_address ON records(address)",
     ]
     for stmt in index_statements:
         try:
@@ -970,6 +1076,22 @@ def admin_required(f):
     return decorated
 
 
+def role_required(*roles):
+    """Decorator that checks user role. Admin role can access everything."""
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not session.get('is_admin'):
+                return redirect(url_for('admin_login'))
+            user_role = session.get('user_role', 'admin')
+            if user_role not in roles and user_role != 'admin':
+                flash('ليس لديك صلاحية للوصول لهذه الصفحة', 'error')
+                return redirect(url_for('admin_dashboard'))
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+
 # ---------------------------------------------------------------------------
 # File helpers
 # ---------------------------------------------------------------------------
@@ -1002,6 +1124,7 @@ def save_upload(file_obj, subfolder='documents'):
 @app.context_processor
 def inject_constants():
     return {
+        'csrf_token': generate_csrf_token,
         'PROVINCES': PROVINCES,
         'ARREST_AUTHORITIES': ARREST_AUTHORITIES,
         'DETENTION_FACILITIES': DETENTION_FACILITIES,
@@ -1027,6 +1150,8 @@ def inject_constants():
         'VOLUNTEER_ROLES': VOLUNTEER_ROLES,
         'MEMBER_STATUSES': MEMBER_STATUSES,
         'MEMBERSHIP_TYPES': MEMBERSHIP_TYPES,
+        'user_role': session.get('user_role', 'admin'),
+        'display_name': session.get('display_name', ''),
     }
 
 
@@ -1143,9 +1268,9 @@ def entry_submit():
         nid = form.get('national_id', '').strip()
         dup = None
         if nid:
-            dup = db.execute("SELECT id, first_name, father_name, last_name FROM records WHERE national_id=? AND national_id != ''", (nid,)).fetchone()
+            dup = db.execute("SELECT id, first_name, father_name, last_name FROM records WHERE deleted_at IS NULL AND national_id=? AND national_id != ''", (nid,)).fetchone()
         if not dup and first and last:
-            dup = db.execute("SELECT id, first_name, father_name, last_name FROM records WHERE first_name=? AND father_name=? AND last_name=?",
+            dup = db.execute("SELECT id, first_name, father_name, last_name FROM records WHERE deleted_at IS NULL AND first_name=? AND father_name=? AND last_name=?",
                              (first, father, last)).fetchone()
         if dup:
             dup_name = ' '.join(filter(None, [dup['first_name'], dup['father_name'], dup['last_name']]))
@@ -1360,9 +1485,36 @@ def admin_login():
             flash(f'تم حظر تسجيل الدخول لمدة {remaining} دقائق بسبب محاولات كثيرة', 'error')
             return render_template('admin_login.html')
 
-        pw_hash = _get_admin_password_hash()
-        if check_password_hash(pw_hash, request.form.get('password', '')):
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+
+        # Try multi-user login first
+        authenticated = False
+        user_role = 'admin'
+        display_name = ''
+        if username:
+            db = get_db()
+            user = db.execute("SELECT * FROM users WHERE username=? AND is_active=1", (username,)).fetchone()
+            if user and check_password_hash(user['password_hash'], password):
+                authenticated = True
+                user_role = user['role']
+                display_name = user['display_name'] or username
+                db.execute("UPDATE users SET last_login=datetime('now','localtime') WHERE id=?", (user['id'],))
+                db.commit()
+
+        # Fall back to legacy admin password
+        if not authenticated:
+            pw_hash = _get_admin_password_hash()
+            if check_password_hash(pw_hash, password):
+                authenticated = True
+                user_role = 'admin'
+                display_name = 'مدير النظام'
+
+        if authenticated:
+            session.clear()
             session['is_admin'] = True
+            session['user_role'] = user_role
+            session['display_name'] = display_name
             session['login_time'] = time.time()
             session.permanent = True
             _login_attempts.pop(ip, None)
@@ -1402,27 +1554,101 @@ def admin_change_password():
     return render_template('admin_change_password.html')
 
 
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    """User management page (admin only)."""
+    if session.get('user_role', 'admin') != 'admin':
+        flash('فقط المدير يمكنه إدارة المستخدمين', 'error')
+        return redirect(url_for('admin_dashboard'))
+    db = get_db()
+    users = db.execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
+    role_labels = {'admin': 'مدير', 'data_entry': 'إدخال بيانات', 'viewer': 'مشاهد'}
+    return render_template('admin_users.html', users=users, role_labels=role_labels)
+
+
+@app.route('/admin/users/add', methods=['POST'])
+@admin_required
+def admin_user_add():
+    if session.get('user_role', 'admin') != 'admin':
+        return jsonify({'error': 'غير مصرح'}), 403
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '')
+    display_name = request.form.get('display_name', '').strip()
+    role = request.form.get('role', 'viewer')
+    if not username or not password:
+        flash('اسم المستخدم وكلمة المرور مطلوبان', 'error')
+        return redirect(url_for('admin_users'))
+    if role not in ('admin', 'data_entry', 'viewer'):
+        role = 'viewer'
+    db = get_db()
+    existing = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if existing:
+        flash('اسم المستخدم موجود مسبقاً', 'error')
+        return redirect(url_for('admin_users'))
+    db.execute(
+        "INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, ?)",
+        (username, generate_password_hash(password), display_name, role)
+    )
+    db.commit()
+    log_audit('user_create', 'user', 0, f'Created user: {username} ({role})')
+    flash(f'تم إضافة المستخدم {username}', 'success')
+    return redirect(url_for('admin_users'))
+
+
+@app.route('/admin/users/<int:user_id>/toggle', methods=['POST'])
+@admin_required
+def admin_user_toggle(user_id):
+    if session.get('user_role', 'admin') != 'admin':
+        return jsonify({'error': 'غير مصرح'}), 403
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if user:
+        new_status = 0 if user['is_active'] else 1
+        db.execute("UPDATE users SET is_active=? WHERE id=?", (new_status, user_id))
+        db.commit()
+        log_audit('user_toggle', 'user', user_id, f'{"activated" if new_status else "deactivated"} {user["username"]}')
+    return redirect(url_for('admin_users'))
+
+
+@app.route('/admin/users/<int:user_id>/reset-password', methods=['POST'])
+@admin_required
+def admin_user_reset_password(user_id):
+    if session.get('user_role', 'admin') != 'admin':
+        return jsonify({'error': 'غير مصرح'}), 403
+    new_pw = request.form.get('new_password', '')
+    if len(new_pw) < 6:
+        flash('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error')
+        return redirect(url_for('admin_users'))
+    db = get_db()
+    db.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_pw), user_id))
+    db.commit()
+    log_audit('user_reset_password', 'user', user_id)
+    flash('تم تغيير كلمة المرور', 'success')
+    return redirect(url_for('admin_users'))
+
+
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
     db = get_db()
 
     # Statistics
-    total = db.execute("SELECT COUNT(*) FROM records").fetchone()[0]
-    survivors = db.execute("SELECT COUNT(*) FROM records WHERE status='survivor'").fetchone()[0]
-    enforced = db.execute("SELECT COUNT(*) FROM records WHERE status='enforced'").fetchone()[0]
-    deceased = db.execute("SELECT COUNT(*) FROM records WHERE status='deceased'").fetchone()[0]
-    males = db.execute("SELECT COUNT(*) FROM records WHERE gender='male'").fetchone()[0]
-    females = db.execute("SELECT COUNT(*) FROM records WHERE gender='female'").fetchone()[0]
+    total = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL").fetchone()[0]
+    survivors = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='survivor'").fetchone()[0]
+    enforced = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='enforced'").fetchone()[0]
+    deceased = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='deceased'").fetchone()[0]
+    males = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND gender='male'").fetchone()[0]
+    females = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND gender='female'").fetchone()[0]
 
     # Province distribution
     province_stats = db.execute(
-        "SELECT province, COUNT(*) as cnt FROM records GROUP BY province ORDER BY cnt DESC"
+        "SELECT province, COUNT(*) as cnt FROM records WHERE deleted_at IS NULL GROUP BY province ORDER BY cnt DESC"
     ).fetchall()
 
     # Authority distribution (with normalization of aliases)
     raw_authority_stats = db.execute(
-        "SELECT arrest_authority, COUNT(*) as cnt FROM records WHERE arrest_authority IS NOT NULL AND arrest_authority != '' GROUP BY arrest_authority ORDER BY cnt DESC"
+        "SELECT arrest_authority, COUNT(*) as cnt FROM records WHERE deleted_at IS NULL AND arrest_authority IS NOT NULL AND arrest_authority != '' GROUP BY arrest_authority ORDER BY cnt DESC"
     ).fetchall()
 
     # Merge counts using keyword-based normalization
@@ -1436,13 +1662,13 @@ def admin_dashboard():
 
     # Year distribution
     year_stats = db.execute(
-        "SELECT arrest_year, COUNT(*) as cnt FROM records WHERE arrest_year > 0 GROUP BY arrest_year ORDER BY arrest_year"
+        "SELECT arrest_year, COUNT(*) as cnt FROM records WHERE deleted_at IS NULL AND arrest_year > 0 GROUP BY arrest_year ORDER BY arrest_year"
     ).fetchall()
 
     # Age distribution (D2)
     current_year = datetime.now().year
     age_brackets = {'0-17': 0, '18-30': 0, '31-45': 0, '46-60': 0, '60+': 0, 'غير محدد': 0}
-    birth_years = db.execute("SELECT birth_year FROM records").fetchall()
+    birth_years = db.execute("SELECT birth_year FROM records WHERE deleted_at IS NULL").fetchall()
     for row in birth_years:
         by = row['birth_year'] or 0
         if by <= 0:
@@ -1462,17 +1688,17 @@ def admin_dashboard():
 
     # Health & vulnerability stats (D3)
     health_stats = {
-        'chronic': db.execute("SELECT COUNT(*) FROM records WHERE chronic IS NOT NULL AND chronic != '' AND chronic != 'لا'").fetchone()[0],
-        'special_needs': db.execute("SELECT COUNT(*) FROM records WHERE has_special_needs = 1").fetchone()[0],
-        'hypertension': db.execute("SELECT COUNT(*) FROM records WHERE has_hypertension = 1").fetchone()[0],
-        'diabetes': db.execute("SELECT COUNT(*) FROM records WHERE has_diabetes = 1").fetchone()[0],
-        'paying_rent': db.execute("SELECT COUNT(*) FROM records WHERE housing_type = 'إيجار'").fetchone()[0],
-        'no_breadwinner': db.execute("SELECT COUNT(*) FROM records WHERE breadwinner = '' OR breadwinner = 'لا يوجد' OR breadwinner IS NULL").fetchone()[0],
+        'chronic': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND chronic IS NOT NULL AND chronic != '' AND chronic != 'لا'").fetchone()[0],
+        'special_needs': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND has_special_needs = 1").fetchone()[0],
+        'hypertension': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND has_hypertension = 1").fetchone()[0],
+        'diabetes': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND has_diabetes = 1").fetchone()[0],
+        'paying_rent': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND housing_type = 'إيجار'").fetchone()[0],
+        'no_breadwinner': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND (breadwinner = '' OR breadwinner = 'لا يوجد' OR breadwinner IS NULL)").fetchone()[0],
     }
 
     # Education breakdown (D4)
     edu_stats = db.execute(
-        "SELECT education, COUNT(*) as cnt FROM records WHERE education IS NOT NULL AND education != '' GROUP BY education ORDER BY cnt DESC"
+        "SELECT education, COUNT(*) as cnt FROM records WHERE deleted_at IS NULL AND education IS NOT NULL AND education != '' GROUP BY education ORDER BY cnt DESC"
     ).fetchall()
 
     # Member payment summary (D5)
@@ -1505,7 +1731,7 @@ def admin_dashboard():
     total_profiles = total + vol_stats['active'] + db.execute("SELECT COUNT(*) FROM members").fetchone()[0]
     # Simplified: count records with key missing fields
     incomplete_records = db.execute(
-        "SELECT COUNT(*) FROM records WHERE first_name='' OR status='' OR province='' OR gender='' OR phone='' OR national_id=''"
+        "SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND (first_name='' OR status='' OR province='' OR gender='' OR phone='' OR national_id='')"
     ).fetchone()[0]
     incomplete_vols = db.execute(
         "SELECT COUNT(*) FROM volunteers WHERE phone='' OR national_id='' OR role=''"
@@ -1532,6 +1758,43 @@ def admin_dashboard():
     }
 
     return render_template('admin_dashboard.html', stats=stats)
+
+
+@app.route('/admin/dashboard/print')
+@admin_required
+def admin_dashboard_print():
+    """Printable statistics report for the dashboard."""
+    db = get_db()
+
+    total = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL").fetchone()[0]
+    survivors = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='survivor'").fetchone()[0]
+    enforced = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='enforced'").fetchone()[0]
+    deceased = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='deceased'").fetchone()[0]
+    males = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND gender='male'").fetchone()[0]
+    females = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND gender='female'").fetchone()[0]
+
+    province_stats = db.execute(
+        "SELECT province, COUNT(*) as cnt FROM records WHERE deleted_at IS NULL GROUP BY province ORDER BY cnt DESC"
+    ).fetchall()
+
+    health_stats = {
+        'chronic': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND chronic IS NOT NULL AND chronic != '' AND chronic != 'لا'").fetchone()[0],
+        'special_needs': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND has_special_needs = 1").fetchone()[0],
+        'hypertension': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND has_hypertension = 1").fetchone()[0],
+        'diabetes': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND has_diabetes = 1").fetchone()[0],
+    }
+
+    edu_stats = db.execute(
+        "SELECT education, COUNT(*) as cnt FROM records WHERE deleted_at IS NULL AND education IS NOT NULL AND education != '' GROUP BY education ORDER BY cnt DESC"
+    ).fetchall()
+
+    stats = {
+        'total': total, 'survivors': survivors, 'enforced': enforced,
+        'deceased': deceased, 'males': males, 'females': females,
+        'province_stats': province_stats, 'health_stats': health_stats,
+        'edu_stats': edu_stats, 'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
+    }
+    return render_template('admin_dashboard_print.html', stats=stats)
 
 
 def compute_need_score(record):
@@ -1609,6 +1872,99 @@ def compute_need_score(record):
     return score
 
 
+def _filters_from_request_args(args):
+    """Build a filters dict from request.args (or any MultiDict).
+    Used by admin_records, api_records, and PDF/Excel export routes."""
+    status_list = args.getlist('status') if hasattr(args, 'getlist') else [args.get('status', '')]
+    expanded = []
+    for s in status_list:
+        if ',' in s:
+            expanded.extend(s.split(','))
+        elif s:
+            expanded.append(s)
+    status_list = expanded
+
+    return {
+        'status': ','.join(status_list),
+        'status_list': status_list,
+        'province': args.get('province', ''),
+        'gender': args.get('gender', ''),
+        'arrest_authority': args.get('arrest_authority', ''),
+        'arrest_place': args.get('arrest_place', ''),
+        'arrest_year_from': args.get('arrest_year_from', ''),
+        'arrest_year_to': args.get('arrest_year_to', ''),
+        'birth_year_from': args.get('birth_year_from', ''),
+        'birth_year_to': args.get('birth_year_to', ''),
+        'marital': args.get('marital', ''),
+        'education': args.get('education', ''),
+        'education_max': args.get('education_max', ''),
+        'housing_type': args.get('housing_type', ''),
+        'blood_type': args.get('blood_type', ''),
+        'has_kids': args.get('has_kids', ''),
+        'has_kids_under_18': args.get('has_kids_under_18', ''),
+        'minor_age_threshold': args.get('minor_age_threshold', ''),
+        'kids_max_age': args.get('kids_max_age', ''),
+        'has_photo': args.get('has_photo', ''),
+        'has_document': args.get('has_document', ''),
+        'case_type': args.get('case_type', ''),
+        'evidence_level': args.get('evidence_level', ''),
+        'verification_status': args.get('verification_status', ''),
+        'civil_registry_status': args.get('civil_registry_status', ''),
+        'digital_evidence_type': args.get('digital_evidence_type', ''),
+        'has_conflicting_info': args.get('has_conflicting_info', ''),
+        'search': args.get('search', ''),
+        'has_special_needs': args.get('has_special_needs', ''),
+        'chronic': args.get('chronic', ''),
+        'breadwinner': args.get('breadwinner', ''),
+        'has_hypertension': args.get('has_hypertension', ''),
+        'has_diabetes': args.get('has_diabetes', ''),
+        'is_registered': args.get('is_registered', ''),
+        'has_legal': args.get('has_legal', ''),
+        'has_assoc': args.get('has_assoc', ''),
+        'reporter_relation': args.get('reporter_relation', ''),
+        'widows_filter': args.get('widows_filter', ''),
+        'spouse_search': args.get('spouse_search', ''),
+        'child_name_search': args.get('child_name_search', ''),
+        'child_education': args.get('child_education', ''),
+        'employment': args.get('employment', ''),
+        'profession': args.get('profession', ''),
+        'address_search': args.get('address_search', ''),
+        'arrest_reason': args.get('arrest_reason', ''),
+        'death_year_from': args.get('death_year_from', ''),
+        'death_year_to': args.get('death_year_to', ''),
+        'release_year_from': args.get('release_year_from', ''),
+        'release_year_to': args.get('release_year_to', ''),
+        'notes_search': args.get('notes_search', ''),
+        'employer': args.get('employer', ''),
+        'breadwinner_relation': args.get('breadwinner_relation', ''),
+        'age_from': args.get('age_from', ''),
+        'age_to': args.get('age_to', ''),
+        'has_guardian': args.get('has_guardian', ''),
+        'digital_evidence_url_status': args.get('digital_evidence_url_status', ''),
+        'kids_age_from': args.get('kids_age_from', ''),
+        'kids_age_to': args.get('kids_age_to', ''),
+        'collector_name': args.get('collector_name', ''),
+        'sort_by_need': args.get('sort_by_need', ''),
+        'created_from': args.get('created_from', ''),
+        'created_to': args.get('created_to', ''),
+        'collection_date_from': args.get('collection_date_from', ''),
+        'collection_date_to': args.get('collection_date_to', ''),
+        'source_type': args.get('source_type', ''),
+        'has_phone': args.get('has_phone', ''),
+        'family_book_number': args.get('family_book_number', ''),
+        'national_id_search': args.get('national_id_search', ''),
+        'has_rent': args.get('has_rent', ''),
+        'detention_facility_search': args.get('detention_facility_search', ''),
+        'record_status': args.get('record_status', ''),
+        'service_name': args.get('service_name', ''),
+        'service_count_min': args.get('service_count_min', ''),
+        'service_provider': args.get('service_provider', ''),
+        'last_service_from': args.get('last_service_from', ''),
+        'last_service_to': args.get('last_service_to', ''),
+        'service_filter_mode': args.get('service_filter_mode', ''),
+    }
+
+
 def _build_record_filter_conditions(filters):
     """Build SQL conditions and params from a filters dict.
 
@@ -1621,7 +1977,7 @@ def _build_record_filter_conditions(filters):
     Returns:
         (conditions, params) - lists for building WHERE clause.
     """
-    conditions = []
+    conditions = ["deleted_at IS NULL"]
     params = []
 
     status_list = filters.get('status_list') or []
@@ -1931,101 +2287,9 @@ def admin_records():
     page = safe_int(request.args.get('page'), 1)
     per_page = safe_int(request.args.get('per_page'), 25)
 
-    # Build filter query
-    conditions = []
-    params = []
-
-    # Status supports multi-select (via checkboxes or comma-separated)
-    status_list = request.args.getlist('status')
-    # Also handle comma-separated values (from pagination URLs)
-    expanded = []
-    for s in status_list:
-        if ',' in s:
-            expanded.extend(s.split(','))
-        elif s:
-            expanded.append(s)
-    status_list = expanded
-
-    filters = {
-        'status': ','.join(status_list),  # kept for backward compat
-        'status_list': status_list,
-        'province': request.args.get('province', ''),
-        'gender': request.args.get('gender', ''),
-        'arrest_authority': request.args.get('arrest_authority', ''),
-        'arrest_place': request.args.get('arrest_place', ''),
-        'arrest_year_from': request.args.get('arrest_year_from', ''),
-        'arrest_year_to': request.args.get('arrest_year_to', ''),
-        'birth_year_from': request.args.get('birth_year_from', ''),
-        'birth_year_to': request.args.get('birth_year_to', ''),
-        'marital': request.args.get('marital', ''),
-        'education': request.args.get('education', ''),
-        'education_max': request.args.get('education_max', ''),
-        'housing_type': request.args.get('housing_type', ''),
-        'blood_type': request.args.get('blood_type', ''),
-        'has_kids': request.args.get('has_kids', ''),
-        'has_kids_under_18': request.args.get('has_kids_under_18', ''),
-        'minor_age_threshold': request.args.get('minor_age_threshold', ''),
-        'kids_max_age': request.args.get('kids_max_age', ''),
-        'has_photo': request.args.get('has_photo', ''),
-        'has_document': request.args.get('has_document', ''),
-        'case_type': request.args.get('case_type', ''),
-        'evidence_level': request.args.get('evidence_level', ''),
-        'verification_status': request.args.get('verification_status', ''),
-        'civil_registry_status': request.args.get('civil_registry_status', ''),
-        'digital_evidence_type': request.args.get('digital_evidence_type', ''),
-        'has_conflicting_info': request.args.get('has_conflicting_info', ''),
-        'search': request.args.get('search', ''),
-        'has_special_needs': request.args.get('has_special_needs', ''),
-        'chronic': request.args.get('chronic', ''),
-        'breadwinner': request.args.get('breadwinner', ''),
-        'has_hypertension': request.args.get('has_hypertension', ''),
-        'has_diabetes': request.args.get('has_diabetes', ''),
-        'is_registered': request.args.get('is_registered', ''),
-        'has_legal': request.args.get('has_legal', ''),
-        'has_assoc': request.args.get('has_assoc', ''),
-        'reporter_relation': request.args.get('reporter_relation', ''),
-        'widows_filter': request.args.get('widows_filter', ''),
-        'spouse_search': request.args.get('spouse_search', ''),
-        'child_name_search': request.args.get('child_name_search', ''),
-        'child_education': request.args.get('child_education', ''),
-        'employment': request.args.get('employment', ''),
-        'profession': request.args.get('profession', ''),
-        'address_search': request.args.get('address_search', ''),
-        'arrest_reason': request.args.get('arrest_reason', ''),
-        'death_year_from': request.args.get('death_year_from', ''),
-        'death_year_to': request.args.get('death_year_to', ''),
-        'release_year_from': request.args.get('release_year_from', ''),
-        'release_year_to': request.args.get('release_year_to', ''),
-        'notes_search': request.args.get('notes_search', ''),
-        'employer': request.args.get('employer', ''),
-        'breadwinner_relation': request.args.get('breadwinner_relation', ''),
-        'age_from': request.args.get('age_from', ''),
-        'age_to': request.args.get('age_to', ''),
-        'has_guardian': request.args.get('has_guardian', ''),
-        'digital_evidence_url_status': request.args.get('digital_evidence_url_status', ''),
-        'kids_age_from': request.args.get('kids_age_from', ''),
-        'kids_age_to': request.args.get('kids_age_to', ''),
-        'collector_name': request.args.get('collector_name', ''),
-        'sort_by_need': request.args.get('sort_by_need', ''),
-        'created_from': request.args.get('created_from', ''),
-        'created_to': request.args.get('created_to', ''),
-        'collection_date_from': request.args.get('collection_date_from', ''),
-        'collection_date_to': request.args.get('collection_date_to', ''),
-        'source_type': request.args.get('source_type', ''),
-        'has_phone': request.args.get('has_phone', ''),
-        'family_book_number': request.args.get('family_book_number', ''),
-        'national_id_search': request.args.get('national_id_search', ''),
-        'has_rent': request.args.get('has_rent', ''),
-        'detention_facility_search': request.args.get('detention_facility_search', ''),
-        'record_status': request.args.get('record_status', ''),
-        'service_name': request.args.get('service_name', ''),
-        'service_count_min': request.args.get('service_count_min', ''),
-        'service_provider': request.args.get('service_provider', ''),
-        'last_service_from': request.args.get('last_service_from', ''),
-        'last_service_to': request.args.get('last_service_to', ''),
-        'service_filter_mode': request.args.get('service_filter_mode', ''),
-    }
-
+    # Build filter query using shared helper
+    filters = _filters_from_request_args(request.args)
+    status_list = filters['status_list']
     conditions, params = _build_record_filter_conditions(filters)
 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
@@ -2126,6 +2390,48 @@ def admin_records():
     )
 
 
+@app.route('/api/saved_filters')
+@admin_required
+def api_saved_filters():
+    """List saved search filters."""
+    db = get_db()
+    entity = request.args.get('entity_type', 'records')
+    filters = db.execute(
+        "SELECT id, name, filter_data, created_at FROM saved_filters WHERE entity_type=? ORDER BY name",
+        (entity,)
+    ).fetchall()
+    return jsonify([{'id': f['id'], 'name': f['name'], 'filter_data': json.loads(f['filter_data']), 'created_at': f['created_at']} for f in filters])
+
+
+@app.route('/api/saved_filters', methods=['POST'])
+@admin_required
+def api_save_filter():
+    """Save current search filters."""
+    data = request.get_json()
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'الاسم مطلوب'}), 400
+    filter_data = data.get('filter_data', {})
+    entity_type = data.get('entity_type', 'records')
+    db = get_db()
+    db.execute(
+        "INSERT INTO saved_filters (name, filter_data, entity_type) VALUES (?, ?, ?)",
+        (name, json.dumps(filter_data, ensure_ascii=False), entity_type)
+    )
+    db.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/saved_filters/<int:filter_id>', methods=['DELETE'])
+@admin_required
+def api_delete_filter(filter_id):
+    """Delete a saved filter."""
+    db = get_db()
+    db.execute("DELETE FROM saved_filters WHERE id = ?", (filter_id,))
+    db.commit()
+    return jsonify({'success': True})
+
+
 @app.route('/api/records')
 @admin_required
 def api_records():
@@ -2134,181 +2440,9 @@ def api_records():
     page = safe_int(request.args.get('page'), 1)
     per_page = safe_int(request.args.get('per_page'), 25)
 
-    # Reuse the same filter logic as admin_records
-    conditions = []
-    params = []
-
-    status_list = request.args.getlist('status')
-    expanded = []
-    for s in status_list:
-        if ',' in s:
-            expanded.extend(s.split(','))
-        elif s:
-            expanded.append(s)
-    status_list = expanded
-
-    # Simple equality filters
-    simple_filters = {
-        'province': 'province', 'gender': 'gender', 'marital': 'marital',
-        'education': 'education', 'housing_type': 'housing_type',
-        'blood_type': 'blood_type', 'case_type': 'case_type',
-        'evidence_level': 'evidence_level', 'verification_status': 'verification_status',
-        'civil_registry_status': 'civil_registry_status',
-        'digital_evidence_type': 'digital_evidence_type',
-        'reporter_relation': 'reporter_relation', 'collector_name': 'collector_name',
-        'breadwinner_relation': 'breadwinner_relation',
-        'digital_evidence_url_status': 'digital_evidence_url_status',
-        'record_status': 'record_status',
-    }
-
-    if status_list:
-        if len(status_list) == 1:
-            conditions.append("status = ?")
-            params.append(status_list[0])
-        else:
-            placeholders = ','.join(['?'] * len(status_list))
-            conditions.append(f"status IN ({placeholders})")
-            params.extend(status_list)
-
-    for param_name, col_name in simple_filters.items():
-        val = request.args.get(param_name, '')
-        if val:
-            conditions.append(f"{col_name} = ?")
-            params.append(val)
-
-    # LIKE filters
-    like_filters = {
-        'spouse_search': 'spouse_name', 'child_name_search': 'children_data',
-        'child_education': 'children_data', 'employment': 'employment',
-        'profession': 'profession', 'address_search': 'address',
-        'arrest_reason': 'arrest_reason', 'employer': 'employer',
-        'breadwinner': 'breadwinner', 'family_book_number': 'family_book_number',
-        'national_id_search': 'national_id', 'detention_facility_search': 'detention_facilities_data',
-        'arrest_place': 'arrest_place',
-    }
-    for param_name, col_name in like_filters.items():
-        val = request.args.get(param_name, '')
-        if val:
-            conditions.append(f"{col_name} LIKE ?")
-            params.append(f"%{val}%")
-
-    # Range filters
-    range_filters = [
-        ('arrest_year_from', 'arrest_year', '>='), ('arrest_year_to', 'arrest_year', '<='),
-        ('birth_year_from', 'birth_year', '>='), ('birth_year_to', 'birth_year', '<='),
-        ('death_year_from', 'death_year', '>='), ('death_year_to', 'death_year', '<='),
-        ('release_year_from', 'release_year', '>='), ('release_year_to', 'release_year', '<='),
-    ]
-    for param_name, col_name, op in range_filters:
-        val = request.args.get(param_name, '')
-        if val:
-            conditions.append(f"{col_name} {op} ?")
-            params.append(int(val))
-
-    # Date range filters
-    if request.args.get('created_from'):
-        conditions.append("created_at >= ?")
-        params.append(request.args['created_from'])
-    if request.args.get('created_to'):
-        conditions.append("created_at <= ?")
-        params.append(request.args['created_to'] + ' 23:59:59')
-    if request.args.get('collection_date_from'):
-        conditions.append("collection_date >= ?")
-        params.append(request.args['collection_date_from'])
-    if request.args.get('collection_date_to'):
-        conditions.append("collection_date <= ?")
-        params.append(request.args['collection_date_to'])
-
-    # Boolean/special filters
-    if request.args.get('has_conflicting_info') == '1':
-        conditions.append("has_conflicting_info = 1")
-    if request.args.get('has_special_needs') == '1':
-        conditions.append("has_special_needs = 1")
-    if request.args.get('has_hypertension') == '1':
-        conditions.append("has_hypertension = 1")
-    if request.args.get('has_diabetes') == '1':
-        conditions.append("has_diabetes = 1")
-    if request.args.get('chronic') == 'yes':
-        conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
-    if request.args.get('has_kids') == 'yes':
-        conditions.append("has_kids = 'yes'")
-    elif request.args.get('has_kids') == 'no':
-        conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
-    if request.args.get('has_kids_under_18') == 'yes':
-        conditions.append("kids_under_18_count > 0")
-    elif request.args.get('has_kids_under_18') == 'no':
-        conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
-    if request.args.get('has_photo') == 'yes':
-        conditions.append("photo_path IS NOT NULL AND photo_path != ''")
-    elif request.args.get('has_photo') == 'no':
-        conditions.append("(photo_path IS NULL OR photo_path = '')")
-    if request.args.get('has_document') == 'yes':
-        conditions.append("document_path IS NOT NULL AND document_path != ''")
-    elif request.args.get('has_document') == 'no':
-        conditions.append("(document_path IS NULL OR document_path = '')")
-    if request.args.get('is_registered') == '1':
-        conditions.append("is_officially_registered = 1")
-    elif request.args.get('is_registered') == '0':
-        conditions.append("(is_officially_registered = 0 OR is_officially_registered IS NULL)")
-    if request.args.get('has_legal') == 'yes':
-        conditions.append("legal = 'نعم'")
-    if request.args.get('has_assoc') == 'yes':
-        conditions.append("assoc = 'yes'")
-    elif request.args.get('has_assoc') == 'no':
-        conditions.append("(assoc != 'yes' OR assoc IS NULL OR assoc = '')")
-    if request.args.get('has_phone') == 'yes':
-        conditions.append("(phone IS NOT NULL AND phone != '')")
-    elif request.args.get('has_phone') == 'no':
-        conditions.append("(phone IS NULL OR phone = '')")
-    if request.args.get('has_rent') == 'yes':
-        conditions.append("rent_amount IS NOT NULL AND rent_amount != '' AND rent_amount != '0'")
-    elif request.args.get('has_rent') == 'no':
-        conditions.append("(rent_amount IS NULL OR rent_amount = '' OR rent_amount = '0')")
-    if request.args.get('has_guardian') == 'yes':
-        conditions.append("guardian_name IS NOT NULL AND guardian_name != ''")
-    elif request.args.get('has_guardian') == 'no':
-        conditions.append("(guardian_name IS NULL OR guardian_name = '')")
-
-    # Widows filter
-    wf = request.args.get('widows_filter', '')
-    if wf == 'widows_deceased':
-        conditions.append("status IN ('deceased') AND gender = 'male' AND marital = 'married'")
-    elif wf == 'widows_enforced':
-        conditions.append("status = 'enforced' AND gender = 'male' AND marital = 'married'")
-    elif wf == 'widows_all':
-        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married'")
-    elif wf == 'widows_with_minors':
-        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married' AND kids_under_18_count > 0")
-
-    # Notes search
-    if request.args.get('notes_search'):
-        conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
-        params.extend([f"%{request.args['notes_search']}%"] * 2)
-
-    # Text search
-    search = request.args.get('search', '')
-    if search:
-        search_term = f"%{search}%"
-        conditions.append("""(
-            first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
-            OR mother_name LIKE ? OR national_id LIKE ? OR phone LIKE ?
-            OR address LIKE ? OR notes LIKE ? OR reporter_name LIKE ?
-            OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
-        )""")
-        params.extend([search_term] * 10)
-
-    # Age range
-    if request.args.get('age_from') and safe_int(request.args['age_from']) is not None:
-        current_year = datetime.now().year
-        max_birth_year = current_year - safe_int(request.args['age_from'])
-        conditions.append("birth_year <= ? AND birth_year > 0")
-        params.append(max_birth_year)
-    if request.args.get('age_to') and safe_int(request.args['age_to']) is not None:
-        current_year = datetime.now().year
-        min_birth_year = current_year - safe_int(request.args['age_to'])
-        conditions.append("birth_year >= ?")
-        params.append(min_birth_year)
-
+    # Build filters dict from request args (reuse shared logic)
+    filters = _filters_from_request_args(request.args)
+    conditions, params = _build_record_filter_conditions(filters)
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
     # Sort
@@ -2783,7 +2917,7 @@ def api_companion_cross_ref(record_id):
                 conditions.append("(first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?)")
                 params.extend([f'%{part}%', f'%{part}%', f'%{part}%'])
         if conditions:
-            query = f"SELECT id, first_name, father_name, last_name, status, province FROM records WHERE ({' OR '.join(conditions)}) AND id != ? LIMIT 5"
+            query = f"SELECT id, first_name, father_name, last_name, status, province FROM records WHERE deleted_at IS NULL AND ({' OR '.join(conditions)}) AND id != ? LIMIT 5"
             params.append(record_id)
             found = db.execute(query, params).fetchall()
             for r in found:
@@ -2814,7 +2948,7 @@ def api_search_records_for_link():
     search_term = f"%{q}%"
     records = db.execute(
         "SELECT id, first_name, father_name, last_name, status, province FROM records "
-        "WHERE (first_name LIKE ? OR last_name LIKE ? OR father_name LIKE ? "
+        "WHERE deleted_at IS NULL AND (first_name LIKE ? OR last_name LIKE ? OR father_name LIKE ? "
         "OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?) "
         "AND id != ? LIMIT 10",
         (search_term, search_term, search_term, search_term, exclude_id)
@@ -2860,11 +2994,45 @@ def admin_record_verify(record_id):
 @admin_required
 def admin_record_delete(record_id):
     db = get_db()
-    db.execute("DELETE FROM records WHERE id = ?", (record_id,))
+    db.execute("UPDATE records SET deleted_at = datetime('now','localtime') WHERE id = ? AND deleted_at IS NULL", (record_id,))
     db.commit()
-    log_audit('record_delete', 'record', record_id)
-    flash('تم حذف السجل', 'success')
+    log_audit('record_soft_delete', 'record', record_id)
+    flash(Markup('تم حذف السجل. <a href="' + url_for('admin_record_restore', record_id=record_id) + '">تراجع</a>'), 'success')
     return redirect(url_for('admin_records'))
+
+
+@app.route('/admin/record/<int:record_id>/restore', methods=['GET', 'POST'])
+@admin_required
+def admin_record_restore(record_id):
+    db = get_db()
+    db.execute("UPDATE records SET deleted_at = NULL WHERE id = ?", (record_id,))
+    db.commit()
+    log_audit('record_restore', 'record', record_id)
+    flash('تم استعادة السجل بنجاح', 'success')
+    return redirect(url_for('admin_record_detail', record_id=record_id))
+
+
+@app.route('/admin/trash')
+@admin_required
+def admin_trash():
+    db = get_db()
+    records = db.execute(
+        "SELECT id, first_name, father_name, last_name, status, province, deleted_at "
+        "FROM records WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+    ).fetchall()
+    return render_template('admin_trash.html', records=records)
+
+
+@app.route('/admin/trash/empty', methods=['POST'])
+@admin_required
+def admin_trash_empty():
+    db = get_db()
+    count = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NOT NULL").fetchone()[0]
+    db.execute("DELETE FROM records WHERE deleted_at IS NOT NULL")
+    db.commit()
+    log_audit('trash_empty', 'record', 0, f'Permanently deleted {count} records')
+    flash(f'تم حذف {count} سجل نهائياً', 'success')
+    return redirect(url_for('admin_trash'))
 
 
 # ---------------------------------------------------------------------------
@@ -2914,287 +3082,11 @@ def record_pdf(record_id):
 
 
 def build_pdf_filter_conditions(args):
-    """Build SQL filter conditions from request args. Shared by PDF route and filtered IDs API."""
-    conditions = []
-    params = []
-
-    pdf_status_list = args.getlist('status')
-    expanded = []
-    for s in pdf_status_list:
-        if ',' in s:
-            expanded.extend(s.split(','))
-        elif s:
-            expanded.append(s)
-    pdf_status_list = expanded
-    if pdf_status_list:
-        if len(pdf_status_list) == 1:
-            conditions.append("status = ?")
-            params.append(pdf_status_list[0])
-        else:
-            placeholders = ','.join(['?'] * len(pdf_status_list))
-            conditions.append(f"status IN ({placeholders})")
-            params.extend(pdf_status_list)
-
-    for key in ['province', 'gender', 'marital', 'education', 'housing_type', 'blood_type',
-                'case_type', 'evidence_level', 'verification_status', 'civil_registry_status']:
-        val = args.get(key, '')
-        if val:
-            conditions.append(f"{key} = ?")
-            params.append(val)
-
-    if args.get('arrest_authority'):
-        aa = args['arrest_authority']
-        matching_keywords = None
-        for canonical, keywords in AUTHORITY_GROUPS.items():
-            if aa == canonical:
-                matching_keywords = keywords
-                break
-            for kw in keywords:
-                if kw in aa:
-                    matching_keywords = keywords
-                    break
-            if matching_keywords:
-                break
-        if matching_keywords:
-            or_clauses = ' OR '.join(['arrest_authority LIKE ?' for _ in matching_keywords])
-            conditions.append(f"({or_clauses})")
-            params.extend([f"%{kw}%" for kw in matching_keywords])
-        else:
-            conditions.append("arrest_authority LIKE ?")
-            params.append(f"%{aa}%")
-    if args.get('arrest_place'):
-        conditions.append("arrest_place LIKE ?")
-        params.append(f"%{args['arrest_place']}%")
-    if args.get('search'):
-        s = f"%{args['search']}%"
-        conditions.append("""(
-            first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
-            OR mother_name LIKE ? OR national_id LIKE ? OR phone LIKE ?
-            OR address LIKE ? OR notes LIKE ? OR reporter_name LIKE ?
-            OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
-        )""")
-        params.extend([s] * 10)
-    if args.get('arrest_year_from') and safe_int(args['arrest_year_from']) is not None:
-        conditions.append("arrest_year >= ?")
-        params.append(safe_int(args['arrest_year_from']))
-    if args.get('arrest_year_to') and safe_int(args['arrest_year_to']) is not None:
-        conditions.append("arrest_year <= ?")
-        params.append(safe_int(args['arrest_year_to']))
-    if args.get('birth_year_from') and safe_int(args['birth_year_from']) is not None:
-        conditions.append("birth_year >= ?")
-        params.append(safe_int(args['birth_year_from']))
-    if args.get('birth_year_to') and safe_int(args['birth_year_to']) is not None:
-        conditions.append("birth_year <= ?")
-        params.append(safe_int(args['birth_year_to']))
-    if args.get('has_kids') == 'yes':
-        conditions.append("has_kids = 'yes'")
-    elif args.get('has_kids') == 'no':
-        conditions.append("(has_kids = 'no' OR has_kids IS NULL OR has_kids = '')")
-    pdf_minor_threshold = safe_int(args.get('minor_age_threshold'), 18)
-    if args.get('has_kids_under_18') == 'yes':
-        if pdf_minor_threshold == 18:
-            conditions.append("kids_under_18_count > 0")
-        else:
-            conditions.append("(children_data IS NOT NULL AND children_data != '' AND children_data != '[]')")
-    elif args.get('has_kids_under_18') == 'no':
-        if pdf_minor_threshold == 18:
-            conditions.append("(kids_under_18_count = 0 OR kids_under_18_count IS NULL)")
-        else:
-            pass  # post-filter
-    if args.get('kids_max_age'):
-        conditions.append("kids_under_18_count > 0")
-    if args.get('has_photo') == 'yes':
-        conditions.append("photo_path IS NOT NULL AND photo_path != ''")
-    elif args.get('has_photo') == 'no':
-        conditions.append("(photo_path IS NULL OR photo_path = '')")
-    if args.get('has_document') == 'yes':
-        conditions.append("document_path IS NOT NULL AND document_path != ''")
-    elif args.get('has_document') == 'no':
-        conditions.append("(document_path IS NULL OR document_path = '')")
-    if args.get('digital_evidence_type'):
-        conditions.append("digital_evidence_type = ?")
-        params.append(args['digital_evidence_type'])
-    if args.get('has_special_needs') == '1':
-        conditions.append("has_special_needs = 1")
-    if args.get('chronic') == 'yes':
-        conditions.append("(chronic = 'نعم' OR has_hypertension = 1 OR has_diabetes = 1 OR (other_diseases IS NOT NULL AND other_diseases != ''))")
-    if args.get('has_hypertension') == '1':
-        conditions.append("has_hypertension = 1")
-    if args.get('has_diabetes') == '1':
-        conditions.append("has_diabetes = 1")
-    if args.get('has_conflicting_info') == '1':
-        conditions.append("has_conflicting_info = 1")
-    if args.get('breadwinner'):
-        conditions.append("breadwinner LIKE ?")
-        params.append(f"%{args['breadwinner']}%")
-    if args.get('is_registered') == '1':
-        conditions.append("is_officially_registered = 1")
-    elif args.get('is_registered') == '0':
-        conditions.append("(is_officially_registered = 0 OR is_officially_registered IS NULL)")
-    if args.get('has_legal') == 'yes':
-        conditions.append("legal = 'نعم'")
-    if args.get('has_assoc') == 'yes':
-        conditions.append("assoc = 'yes'")
-    elif args.get('has_assoc') == 'no':
-        conditions.append("(assoc != 'yes' OR assoc IS NULL OR assoc = '')")
-    if args.get('reporter_relation'):
-        conditions.append("reporter_relation = ?")
-        params.append(args['reporter_relation'])
-    if args.get('education_max'):
-        edu_order = ['أمّي', 'ابتدائية', 'إعدادية', 'ثانوية', 'معهد', 'بكالوريوس', 'ماجستير', 'دكتوراه']
-        try:
-            max_idx = edu_order.index(args['education_max'])
-            included = edu_order[:max_idx + 1]
-            placeholders = ','.join(['?'] * len(included))
-            conditions.append(f"education IN ({placeholders})")
-            params.extend(included)
-        except ValueError:
-            pass
-    widows_f = args.get('widows_filter', '')
-    if widows_f == 'widows_deceased':
-        conditions.append("status IN ('deceased') AND gender = 'male' AND marital = 'married'")
-    elif widows_f == 'widows_enforced':
-        conditions.append("status = 'enforced' AND gender = 'male' AND marital = 'married'")
-    elif widows_f == 'widows_all':
-        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married'")
-    elif widows_f == 'widows_with_minors':
-        conditions.append("status IN ('deceased', 'enforced') AND gender = 'male' AND marital = 'married' AND kids_under_18_count > 0")
-    if args.get('spouse_search'):
-        conditions.append("spouse_name LIKE ?")
-        params.append(f"%{args['spouse_search']}%")
-    if args.get('child_name_search'):
-        conditions.append("children_data LIKE ?")
-        params.append(f"%{args['child_name_search']}%")
-    if args.get('child_education'):
-        conditions.append("children_data LIKE ?")
-        params.append(f"%{args['child_education']}%")
-    if args.get('employment'):
-        conditions.append("employment LIKE ?")
-        params.append(f"%{args['employment']}%")
-    if args.get('profession'):
-        conditions.append("profession LIKE ?")
-        params.append(f"%{args['profession']}%")
-    if args.get('address_search'):
-        conditions.append("address LIKE ?")
-        params.append(f"%{args['address_search']}%")
-    if args.get('arrest_reason'):
-        conditions.append("arrest_reason LIKE ?")
-        params.append(f"%{args['arrest_reason']}%")
-    if args.get('death_year_from') and safe_int(args['death_year_from']) is not None:
-        conditions.append("death_year >= ?")
-        params.append(safe_int(args['death_year_from']))
-    if args.get('death_year_to') and safe_int(args['death_year_to']) is not None:
-        conditions.append("death_year <= ?")
-        params.append(safe_int(args['death_year_to']))
-    if args.get('release_year_from') and safe_int(args['release_year_from']) is not None:
-        conditions.append("release_year >= ?")
-        params.append(safe_int(args['release_year_from']))
-    if args.get('release_year_to') and safe_int(args['release_year_to']) is not None:
-        conditions.append("release_year <= ?")
-        params.append(safe_int(args['release_year_to']))
-    if args.get('notes_search'):
-        conditions.append("(notes LIKE ? OR methodology_notes LIKE ?)")
-        params.extend([f"%{args['notes_search']}%"] * 2)
-    if args.get('employer'):
-        conditions.append("employer LIKE ?")
-        params.append(f"%{args['employer']}%")
-    if args.get('breadwinner_relation'):
-        conditions.append("breadwinner_relation = ?")
-        params.append(args['breadwinner_relation'])
-    if args.get('age_from') and safe_int(args['age_from']) is not None:
-        current_year = datetime.now().year
-        max_birth_year = current_year - safe_int(args['age_from'])
-        conditions.append("birth_year <= ? AND birth_year > 0")
-        params.append(max_birth_year)
-    if args.get('age_to') and safe_int(args['age_to']) is not None:
-        current_year = datetime.now().year
-        min_birth_year = current_year - safe_int(args['age_to'])
-        conditions.append("birth_year >= ?")
-        params.append(min_birth_year)
-    if args.get('has_guardian') == 'yes':
-        conditions.append("guardian_name IS NOT NULL AND guardian_name != ''")
-    elif args.get('has_guardian') == 'no':
-        conditions.append("(guardian_name IS NULL OR guardian_name = '')")
-    if args.get('digital_evidence_url_status'):
-        conditions.append("digital_evidence_url_status = ?")
-        params.append(args['digital_evidence_url_status'])
-    if args.get('collector_name'):
-        conditions.append("collector_name = ?")
-        params.append(args['collector_name'])
-    # Data entry date range (created_at is TEXT like '2024-01-15 10:30:00')
-    if args.get('created_from'):
-        conditions.append("created_at >= ?")
-        params.append(args['created_from'])
-    if args.get('created_to'):
-        conditions.append("created_at <= ?")
-        params.append(args['created_to'] + ' 23:59:59')
-    # Collection date range
-    if args.get('collection_date_from'):
-        conditions.append("collection_date >= ?")
-        params.append(args['collection_date_from'])
-    if args.get('collection_date_to'):
-        conditions.append("collection_date <= ?")
-        params.append(args['collection_date_to'])
-    if args.get('source_type'):
-        conditions.append("source_type = ?")
-        params.append(args['source_type'])
-    if args.get('has_phone') == 'yes':
-        conditions.append("(phone IS NOT NULL AND phone != '')")
-    elif args.get('has_phone') == 'no':
-        conditions.append("(phone IS NULL OR phone = '')")
-    if args.get('family_book_number'):
-        conditions.append("family_book_number LIKE ?")
-        params.append(f"%{args['family_book_number']}%")
-    if args.get('national_id_search'):
-        conditions.append("national_id LIKE ?")
-        params.append(f"%{args['national_id_search']}%")
-    if args.get('has_rent') == 'yes':
-        conditions.append("rent_amount IS NOT NULL AND rent_amount != '' AND rent_amount != '0'")
-    elif args.get('has_rent') == 'no':
-        conditions.append("(rent_amount IS NULL OR rent_amount = '' OR rent_amount = '0')")
-    if args.get('detention_facility_search'):
-        conditions.append("detention_facilities_data LIKE ?")
-        params.append(f"%{args['detention_facility_search']}%")
-    # Service filters (subqueries on record_services) - match _build_record_filter_conditions
-    svc_mode = args.get('service_filter_mode', '') or 'received'
-    if svc_mode == 'not_received' and args.get('service_name'):
-        conditions.append(
-            "NOT EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
-        )
-        params.append(args['service_name'])
-    elif args.get('service_name') and args.get('service_count_min'):
-        conditions.append(
-            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?) >= ?"
-        )
-        params.append(args['service_name'])
-        params.append(safe_int(args['service_count_min'], 1))
-    elif args.get('service_name'):
-        conditions.append(
-            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_name = ?)"
-        )
-        params.append(args['service_name'])
-    elif args.get('service_count_min'):
-        conditions.append(
-            "(SELECT COUNT(*) FROM record_services rs WHERE rs.record_id = records.id) >= ?"
-        )
-        params.append(safe_int(args['service_count_min'], 1))
-    if args.get('service_provider'):
-        conditions.append(
-            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.provider = ?)"
-        )
-        params.append(args['service_provider'])
-    if args.get('last_service_from'):
-        conditions.append(
-            "EXISTS (SELECT 1 FROM record_services rs WHERE rs.record_id = records.id AND rs.service_date >= ?)"
-        )
-        params.append(args['last_service_from'])
-    if args.get('last_service_to'):
-        conditions.append(
-            "(SELECT MAX(rs.service_date) FROM record_services rs WHERE rs.record_id = records.id) <= ?"
-        )
-        params.append(args['last_service_to'])
-
-    return conditions, params, pdf_status_list
+    """Build SQL filter conditions from request args. Shared by PDF route and filtered IDs API.
+    Now delegates to the unified _build_record_filter_conditions."""
+    filters = _filters_from_request_args(args)
+    conditions, params = _build_record_filter_conditions(filters)
+    return conditions, params, filters['status_list']
 
 
 @app.route('/admin/records/pdf', methods=['GET', 'POST'])
@@ -3248,7 +3140,7 @@ def records_list_pdf():
         missing_ids = [rid for rid in ordered_ids if rid not in rec_map]
         if missing_ids:
             placeholders = ','.join(['?'] * len(missing_ids))
-            extra = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", missing_ids).fetchall()
+            extra = db.execute(f"SELECT * FROM records WHERE deleted_at IS NULL AND id IN ({placeholders})", missing_ids).fetchall()
             for r in extra:
                 rec_map[r['id']] = r
         # Rebuild records in the user's custom order
@@ -3507,7 +3399,7 @@ def records_list_excel():
         missing_ids = [rid for rid in ordered_ids if rid not in rec_map]
         if missing_ids:
             placeholders = ','.join(['?'] * len(missing_ids))
-            extra = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", missing_ids).fetchall()
+            extra = db.execute(f"SELECT * FROM records WHERE deleted_at IS NULL AND id IN ({placeholders})", missing_ids).fetchall()
             for r in extra:
                 rec_map[r['id']] = r
         records = [rec_map[rid] for rid in ordered_ids if rid in rec_map]
@@ -3622,7 +3514,7 @@ def records_export_vcf():
         missing_ids = [rid for rid in ordered_ids if rid not in rec_map]
         if missing_ids:
             placeholders = ','.join(['?'] * len(missing_ids))
-            extra = db.execute(f"SELECT * FROM records WHERE id IN ({placeholders})", missing_ids).fetchall()
+            extra = db.execute(f"SELECT * FROM records WHERE deleted_at IS NULL AND id IN ({placeholders})", missing_ids).fetchall()
             for r in extra:
                 rec_map[r['id']] = r
         records = [rec_map[rid] for rid in ordered_ids if rid in rec_map]
@@ -3766,7 +3658,7 @@ def export_kids_no_birthdate():
     db = get_db()
     rows = db.execute(
         "SELECT id, first_name, father_name, last_name, phone, children_data "
-        "FROM records WHERE has_kids = 'yes' AND children_data IS NOT NULL AND children_data != '' AND children_data != '[]' "
+        "FROM records WHERE deleted_at IS NULL AND has_kids = 'yes' AND children_data IS NOT NULL AND children_data != '' AND children_data != '[]' "
         "ORDER BY id DESC"
     ).fetchall()
 
@@ -3810,10 +3702,10 @@ def export_kids_no_birthdate():
 @app.route('/api/stats')
 def api_stats():
     db = get_db()
-    total = db.execute("SELECT COUNT(*) FROM records").fetchone()[0]
-    survivors = db.execute("SELECT COUNT(*) FROM records WHERE status='survivor'").fetchone()[0]
-    enforced = db.execute("SELECT COUNT(*) FROM records WHERE status='enforced'").fetchone()[0]
-    deceased = db.execute("SELECT COUNT(*) FROM records WHERE status='deceased'").fetchone()[0]
+    total = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL").fetchone()[0]
+    survivors = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='survivor'").fetchone()[0]
+    enforced = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='enforced'").fetchone()[0]
+    deceased = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='deceased'").fetchone()[0]
     return jsonify({
         'total': total, 'survivors': survivors,
         'enforced': enforced, 'deceased': deceased
@@ -3942,8 +3834,8 @@ def api_search_records():
     db = get_db()
     s = f"%{q}%"
     rows = db.execute(
-        "SELECT * FROM records WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? "
-        "OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ? "
+        "SELECT * FROM records WHERE deleted_at IS NULL AND (first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? "
+        "OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?) "
         "ORDER BY id DESC LIMIT 20", (s, s, s, s)
     ).fetchall()
     return jsonify([serialize_record_for_picker(r) for r in rows])
@@ -4572,7 +4464,7 @@ def admin_member_delete_payment(mid, pid):
 @admin_required
 def admin_record_add_service(record_id):
     db = get_db()
-    record = db.execute("SELECT id FROM records WHERE id=?", (record_id,)).fetchone()
+    record = db.execute("SELECT id FROM records WHERE deleted_at IS NULL AND id=?", (record_id,)).fetchone()
     if not record:
         flash('السجل غير موجود', 'error')
         return redirect(url_for('admin_records'))
@@ -5246,9 +5138,9 @@ def api_search_for_list():
         rows = db.execute("""
             SELECT id, first_name, father_name, last_name, phone, status, province
             FROM records
-            WHERE first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
+            WHERE deleted_at IS NULL AND (first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?
                   OR national_id LIKE ? OR phone LIKE ?
-                  OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?
+                  OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?)
             ORDER BY first_name LIMIT 15
         """, (term, term, term, term, term, term)).fetchall()
         for r in rows:
@@ -5431,6 +5323,7 @@ def api_kdeconnect_send_sms_bulk():
 
 
 @app.route('/uploads/<path:filename>')
+@admin_required
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
@@ -5564,7 +5457,7 @@ def admin_location_report():
             base_q += " AND status = ?"
             params.append(status_filter)
     else:
-        base_q = "SELECT province, address, address_area FROM records WHERE 1=1"
+        base_q = "SELECT province, address, address_area FROM records WHERE deleted_at IS NULL"
         has_area_col = True
         params = []
         if status_filter:
@@ -5693,6 +5586,115 @@ def admin_server_config():
     return render_template('admin_server_config.html', config=cfg, current_ip=lan_ip)
 
 
+@app.route('/api/network')
+@admin_required
+def api_network():
+    """Return network graph data for relationship visualization."""
+    db = get_db()
+    # Get all records (nodes)
+    records = db.execute(
+        "SELECT id, first_name, father_name, last_name, status, province "
+        "FROM records WHERE deleted_at IS NULL"
+    ).fetchall()
+
+    nodes = []
+    node_ids = set()
+    for r in records:
+        node_ids.add(r['id'])
+        nodes.append({
+            'id': r['id'],
+            'name': ' '.join(filter(None, [r['first_name'], r['father_name'], r['last_name']])),
+            'status': r['status'] or '',
+            'province': r['province'] or '',
+        })
+
+    edges = []
+    # record_links
+    links = db.execute("SELECT record_id_a, record_id_b, link_type, notes FROM record_links").fetchall()
+    for l in links:
+        if l['record_id_a'] in node_ids and l['record_id_b'] in node_ids:
+            edges.append({
+                'source': l['record_id_a'], 'target': l['record_id_b'],
+                'type': l['link_type'], 'label': l['notes'] or l['link_type'],
+            })
+
+    # companions with linked records
+    comps = db.execute(
+        "SELECT record_id, linked_record_id, first_name, last_name "
+        "FROM record_companions WHERE linked_record_id IS NOT NULL"
+    ).fetchall()
+    for c in comps:
+        if c['record_id'] in node_ids and c['linked_record_id'] in node_ids:
+            edges.append({
+                'source': c['record_id'], 'target': c['linked_record_id'],
+                'type': 'companion',
+                'label': ' '.join(filter(None, [c['first_name'], c['last_name']])) or 'رفيق',
+            })
+
+    # Only include nodes that have at least one edge
+    connected_ids = set()
+    for e in edges:
+        connected_ids.add(e['source'])
+        connected_ids.add(e['target'])
+    nodes = [n for n in nodes if n['id'] in connected_ids]
+
+    return jsonify({'nodes': nodes, 'edges': edges})
+
+
+@app.route('/admin/network')
+@admin_required
+def admin_network():
+    """Family/relationship network visualization."""
+    return render_template('admin_network.html')
+
+
+@app.route('/admin/dedup')
+@admin_required
+def admin_dedup():
+    """Batch deduplication scanner - finds potential duplicate records."""
+    db = get_db()
+    records = db.execute(
+        "SELECT id, first_name, father_name, last_name, national_id, phone, province, status "
+        "FROM records WHERE deleted_at IS NULL ORDER BY first_name, last_name"
+    ).fetchall()
+
+    duplicates = []
+    seen = {}  # key -> list of record dicts
+
+    for r in records:
+        # Key 1: exact name match (first + father + last)
+        name_key = f"{(r['first_name'] or '').strip()}|{(r['father_name'] or '').strip()}|{(r['last_name'] or '').strip()}"
+        if name_key and name_key != '||':
+            seen.setdefault(('name', name_key), []).append(r)
+
+        # Key 2: national_id match
+        nid = (r['national_id'] or '').strip()
+        if nid:
+            seen.setdefault(('nid', nid), []).append(r)
+
+        # Key 3: phone match
+        phone = (r['phone'] or '').strip()
+        if phone:
+            seen.setdefault(('phone', phone), []).append(r)
+
+    # Collect groups with >1 match
+    dup_groups = []
+    seen_ids = set()
+    for (match_type, key), group in seen.items():
+        if len(group) > 1:
+            ids = tuple(sorted(r['id'] for r in group))
+            if ids not in seen_ids:
+                seen_ids.add(ids)
+                type_labels = {'name': 'تطابق الاسم', 'nid': 'تطابق الرقم الوطني', 'phone': 'تطابق الهاتف'}
+                dup_groups.append({
+                    'match_type': type_labels.get(match_type, match_type),
+                    'match_value': key,
+                    'records': [dict(r) for r in group],
+                })
+
+    return render_template('admin_dedup.html', groups=dup_groups, total_groups=len(dup_groups))
+
+
 @app.route('/admin/missing-details')
 @admin_required
 def admin_missing_details():
@@ -5806,7 +5808,7 @@ def admin_missing_details():
         ('death_place', 'مكان الوفاة'),
     ]
     if profile_type in ('all', 'records'):
-        records = db.execute("SELECT * FROM records ORDER BY id").fetchall()
+        records = db.execute("SELECT * FROM records WHERE deleted_at IS NULL ORDER BY id").fetchall()
         for r in records:
             # Build status-aware field list
             fields_to_check = list(record_base_fields)
@@ -5939,7 +5941,7 @@ def admin_missing_details_excel():
     int_cols = {'birth_year', 'arrest_year', 'release_year', 'death_year'}
 
     if profile_type in ('all', 'records'):
-        for r in db.execute("SELECT * FROM records ORDER BY id").fetchall():
+        for r in db.execute("SELECT * FROM records WHERE deleted_at IS NULL ORDER BY id").fetchall():
             fields = list(record_base)
             s = r['status'] or ''
             if s in ('enforced', 'survivor', 'deceased'):

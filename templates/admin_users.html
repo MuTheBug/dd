@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}إدارة المستخدمين - حقنا{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>إدارة المستخدمين</h2>
+
+    <!-- Add User Form -->
+    <div class="card" style="margin-bottom:1.5rem; padding:1rem;">
+        <h3 style="margin-bottom:0.8rem;">إضافة مستخدم جديد</h3>
+        <form method="post" action="{{ url_for('admin_user_add') }}" style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:end;">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label style="font-size:0.85rem;">اسم المستخدم</label>
+                <input type="text" name="username" required style="padding:0.4rem; border:1px solid var(--border); border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:0.85rem;">الاسم المعروض</label>
+                <input type="text" name="display_name" style="padding:0.4rem; border:1px solid var(--border); border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:0.85rem;">كلمة المرور</label>
+                <input type="password" name="password" required minlength="6" style="padding:0.4rem; border:1px solid var(--border); border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:0.85rem;">الصلاحية</label>
+                <select name="role" style="padding:0.4rem; border:1px solid var(--border); border-radius:6px;">
+                    <option value="admin">مدير</option>
+                    <option value="data_entry">إدخال بيانات</option>
+                    <option value="viewer" selected>مشاهد</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">إضافة</button>
+        </form>
+    </div>
+
+    <!-- Users List -->
+    {% if users %}
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>اسم المستخدم</th>
+                    <th>الاسم المعروض</th>
+                    <th>الصلاحية</th>
+                    <th>الحالة</th>
+                    <th>آخر دخول</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>{{ u.username }}</td>
+                    <td>{{ u.display_name }}</td>
+                    <td>{{ role_labels.get(u.role, u.role) }}</td>
+                    <td>
+                        {% if u.is_active %}
+                        <span style="color:#059669;">نشط</span>
+                        {% else %}
+                        <span style="color:#dc2626;">معطّل</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ u.last_login or '-' }}</td>
+                    <td style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                        <form method="post" action="{{ url_for('admin_user_toggle', user_id=u.id) }}" style="display:inline;">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline">{{ 'تعطيل' if u.is_active else 'تفعيل' }}</button>
+                        </form>
+                        <form method="post" action="{{ url_for('admin_user_reset_password', user_id=u.id) }}" style="display:inline;" onsubmit="var p=prompt('كلمة المرور الجديدة:'); if(!p||p.length<6){alert('6 أحرف على الأقل');return false;} this.querySelector('[name=new_password]').value=p;">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="new_password" value="">
+                            <button type="submit" class="btn btn-sm btn-outline">تغيير كلمة المرور</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><p>لم يتم إضافة مستخدمين بعد. يمكنك الدخول بكلمة مرور المدير الرئيسية.</p></div>
+    {% endif %}
+</div>
+{% endblock %}

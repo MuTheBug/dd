@@ -171,6 +171,8 @@
         </div>
         <button type="button" class="btn btn-primary btn-sm" onclick="applyListFilter()">تطبيق</button>
         <button type="button" class="btn btn-outline btn-sm" onclick="resetListFilter()">إعادة تعيين</button>
+        <span style="border-right:1px solid var(--border); height:24px;"></span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="applyPreset(20,40)" style="font-size:0.78rem;">20-40 سنة</button>
         <span id="clFilterCount" style="font-size:0.8rem; color:var(--text-light); margin-right:auto;"></span>
     </div>
 </div>
@@ -395,6 +397,11 @@ function applyListFilter() {
     if (shown < total) { counter.textContent = 'عرض ' + shown + ' من ' + total; }
     else { counter.textContent = ''; }
     renumberVisibleRows();
+}
+function applyPreset(from, to) {
+    document.getElementById('clAgeFrom').value = from;
+    document.getElementById('clAgeTo').value = to;
+    applyListFilter();
 }
 function resetListFilter() {
     document.querySelectorAll('.cl-status-filter').forEach(function(cb) { cb.checked = true; });

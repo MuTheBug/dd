@@ -145,11 +145,42 @@
     </div>
 </div>
 
+<!-- Filter Bar -->
+{% if total > 0 %}
+<div class="card" style="padding: 0.8rem 1rem;">
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.8rem;">
+        <span style="font-weight:600; font-size:0.9rem; color:var(--text-light);">&#x1F50D; تصفية:</span>
+        <label class="checkbox-label" style="font-size:0.85rem;">
+            <input type="checkbox" class="cl-status-filter" value="survivor" checked> &#x1F7E2; ناجٍ
+        </label>
+        <label class="checkbox-label" style="font-size:0.85rem;">
+            <input type="checkbox" class="cl-status-filter" value="enforced" checked> &#x1F7E0; مغيّب قسراً
+        </label>
+        <label class="checkbox-label" style="font-size:0.85rem;">
+            <input type="checkbox" class="cl-status-filter" value="deceased" checked> &#x1F534; متوفى
+        </label>
+        <label class="checkbox-label" style="font-size:0.85rem;">
+            <input type="checkbox" class="cl-status-filter" value="" checked> بدون حالة
+        </label>
+        <span style="border-right:1px solid var(--border); height:24px;"></span>
+        <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
+            <label>العمر من</label>
+            <input type="number" id="clAgeFrom" min="0" max="120" style="width:60px; font-size:0.85rem; padding:3px 6px;" placeholder="0">
+            <label>إلى</label>
+            <input type="number" id="clAgeTo" min="0" max="120" style="width:60px; font-size:0.85rem; padding:3px 6px;" placeholder="120">
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="applyListFilter()">تطبيق</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="resetListFilter()">إعادة تعيين</button>
+        <span id="clFilterCount" style="font-size:0.8rem; color:var(--text-light); margin-right:auto;"></span>
+    </div>
+</div>
+{% endif %}
+
 <!-- Combined Table -->
 {% if total > 0 %}
 <div class="card" style="padding: 0; overflow: hidden;">
     <div class="table-wrapper">
-        <table>
+        <table id="listTable">
             <thead>
                 <tr>
                     <th style="width:35px;">#</th>
@@ -162,7 +193,7 @@
             <tbody>
                 {% set counter = {'n': 1} %}
                 {% for m in manual_items %}
-                <tr>
+                <tr data-status="{{ m.status or '' }}" data-birth-year="{{ m.birth_year or '' }}">
                     <td>{{ counter.n }}{% if counter.update({'n': counter.n + 1}) %}{% endif %}</td>
                     <td style="font-weight: 600;">
                         {{ m.full_name }}{% if m.father_name %} {{ m.father_name }}{% endif %}
@@ -187,7 +218,7 @@
                 </tr>
                 {% endfor %}
                 {% for r in items %}
-                <tr style="background: rgba(37,99,235,0.03);">
+                <tr style="background: rgba(37,99,235,0.03);" data-status="{{ r.status or '' }}" data-birth-year="{{ r.birth_year or '' }}">
                     <td>{{ counter.n }}{% if counter.update({'n': counter.n + 1}) %}{% endif %}</td>
                     <td style="font-weight: 600;">
                         {{ r.first_name }} {{ r.father_name or '' }} {{ r.last_name or '' }}
@@ -338,6 +369,48 @@
 </div>
 
 <script>
+/* ── List filter by status & age ── */
+function applyListFilter() {
+    var checked = [];
+    document.querySelectorAll('.cl-status-filter:checked').forEach(function(cb) { checked.push(cb.value); });
+    var ageFrom = parseInt(document.getElementById('clAgeFrom').value) || 0;
+    var ageTo = parseInt(document.getElementById('clAgeTo').value) || 999;
+    var currentYear = new Date().getFullYear();
+    var rows = document.querySelectorAll('#listTable tbody tr');
+    var shown = 0, total = 0;
+    rows.forEach(function(tr) {
+        total++;
+        var status = tr.getAttribute('data-status') || '';
+        var birthYear = tr.getAttribute('data-birth-year');
+        var statusOk = checked.indexOf(status) >= 0;
+        var ageOk = true;
+        if (birthYear && birthYear !== '') {
+            var age = currentYear - parseInt(birthYear);
+            ageOk = age >= ageFrom && age <= ageTo;
+        }
+        if (statusOk && ageOk) { tr.style.display = ''; shown++; }
+        else { tr.style.display = 'none'; }
+    });
+    var counter = document.getElementById('clFilterCount');
+    if (shown < total) { counter.textContent = 'عرض ' + shown + ' من ' + total; }
+    else { counter.textContent = ''; }
+    renumberVisibleRows();
+}
+function resetListFilter() {
+    document.querySelectorAll('.cl-status-filter').forEach(function(cb) { cb.checked = true; });
+    document.getElementById('clAgeFrom').value = '';
+    document.getElementById('clAgeTo').value = '';
+    applyListFilter();
+}
+function renumberVisibleRows() {
+    var n = 1;
+    document.querySelectorAll('#listTable tbody tr').forEach(function(tr) {
+        if (tr.style.display !== 'none') {
+            tr.cells[0].textContent = n++;
+        }
+    });
+}
+
 function clToggleAll(on) {
     document.querySelectorAll('.cl-col-check').forEach(function(cb) { cb.checked = on; });
 }

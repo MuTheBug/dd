@@ -172,7 +172,7 @@
         <button type="button" class="btn btn-primary btn-sm" onclick="applyListFilter()">تطبيق</button>
         <button type="button" class="btn btn-outline btn-sm" onclick="resetListFilter()">إعادة تعيين</button>
         <span style="border-right:1px solid var(--border); height:24px;"></span>
-        <button type="button" class="btn btn-outline btn-sm" onclick="applyPreset(20,40)" style="font-size:0.78rem;">20-40 سنة</button>
+        <button type="button" id="btnAge2040" class="btn btn-outline btn-sm" onclick="toggleAge2040()" style="font-size:0.82rem;">العمر 20-40</button>
         <span id="clFilterCount" style="font-size:0.8rem; color:var(--text-light); margin-right:auto;"></span>
     </div>
 </div>
@@ -398,15 +398,32 @@ function applyListFilter() {
     else { counter.textContent = ''; }
     renumberVisibleRows();
 }
-function applyPreset(from, to) {
-    document.getElementById('clAgeFrom').value = from;
-    document.getElementById('clAgeTo').value = to;
+var age2040Active = false;
+function toggleAge2040() {
+    var btn = document.getElementById('btnAge2040');
+    age2040Active = !age2040Active;
+    if (age2040Active) {
+        document.getElementById('clAgeFrom').value = 20;
+        document.getElementById('clAgeTo').value = 40;
+        btn.style.background = 'var(--primary)';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'var(--primary)';
+    } else {
+        document.getElementById('clAgeFrom').value = '';
+        document.getElementById('clAgeTo').value = '';
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+    }
     applyListFilter();
 }
 function resetListFilter() {
     document.querySelectorAll('.cl-status-filter').forEach(function(cb) { cb.checked = true; });
     document.getElementById('clAgeFrom').value = '';
     document.getElementById('clAgeTo').value = '';
+    age2040Active = false;
+    var btn = document.getElementById('btnAge2040');
+    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; }
     applyListFilter();
 }
 function renumberVisibleRows() {

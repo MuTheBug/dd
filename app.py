@@ -145,8 +145,14 @@ def _get_admin_password_hash():
     if os.path.exists(ADMIN_PASSWORD_FILE):
         with open(ADMIN_PASSWORD_FILE, 'r') as f:
             return f.read().strip()
-    # First run: create default hashed password
-    default_hash = generate_password_hash('haqquna2024')
+    # First run: use env var or generate random password (never hardcode in source)
+    default_password = os.environ.get('HAQQUNA_DEFAULT_PASSWORD', '')
+    if not default_password:
+        default_password = secrets.token_urlsafe(16)
+        import sys
+        print(f"[HAQQUNA] Generated initial admin password: {default_password}", file=sys.stderr)
+        print(f"[HAQQUNA] Set HAQQUNA_DEFAULT_PASSWORD env var to override.", file=sys.stderr)
+    default_hash = generate_password_hash(default_password)
     with open(ADMIN_PASSWORD_FILE, 'w') as f:
         f.write(default_hash)
     return default_hash
@@ -533,16 +539,31 @@ def db_execute_with_retry(db, sql, params=None, max_retries=3):
             raise
 
 
-def log_audit(action, entity_type, entity_id=None, details=''):
-    """Log an admin action to the audit trail."""
+def log_audit(action, entity_type, entity_id=None, details='', changed_by=None):
+    """Log an admin action to the audit trail (Berkeley Protocol: chain of custody)."""
     try:
         db = get_db()
         ip = request.remote_addr if request else ''
-        db.execute("INSERT INTO audit_log (action, entity_type, entity_id, details, ip_address) VALUES (?,?,?,?,?)",
-                   (action, entity_type, entity_id, details, ip))
+        if changed_by is None:
+            changed_by = session.get('username', session.get('display_name', 'admin'))
+        # Store structured JSON details for Berkeley Protocol compliance
+        if isinstance(details, str):
+            structured_details = json.dumps({
+                'changed_by': changed_by,
+                'description': details,
+            }, ensure_ascii=False)
+        else:
+            if 'changed_by' not in details:
+                details['changed_by'] = changed_by
+            structured_details = json.dumps(details, ensure_ascii=False)
+        db.execute(
+            "INSERT INTO audit_log (action, entity_type, entity_id, details, ip_address, user_id) VALUES (?,?,?,?,?,?)",
+            (action, entity_type, entity_id, structured_details, ip, changed_by)
+        )
         db.commit()
-    except Exception:
-        pass  # Never let audit logging break the main operation
+    except Exception as e:
+        import sys
+        print(f"[AUDIT LOG ERROR] {e}", file=sys.stderr)
 
 
 @app.teardown_appcontext
@@ -681,6 +702,14 @@ def migrate_db():
         'family_book_number': "TEXT DEFAULT ''",
         'address_area': "TEXT DEFAULT ''",
         'deleted_at': "TEXT DEFAULT NULL",
+        # Berkeley Protocol: link collector to volunteers table for provenance
+        'collector_id': "INTEGER DEFAULT NULL",
+        # Berkeley Protocol: hash for digital evidence screenshots
+        'screenshot_hash': "TEXT DEFAULT ''",
+        # Renamed from children_data_w for clarity
+        'spouse_previous_children_data': "TEXT DEFAULT '[]'",
+        # Berkeley Protocol: structured methodology type
+        'methodology_type': "TEXT DEFAULT ''",
     }
 
     for col, typedef in new_columns.items():
@@ -984,6 +1013,115 @@ def migrate_db():
         )
     """)
 
+    # -- Berkeley Protocol: record_witnesses table (migrated from witnesses_data JSON) --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS record_witnesses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id INTEGER NOT NULL,
+            name TEXT DEFAULT '',
+            relation TEXT DEFAULT '',
+            contact TEXT DEFAULT '',
+            testimony_summary TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+        )
+    """)
+
+    # -- Berkeley Protocol: record_detentions table (migrated from detention_facilities_data JSON) --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS record_detentions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id INTEGER NOT NULL,
+            facility_name TEXT DEFAULT '',
+            date_from TEXT DEFAULT '',
+            date_to TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+        )
+    """)
+
+    # -- Add user_id column to audit_log for Berkeley Protocol chain of custody --
+    cursor.execute("PRAGMA table_info(audit_log)")
+    audit_existing = {row[1] for row in cursor.fetchall()}
+    if 'user_id' not in audit_existing:
+        try:
+            cursor.execute("ALTER TABLE audit_log ADD COLUMN user_id TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+
+    # -- Migrate witnesses_data JSON -> record_witnesses table --
+    try:
+        witness_count = cursor.execute("SELECT COUNT(*) FROM record_witnesses").fetchone()[0]
+        if witness_count == 0:
+            rows = cursor.execute("SELECT id, witnesses_data FROM records WHERE witnesses_data IS NOT NULL AND witnesses_data != '' AND witnesses_data != '[]'").fetchall()
+            for row in rows:
+                try:
+                    witnesses = json.loads(row[1])
+                    for w in witnesses:
+                        if isinstance(w, dict):
+                            cursor.execute(
+                                "INSERT INTO record_witnesses (record_id, name, relation, contact, testimony_summary) VALUES (?,?,?,?,?)",
+                                (row[0], w.get('name', ''), w.get('relation', ''), w.get('contact', w.get('phone', '')), w.get('testimony', w.get('notes', '')))
+                            )
+                except (json.JSONDecodeError, TypeError):
+                    pass
+    except sqlite3.OperationalError:
+        pass
+
+    # -- Migrate detention_facilities_data JSON -> record_detentions table --
+    try:
+        detention_count = cursor.execute("SELECT COUNT(*) FROM record_detentions").fetchone()[0]
+        if detention_count == 0:
+            rows = cursor.execute("SELECT id, detention_facilities_data FROM records WHERE detention_facilities_data IS NOT NULL AND detention_facilities_data != '' AND detention_facilities_data != '[]'").fetchall()
+            for row in rows:
+                try:
+                    facilities = json.loads(row[1])
+                    for f in facilities:
+                        if isinstance(f, dict):
+                            cursor.execute(
+                                "INSERT INTO record_detentions (record_id, facility_name, date_from, date_to, notes) VALUES (?,?,?,?,?)",
+                                (row[0], f.get('name', f.get('facility', '')), f.get('from', f.get('date_from', '')), f.get('to', f.get('date_to', '')), f.get('notes', ''))
+                            )
+                        elif isinstance(f, str):
+                            cursor.execute(
+                                "INSERT INTO record_detentions (record_id, facility_name) VALUES (?,?)",
+                                (row[0], f)
+                            )
+                except (json.JSONDecodeError, TypeError):
+                    pass
+    except sqlite3.OperationalError:
+        pass
+
+    # -- Seed initial admin user from existing password hash (activate users system) --
+    try:
+        user_count = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        if user_count == 0:
+            admin_pw_file = os.path.join(BASE_DIR, 'admin_password.hash')
+            if os.path.exists(admin_pw_file):
+                with open(admin_pw_file, 'r') as f:
+                    pw_hash = f.read().strip()
+                if pw_hash:
+                    cursor.execute(
+                        "INSERT INTO users (username, password_hash, display_name, role, is_active) VALUES (?,?,?,?,?)",
+                        ('admin', pw_hash, 'مدير النظام', 'admin', 1)
+                    )
+    except sqlite3.OperationalError:
+        pass
+
+    # -- Migrate spouse_previous_children_data from children_data_w --
+    try:
+        cursor.execute("PRAGMA table_info(records)")
+        rec_cols = {row[1] for row in cursor.fetchall()}
+        if 'spouse_previous_children_data' in rec_cols and 'children_data_w' in rec_cols:
+            cursor.execute("""
+                UPDATE records SET spouse_previous_children_data = children_data_w
+                WHERE (spouse_previous_children_data IS NULL OR spouse_previous_children_data = '' OR spouse_previous_children_data = '[]')
+                AND children_data_w IS NOT NULL AND children_data_w != '' AND children_data_w != '[]'
+            """)
+    except sqlite3.OperationalError:
+        pass
+
     # -- Database indexes for performance --
     index_statements = [
         "CREATE INDEX IF NOT EXISTS idx_records_status ON records(status)",
@@ -1023,6 +1161,13 @@ def migrate_db():
         "CREATE INDEX IF NOT EXISTS idx_record_companions_record_id ON record_companions(record_id)",
         "CREATE INDEX IF NOT EXISTS idx_record_services_record_id ON record_services(record_id)",
         "CREATE INDEX IF NOT EXISTS idx_records_address ON records(address)",
+        # New composite indexes for common query patterns
+        "CREATE INDEX IF NOT EXISTS idx_records_deleted_status ON records(deleted_at, status)",
+        "CREATE INDEX IF NOT EXISTS idx_records_deleted_province ON records(deleted_at, province)",
+        "CREATE INDEX IF NOT EXISTS idx_record_changes_changed_at ON record_changes(changed_at)",
+        "CREATE INDEX IF NOT EXISTS idx_record_witnesses_record_id ON record_witnesses(record_id)",
+        "CREATE INDEX IF NOT EXISTS idx_record_detentions_record_id ON record_detentions(record_id)",
+        "CREATE INDEX IF NOT EXISTS idx_record_detentions_facility ON record_detentions(facility_name)",
     ]
     for stmt in index_statements:
         try:
@@ -1036,6 +1181,95 @@ def migrate_db():
 
 # Run migrations at module load to ensure schema is up-to-date
 migrate_db()
+
+
+# ---------------------------------------------------------------------------
+# Berkeley Protocol: Cached stats function (eliminates duplicate COUNT queries)
+# ---------------------------------------------------------------------------
+def _get_cached_stats(db):
+    """Get all record counts in a single query, cached per-request in Flask g."""
+    if hasattr(g, '_cached_stats'):
+        return g._cached_stats
+
+    row = db.execute("""
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN status='survivor' THEN 1 ELSE 0 END) as survivors,
+            SUM(CASE WHEN status='enforced' THEN 1 ELSE 0 END) as enforced,
+            SUM(CASE WHEN status='deceased' THEN 1 ELSE 0 END) as deceased,
+            SUM(CASE WHEN gender='male' THEN 1 ELSE 0 END) as males,
+            SUM(CASE WHEN gender='female' THEN 1 ELSE 0 END) as females,
+            SUM(CASE WHEN chronic IS NOT NULL AND chronic != '' AND chronic != 'لا' THEN 1 ELSE 0 END) as chronic,
+            SUM(CASE WHEN has_special_needs = 1 THEN 1 ELSE 0 END) as special_needs,
+            SUM(CASE WHEN has_hypertension = 1 THEN 1 ELSE 0 END) as hypertension,
+            SUM(CASE WHEN has_diabetes = 1 THEN 1 ELSE 0 END) as diabetes,
+            SUM(CASE WHEN housing_type = 'إيجار' THEN 1 ELSE 0 END) as paying_rent,
+            SUM(CASE WHEN breadwinner = '' OR breadwinner = 'لا يوجد' OR breadwinner IS NULL THEN 1 ELSE 0 END) as no_breadwinner,
+            SUM(CASE WHEN first_name='' OR status='' OR province='' OR gender='' OR phone='' OR national_id='' THEN 1 ELSE 0 END) as incomplete
+        FROM records WHERE deleted_at IS NULL
+    """).fetchone()
+
+    stats = {
+        'total': row['total'] or 0,
+        'survivors': row['survivors'] or 0,
+        'enforced': row['enforced'] or 0,
+        'deceased': row['deceased'] or 0,
+        'males': row['males'] or 0,
+        'females': row['females'] or 0,
+        'health': {
+            'chronic': row['chronic'] or 0,
+            'special_needs': row['special_needs'] or 0,
+            'hypertension': row['hypertension'] or 0,
+            'diabetes': row['diabetes'] or 0,
+            'paying_rent': row['paying_rent'] or 0,
+            'no_breadwinner': row['no_breadwinner'] or 0,
+        },
+        'incomplete_records': row['incomplete'] or 0,
+    }
+    g._cached_stats = stats
+    return stats
+
+
+# ---------------------------------------------------------------------------
+# Berkeley Protocol: Application-level record validation
+# ---------------------------------------------------------------------------
+def validate_record(form_data):
+    """Validate record data and return list of (field, error_message) tuples."""
+    errors = []
+    current_year = datetime.now().year
+
+    # Date sanity checks
+    for field, label in [('arrest_year', 'سنة الاعتقال'), ('birth_year', 'سنة الولادة')]:
+        val = form_data.get(field, '')
+        if val and val != '':
+            try:
+                year = int(val)
+                if year < 1900 or year > current_year + 1:
+                    errors.append((field, f'{label} يجب أن يكون بين 1900 و {current_year}'))
+            except (ValueError, TypeError):
+                errors.append((field, f'{label} يجب أن يكون رقماً'))
+
+    # Status validation
+    status = form_data.get('status', '')
+    if status and status not in ('survivor', 'enforced', 'deceased'):
+        errors.append(('status', 'الحالة غير صالحة'))
+
+    # Evidence level validation
+    evidence = form_data.get('evidence_level', '')
+    if evidence and evidence not in ('high', 'medium', 'low', 'unverified', ''):
+        errors.append(('evidence_level', 'مستوى الأدلة غير صالح'))
+
+    # Verification status validation
+    verification = form_data.get('verification_status', '')
+    if verification and verification not in ('Verified', 'Corroborated', 'Unverified', 'Conflicting', ''):
+        errors.append(('verification_status', 'حالة التحقق غير صالحة'))
+
+    # Phone format (basic: digits, +, spaces, dashes)
+    phone = form_data.get('phone', '')
+    if phone and not re.match(r'^[\d\s\-\+\(\)]+$', phone):
+        errors.append(('phone', 'رقم الهاتف غير صالح'))
+
+    return errors
 
 
 # Volunteer statuses
@@ -1150,8 +1384,12 @@ def inject_constants():
         'VOLUNTEER_ROLES': VOLUNTEER_ROLES,
         'MEMBER_STATUSES': MEMBER_STATUSES,
         'MEMBERSHIP_TYPES': MEMBERSHIP_TYPES,
+        'METHODOLOGY_TYPES': METHODOLOGY_TYPES,
+        'STATUS_LABELS': STATUS_LABELS,
+        'VALID_STATUS_TRANSITIONS': VALID_STATUS_TRANSITIONS,
         'user_role': session.get('user_role', 'admin'),
         'display_name': session.get('display_name', ''),
+        'username': session.get('username', ''),
     }
 
 
@@ -1228,11 +1466,18 @@ def _validate_entry(form):
     if nid and not re.match(r'^\d{11}$', nid):
         warnings.append('الرقم الوطني يجب أن يكون 11 رقماً')
 
-    # Date logic
+    # Date logic with range validation
+    current_year = datetime.now().year
     birth_year = int(form.get('birth_year', 0) or 0)
     arrest_year = int(form.get('arrest_year', 0) or 0)
     death_year = int(form.get('death_year', 0) or 0)
     release_year = int(form.get('release_year', 0) or 0)
+
+    # Range checks (Berkeley Protocol: data quality)
+    for year_val, label in [(birth_year, 'سنة الميلاد'), (arrest_year, 'سنة الاعتقال'),
+                             (death_year, 'سنة الوفاة'), (release_year, 'سنة الإفراج')]:
+        if year_val and (year_val < 1900 or year_val > current_year + 1):
+            errors.append(f'{label} يجب أن يكون بين 1900 و {current_year}')
 
     if birth_year and death_year and death_year < birth_year:
         errors.append('سنة الوفاة لا يمكن أن تكون قبل سنة الميلاد')
@@ -1240,6 +1485,16 @@ def _validate_entry(form):
         errors.append('سنة الاعتقال لا يمكن أن تكون قبل سنة الميلاد')
     if arrest_year and release_year and release_year < arrest_year:
         errors.append('سنة الإفراج لا يمكن أن تكون قبل سنة الاعتقال')
+
+    # Status validation
+    status = form.get('status', '')
+    if status and status not in ('survivor', 'enforced', 'deceased'):
+        errors.append('حالة الشخص غير صالحة')
+
+    # Evidence level validation
+    evidence = form.get('evidence_level', '')
+    if evidence and evidence not in ('high', 'medium', 'low', 'unverified', ''):
+        errors.append('مستوى الأدلة غير صالح')
 
     return errors, warnings
 
@@ -1298,9 +1553,11 @@ def entry_submit():
         doc_path = doc_path or ''
         doc_hash = doc_hash or ''
 
+    screenshot_hash = ''
     if 'digital_evidence_screenshot' in request.files:
-        screenshot_path, _ = save_upload(request.files['digital_evidence_screenshot'], 'screenshots')
+        screenshot_path, screenshot_hash = save_upload(request.files['digital_evidence_screenshot'], 'screenshots')
         screenshot_path = screenshot_path or ''
+        screenshot_hash = screenshot_hash or ''
 
     if 'civil_registry_document' in request.files:
         civil_doc_path, _ = save_upload(request.files['civil_registry_document'], 'documents')
@@ -1368,7 +1625,7 @@ def entry_submit():
         verification_status, methodology_notes,
         record_slug, photo_hash, document_hash,
         survivor_cv_path, survivor_cv_text, survivor_cv_photo_path,
-        address_area
+        address_area, screenshot_hash
     ) VALUES (
         ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?, ?,?,?,?,
         ?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?,?,
@@ -1376,7 +1633,7 @@ def entry_submit():
         ?,?, ?,?,?,?, ?,?, ?,?,?,?,?, ?,
         ?,?,?,?,?, ?,?, ?,?,?, ?,?, ?,?, ?,
         ?,?,?, ?,?, ?,?, ?,?, ?,
-        ?,?,?, ?,?, ?,?,?, ?,?,?,?
+        ?,?,?, ?,?, ?,?,?, ?,?,?,?,?
     )""", (
         form.get('first_name', ''), form.get('father_name', ''), form.get('last_name', ''),
         form.get('gender', ''), form.get('mother_name', ''),
@@ -1444,7 +1701,7 @@ def entry_submit():
         'Unverified', form.get('methodology_notes', ''),
         slug, photo_hash, doc_hash,
         cv_path, form.get('survivor_cv_text', ''), cv_photo_path,
-        form.get('address_area', '')
+        form.get('address_area', ''), screenshot_hash
     ))
 
     # Use retry logic for concurrent access
@@ -1515,9 +1772,11 @@ def admin_login():
             session['is_admin'] = True
             session['user_role'] = user_role
             session['display_name'] = display_name
+            session['username'] = username or 'admin'  # Berkeley Protocol: chain of custody tracking
             session['login_time'] = time.time()
             session.permanent = True
             _login_attempts.pop(ip, None)
+            log_audit('login', 'user', 0, {'description': f'User logged in: {username or "admin"} ({user_role})'})
             return redirect(url_for('admin_dashboard'))
         _login_attempts.setdefault(ip, []).append(now)
         attempts_left = LOGIN_MAX_ATTEMPTS - len(_login_attempts[ip])
@@ -1633,13 +1892,14 @@ def admin_user_reset_password(user_id):
 def admin_dashboard():
     db = get_db()
 
-    # Statistics
-    total = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL").fetchone()[0]
-    survivors = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='survivor'").fetchone()[0]
-    enforced = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='enforced'").fetchone()[0]
-    deceased = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND status='deceased'").fetchone()[0]
-    males = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND gender='male'").fetchone()[0]
-    females = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND gender='female'").fetchone()[0]
+    # Statistics (uses cached single-query function to eliminate duplicate COUNTs)
+    cs = _get_cached_stats(db)
+    total = cs['total']
+    survivors = cs['survivors']
+    enforced = cs['enforced']
+    deceased = cs['deceased']
+    males = cs['males']
+    females = cs['females']
 
     # Province distribution
     province_stats = db.execute(
@@ -1686,15 +1946,8 @@ def admin_dashboard():
             else:
                 age_brackets['60+'] += 1
 
-    # Health & vulnerability stats (D3)
-    health_stats = {
-        'chronic': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND chronic IS NOT NULL AND chronic != '' AND chronic != 'لا'").fetchone()[0],
-        'special_needs': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND has_special_needs = 1").fetchone()[0],
-        'hypertension': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND has_hypertension = 1").fetchone()[0],
-        'diabetes': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND has_diabetes = 1").fetchone()[0],
-        'paying_rent': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND housing_type = 'إيجار'").fetchone()[0],
-        'no_breadwinner': db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND (breadwinner = '' OR breadwinner = 'لا يوجد' OR breadwinner IS NULL)").fetchone()[0],
-    }
+    # Health & vulnerability stats (D3) - from cached stats
+    health_stats = cs['health']
 
     # Education breakdown (D4)
     edu_stats = db.execute(
@@ -1712,8 +1965,8 @@ def admin_dashboard():
             else:
                 payment_stats['unpaid_count'] = p['cnt']
             payment_stats['total_due'] += p['total'] or 0
-    except Exception:
-        pass
+    except (sqlite3.OperationalError, TypeError, KeyError) as e:
+        app.logger.warning(f"Payment stats error: {e}")
 
     # Volunteer summary (D6)
     vol_stats = {
@@ -1724,15 +1977,12 @@ def admin_dashboard():
     try:
         h = db.execute("SELECT SUM(hours) FROM volunteer_attendance").fetchone()[0]
         vol_stats['total_hours'] = round(h or 0, 1)
-    except Exception:
-        pass
+    except (sqlite3.OperationalError, TypeError) as e:
+        app.logger.warning(f"Volunteer hours error: {e}")
 
-    # Data completeness (D1) - quick count
+    # Data completeness (D1) - uses cached incomplete count
     total_profiles = total + vol_stats['active'] + db.execute("SELECT COUNT(*) FROM members").fetchone()[0]
-    # Simplified: count records with key missing fields
-    incomplete_records = db.execute(
-        "SELECT COUNT(*) FROM records WHERE deleted_at IS NULL AND (first_name='' OR status='' OR province='' OR gender='' OR phone='' OR national_id='')"
-    ).fetchone()[0]
+    incomplete_records = cs['incomplete_records']
     incomplete_vols = db.execute(
         "SELECT COUNT(*) FROM volunteers WHERE phone='' OR national_id='' OR role=''"
     ).fetchone()[0]
@@ -2568,6 +2818,14 @@ def admin_record_edit(record_id):
         flash('السجل غير موجود', 'error')
         return redirect(url_for('admin_records'))
 
+    # Berkeley Protocol: Prevent editing locked records
+    if (record['record_status'] or 'draft') == 'locked':
+        user_role = session.get('user_role', 'admin')
+        if user_role != 'admin':
+            flash('هذا السجل مقفل ولا يمكن تعديله. يجب فتحه أولاً بواسطة المدير.', 'error')
+            return redirect(url_for('admin_record_detail', record_id=record_id))
+        flash('تحذير: هذا السجل مقفل. التعديلات ستُسجَّل في سجل التغييرات.', 'warning')
+
     if request.method == 'POST':
         form = request.form
 
@@ -2736,10 +2994,12 @@ def admin_record_edit(record_id):
             record_id
         ))
 
-        # Track field-level changes
+        # Track field-level changes (Berkeley Protocol: chain of custody)
         new_record = db.execute("SELECT * FROM records WHERE id = ?", (record_id,)).fetchone()
         ip = request.remote_addr or ''
+        changed_by = session.get('username', session.get('display_name', 'admin'))
         skip_fields = {'id', 'created_at', 'updated_at', 'record_slug'}
+        changed_fields = []
         for key in record.keys():
             if key in skip_fields:
                 continue
@@ -2747,12 +3007,16 @@ def admin_record_edit(record_id):
             new_val = str(new_record[key] or '')
             if old_val != new_val:
                 db.execute(
-                    "INSERT INTO record_changes (record_id, field_name, old_value, new_value, ip_address) VALUES (?,?,?,?,?)",
-                    (record_id, key, old_val, new_val, ip)
+                    "INSERT INTO record_changes (record_id, field_name, old_value, new_value, changed_by, ip_address) VALUES (?,?,?,?,?,?)",
+                    (record_id, key, old_val, new_val, changed_by, ip)
                 )
+                changed_fields.append(key)
 
         db.commit()
-        log_audit('record_edit', 'record', record_id)
+        log_audit('record_edit', 'record', record_id, {
+            'fields_changed': changed_fields,
+            'description': f'Edited {len(changed_fields)} fields',
+        })
         flash('تم تحديث السجل بنجاح', 'success')
         return_to = request.form.get('return_to', '').strip()
         if return_to and return_to.startswith('/'):
@@ -2961,12 +3225,43 @@ def api_search_records_for_link():
     } for r in records])
 
 
+# Berkeley Protocol: Valid record status transitions (workflow enforcement)
+VALID_STATUS_TRANSITIONS = {
+    'draft': ['reviewed'],           # data_entry or admin
+    'reviewed': ['draft', 'verified'],  # verified: admin only
+    'verified': ['reviewed', 'locked'], # admin only
+    'locked': ['verified'],             # admin only (unlock requires reason)
+}
+STATUS_LABELS = {'draft': 'مسودة', 'reviewed': 'مراجَع', 'verified': 'موثّق', 'locked': 'مقفل'}
+
+# Berkeley Protocol: Minimum required fields per record_status level
+BERKELEY_REQUIRED_FIELDS = {
+    'reviewed': ['first_name', 'father_name', 'last_name', 'status', 'source_type', 'collector_name', 'collection_date'],
+    'verified': ['first_name', 'father_name', 'last_name', 'status', 'source_type', 'collector_name', 'collection_date',
+                 'evidence_level', 'verification_status'],
+    'locked': ['first_name', 'father_name', 'last_name', 'status', 'source_type', 'collector_name', 'collection_date',
+               'evidence_level', 'verification_status'],
+}
+
+# Berkeley Protocol: Structured methodology types
+METHODOLOGY_TYPES = [
+    ('interview', 'مقابلة شخصية'),
+    ('document_review', 'مراجعة وثائق'),
+    ('open_source', 'تحقيق مصادر مفتوحة'),
+    ('field_visit', 'زيارة ميدانية'),
+    ('remote_interview', 'مقابلة عن بعد'),
+    ('database_cross_ref', 'تقاطع قواعد بيانات'),
+    ('witness_testimony', 'شهادة شاهد'),
+    ('other', 'أخرى'),
+]
+
+
 @app.route('/admin/record/<int:record_id>/verify', methods=['POST'])
 @admin_required
 def admin_record_verify(record_id):
-    """Change record verification status (draft -> reviewed -> verified -> locked)."""
+    """Change record verification status with Berkeley Protocol workflow enforcement."""
     db = get_db()
-    record = db.execute("SELECT id, record_status FROM records WHERE id = ?", (record_id,)).fetchone()
+    record = db.execute("SELECT * FROM records WHERE id = ?", (record_id,)).fetchone()
     if not record:
         flash('السجل غير موجود', 'error')
         return redirect(url_for('admin_records'))
@@ -2975,19 +3270,109 @@ def admin_record_verify(record_id):
     if new_status not in valid_statuses:
         flash('حالة غير صالحة', 'error')
         return redirect(url_for('admin_record_detail', record_id=record_id))
+
     old_status = record['record_status'] or 'draft'
+    user_role = session.get('user_role', 'admin')
+
+    # Enforce workflow transitions
+    allowed_next = VALID_STATUS_TRANSITIONS.get(old_status, [])
+    if new_status not in allowed_next:
+        flash(f'لا يمكن الانتقال من {STATUS_LABELS.get(old_status, old_status)} إلى {STATUS_LABELS.get(new_status, new_status)} مباشرة', 'error')
+        return redirect(url_for('admin_record_detail', record_id=record_id))
+
+    # Admin-only transitions
+    if new_status in ('verified', 'locked') and user_role != 'admin':
+        flash('فقط المدير يمكنه توثيق أو قفل السجلات', 'error')
+        return redirect(url_for('admin_record_detail', record_id=record_id))
+    if old_status == 'locked' and user_role != 'admin':
+        flash('فقط المدير يمكنه فتح السجلات المقفلة', 'error')
+        return redirect(url_for('admin_record_detail', record_id=record_id))
+
+    # Berkeley Protocol: Check mandatory fields before advancing
+    required_fields = BERKELEY_REQUIRED_FIELDS.get(new_status, [])
+    missing = [f for f in required_fields if not (record[f] if f in record.keys() else '')]
+    if missing:
+        field_labels = {
+            'first_name': 'الاسم', 'father_name': 'اسم الأب', 'last_name': 'الكنية',
+            'status': 'الحالة', 'source_type': 'نوع المصدر', 'collector_name': 'اسم جامع البيانات',
+            'collection_date': 'تاريخ الجمع', 'evidence_level': 'مستوى الأدلة',
+            'verification_status': 'حالة التحقق',
+        }
+        missing_labels = [field_labels.get(f, f) for f in missing]
+        flash(f'لا يمكن الترقية: الحقول التالية مطلوبة: {", ".join(missing_labels)}', 'error')
+        return redirect(url_for('admin_record_detail', record_id=record_id))
+
     db.execute("UPDATE records SET record_status = ? WHERE id = ?", (new_status, record_id))
-    # Track the change
+    # Track the change with chain of custody
     ip = request.remote_addr or ''
+    changed_by = session.get('username', session.get('display_name', 'admin'))
     db.execute(
-        "INSERT INTO record_changes (record_id, field_name, old_value, new_value, ip_address) VALUES (?,?,?,?,?)",
-        (record_id, 'record_status', old_status, new_status, ip)
+        "INSERT INTO record_changes (record_id, field_name, old_value, new_value, changed_by, ip_address) VALUES (?,?,?,?,?,?)",
+        (record_id, 'record_status', old_status, new_status, changed_by, ip)
     )
     db.commit()
-    log_audit('record_verify', 'record', record_id, f'{old_status} -> {new_status}')
-    status_labels = {'draft': 'مسودة', 'reviewed': 'مراجَع', 'verified': 'موثّق', 'locked': 'مقفل'}
-    flash(f'تم تغيير حالة السجل إلى: {status_labels.get(new_status, new_status)}', 'success')
+    log_audit('record_verify', 'record', record_id, {
+        'transition': f'{old_status} -> {new_status}',
+        'description': f'Status changed from {old_status} to {new_status}',
+    })
+    flash(f'تم تغيير حالة السجل إلى: {STATUS_LABELS.get(new_status, new_status)}', 'success')
     return redirect(url_for('admin_record_detail', record_id=record_id))
+
+
+@app.route('/admin/record/<int:record_id>/verify-integrity', methods=['POST'])
+@admin_required
+def admin_record_verify_integrity(record_id):
+    """Berkeley Protocol: Verify file integrity by recomputing SHA256 hashes."""
+    db = get_db()
+    record = db.execute("SELECT id, photo_path, photo_hash, document_path, document_hash, "
+                        "digital_evidence_screenshot_path, screenshot_hash FROM records WHERE id = ?",
+                        (record_id,)).fetchone()
+    if not record:
+        return jsonify({'error': 'السجل غير موجود'}), 404
+
+    results = {}
+    file_checks = [
+        ('photo', record['photo_path'], record['photo_hash']),
+        ('document', record['document_path'], record['document_hash']),
+        ('screenshot', record['digital_evidence_screenshot_path'], record.get('screenshot_hash', '')),
+    ]
+
+    for label, file_path, stored_hash in file_checks:
+        if not file_path:
+            results[label] = {'status': 'no_file', 'message': 'لا يوجد ملف'}
+            continue
+        full_path = os.path.join(BASE_DIR, file_path) if not os.path.isabs(file_path) else file_path
+        if not os.path.exists(full_path):
+            results[label] = {'status': 'missing', 'message': 'الملف مفقود'}
+            continue
+        # Recompute hash
+        sha256 = hashlib.sha256()
+        with open(full_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                sha256.update(chunk)
+        current_hash = sha256.hexdigest()
+
+        if not stored_hash:
+            # Store hash for first time
+            hash_col = f'{label}_hash'
+            if label == 'screenshot':
+                hash_col = 'screenshot_hash'
+            try:
+                db.execute(f"UPDATE records SET {hash_col} = ? WHERE id = ?", (current_hash, record_id))
+                db.commit()
+            except sqlite3.OperationalError:
+                pass
+            results[label] = {'status': 'initialized', 'message': 'تم حساب البصمة لأول مرة', 'hash': current_hash}
+        elif current_hash == stored_hash:
+            results[label] = {'status': 'verified', 'message': 'سلامة الملف مؤكدة ✓', 'hash': current_hash}
+        else:
+            results[label] = {'status': 'tampered', 'message': 'تحذير: الملف تم تعديله!',
+                              'stored_hash': stored_hash, 'current_hash': current_hash}
+
+    log_audit('integrity_check', 'record', record_id, {
+        'results': {k: v['status'] for k, v in results.items()},
+    })
+    return jsonify({'record_id': record_id, 'integrity': results})
 
 
 @app.route('/admin/record/<int:record_id>/delete', methods=['POST'])
@@ -3754,10 +4139,10 @@ def serialize_record_for_picker(r, minor_threshold=18):
                     age = None
                     if c.get('birth_year'):
                         try: age = current_year - int(c['birth_year'])
-                        except: pass
+                        except (ValueError, TypeError): pass
                     elif c.get('age'):
                         try: age = int(c['age'])
-                        except: pass
+                        except (ValueError, TypeError): pass
                     if age is not None and age < minor_threshold:
                         name = c.get('name', '')
                         if c.get('birth_year'):
@@ -3779,10 +4164,10 @@ def serialize_record_for_picker(r, minor_threshold=18):
                     age = None
                     if c.get('birth_year'):
                         try: age = current_year - int(c['birth_year'])
-                        except: pass
+                        except (ValueError, TypeError): pass
                     elif c.get('age'):
                         try: age = int(c['age'])
-                        except: pass
+                        except (ValueError, TypeError): pass
                     if age is not None and age < 13:
                         names.append(c.get('name', ''))
                 rec[k] = ', '.join(names) if names else '-'
@@ -3798,10 +4183,10 @@ def serialize_record_for_picker(r, minor_threshold=18):
                     age = None
                     if c.get('birth_year'):
                         try: age = current_year - int(c['birth_year'])
-                        except: pass
+                        except (ValueError, TypeError): pass
                     elif c.get('age'):
                         try: age = int(c['age'])
-                        except: pass
+                        except (ValueError, TypeError): pass
                     if age is not None and age < 13:
                         ages.append(str(age))
                 rec[k] = ', '.join(ages) if ages else '-'
@@ -4900,7 +5285,8 @@ def admin_list_whatsapp(lid):
     except ImportError:
         return jsonify({'error': 'Playwright غير مثبت. قم بتشغيل: pip install playwright && playwright install chromium'}), 500
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"WhatsApp group creation error: {e}")
+        return jsonify({'error': 'حدث خطأ داخلي أثناء إنشاء المجموعة'}), 500
 
 
 @app.route('/admin/list/<int:lid>/delete', methods=['POST'])
@@ -5271,7 +5657,8 @@ def api_kdeconnect_devices():
     except subprocess.TimeoutExpired:
         return jsonify({'error': 'انتهت مهلة الاتصال بـ KDE Connect'}), 500
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"KDE Connect devices error: {e}")
+        return jsonify({'error': 'حدث خطأ داخلي'}), 500
 
 
 @app.route('/api/kdeconnect/send_sms', methods=['POST'])
@@ -5304,7 +5691,8 @@ def api_kdeconnect_send_sms():
     except subprocess.TimeoutExpired:
         return jsonify({'error': 'انتهت مهلة الإرسال'}), 500
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"KDE Connect SMS error: {e}")
+        return jsonify({'error': 'حدث خطأ داخلي'}), 500
 
 
 @app.route('/api/kdeconnect/send_sms_bulk', methods=['POST'])

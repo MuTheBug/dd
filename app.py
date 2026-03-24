@@ -6708,7 +6708,107 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HAQQUNA - Victim Documentation System')
     parser.add_argument('--ip', type=str, default='', help='Fixed IP address to bind/display (e.g. 192.168.1.100)')
     parser.add_argument('--port', type=int, default=0, help='Port number (default: 5000)')
+    parser.add_argument('--init-db', action='store_true',
+                        help='Initialize the database and set admin password, then exit')
+    parser.add_argument('--reset-password', action='store_true',
+                        help='Reset the admin password, then exit')
     args = parser.parse_args()
+
+    # --- Init DB command: create fresh database + set admin password ---
+    if args.init_db:
+        print("\n" + "="*60)
+        print("  HAQQUNA - Database Initialization")
+        print("="*60)
+        db_exists = os.path.exists(DB_PATH)
+        if db_exists:
+            size_kb = os.path.getsize(DB_PATH) / 1024
+            print(f"  Database already exists: {DB_PATH} ({size_kb:.0f} KB)")
+            print("  Running migrations to ensure schema is up-to-date...")
+        else:
+            print(f"  Creating new database: {DB_PATH}")
+        migrate_db()
+        record_count = 0
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            record_count = conn.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL").fetchone()[0]
+            conn.close()
+        except Exception:
+            pass
+        print(f"  Database ready. Records: {record_count}")
+        print("="*60)
+        # Set admin password
+        pw = os.environ.get('HAQQUNA_DEFAULT_PASSWORD', '')
+        if pw:
+            print(f"  Using password from HAQQUNA_DEFAULT_PASSWORD env var.")
+        else:
+            import getpass
+            try:
+                pw = getpass.getpass("  Enter new admin password (min 6 chars): ")
+                if len(pw) < 6:
+                    print("  ERROR: Password must be at least 6 characters.")
+                    sys.exit(1)
+                pw2 = getpass.getpass("  Confirm password: ")
+                if pw != pw2:
+                    print("  ERROR: Passwords do not match.")
+                    sys.exit(1)
+            except (EOFError, KeyboardInterrupt):
+                # Non-interactive: generate a random password
+                pw = secrets.token_urlsafe(12)
+                print(f"\n  (Non-interactive) Generated admin password: {pw}")
+        _set_admin_password(pw)
+        # Ensure admin user exists in users table
+        conn = sqlite3.connect(DB_PATH)
+        existing = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
+        pw_hash = generate_password_hash(pw)
+        if existing:
+            conn.execute("UPDATE users SET password_hash=?, is_active=1 WHERE username='admin'", (pw_hash,))
+        else:
+            conn.execute(
+                "INSERT INTO users (username, password_hash, display_name, role, is_active) VALUES (?,?,?,?,?)",
+                ('admin', pw_hash, 'مدير النظام', 'admin', 1)
+            )
+        conn.commit()
+        conn.close()
+        print("  Admin password set successfully.")
+        print(f"  Username: admin")
+        print("="*60)
+        print("  Run 'python app.py' to start the server.\n")
+        sys.exit(0)
+
+    # --- Reset password command ---
+    if args.reset_password:
+        print("\n" + "="*60)
+        print("  HAQQUNA - Reset Admin Password")
+        print("="*60)
+        pw = os.environ.get('HAQQUNA_DEFAULT_PASSWORD', '')
+        if pw:
+            print(f"  Using password from HAQQUNA_DEFAULT_PASSWORD env var.")
+        else:
+            import getpass
+            try:
+                pw = getpass.getpass("  Enter new admin password (min 6 chars): ")
+                if len(pw) < 6:
+                    print("  ERROR: Password must be at least 6 characters.")
+                    sys.exit(1)
+                pw2 = getpass.getpass("  Confirm password: ")
+                if pw != pw2:
+                    print("  ERROR: Passwords do not match.")
+                    sys.exit(1)
+            except (EOFError, KeyboardInterrupt):
+                pw = secrets.token_urlsafe(12)
+                print(f"\n  (Non-interactive) Generated admin password: {pw}")
+        _set_admin_password(pw)
+        # Also update the users table
+        if os.path.exists(DB_PATH):
+            pw_hash = generate_password_hash(pw)
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute("UPDATE users SET password_hash=? WHERE username='admin'", (pw_hash,))
+            conn.commit()
+            conn.close()
+        print("  Admin password reset successfully.")
+        print(f"  Username: admin")
+        print("="*60 + "\n")
+        sys.exit(0)
 
     migrate_db()
 
@@ -6729,7 +6829,10 @@ if __name__ == '__main__':
         print(f"  Fixed IP:   {fixed_ip} (configured)")
     print(f"  Admin:      http://{lan_ip}:{port}/admin")
     print(f"  Data Entry: http://{lan_ip}:{port}/entry")
-    print(f"  Password:   (stored in admin_password.hash)")
+    if not os.path.exists(ADMIN_PASSWORD_FILE):
+        print(f"  NOTE:       No admin password set! Run: python app.py --init-db")
+    else:
+        print(f"  Password:   (stored in admin_password.hash)")
     print("="*60)
     print(f"  * Other devices on your network can connect using:")
     print(f"    http://{lan_ip}:{port}")

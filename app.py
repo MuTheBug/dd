@@ -6588,25 +6588,123 @@ def admin_import():
                     idx = col_map.get(col)
                     return str(row[idx]).strip() if idx is not None and idx < len(row) and row[idx] else ''
 
+                def gi(col):
+                    """Get integer value or 0."""
+                    v = g(col)
+                    try:
+                        return int(float(v)) if v else 0
+                    except (ValueError, TypeError):
+                        return 0
+
                 first = g('first_name') or g('الاسم')
                 last = g('last_name') or g('الكنية')
                 if not first:
                     skipped.append(f'سطر {row_num}: الاسم مطلوب')
                     continue
 
-                slug = f"{first}-{last}-{int(time.time())}".replace(' ', '-')
+                slug = f"{first}-{last}-{int(time.time())}-{row_num}".replace(' ', '-')
                 try:
-                    db.execute("""INSERT INTO records (first_name, father_name, last_name, mother_name,
-                        gender, status, province, national_id, phone, birth_year,
-                        marital, address, housing_type, record_slug)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (first, g('father_name') or g('اسم الأب'), last,
-                         g('mother_name') or g('اسم الأم'),
-                         g('gender') or g('الجنس'), g('status') or g('الحالة'),
-                         g('province') or g('المحافظة'), g('national_id') or g('الرقم الوطني'),
-                         g('phone') or g('الهاتف'), int(g('birth_year') or g('سنة الميلاد') or 0),
-                         g('marital') or g('الحالة الاجتماعية'), g('address') or g('العنوان'),
-                         g('housing_type') or g('نوع السكن'), slug))
+                    db.execute("""INSERT INTO records (
+                        first_name, father_name, last_name, mother_name,
+                        gender, birth_day, birth_month, birth_year, blood_type,
+                        national_id, phone, province, address, address_area,
+                        housing_type, rent_amount, status, marital, case_type,
+                        arrest_day, arrest_month, arrest_year,
+                        arrest_place, arrest_authority, arrest_reason, arrest_causer,
+                        release_day, release_month, release_year,
+                        death_day, death_month, death_year, death_place,
+                        spouse_name, spouse_phone, has_kids, kids_count,
+                        guardian_name, guardian_relation, guardian_phone,
+                        education, edu_type, edu_specialization, edu_university,
+                        employment, profession, employer,
+                        chronic, has_hypertension, has_diabetes,
+                        has_special_needs, special_needs_details,
+                        breadwinner, breadwinner_job, breadwinner_relation,
+                        legal, legal_details, is_officially_registered,
+                        civil_registry_status, civil_registry_date, family_book_number,
+                        reporter_name, reporter_relation, reporter_phone, reporter_id,
+                        informant_consent, evidence_level, source_type,
+                        collection_date, collector_name, methodology_notes,
+                        notes, record_slug
+                    ) VALUES (
+                        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,
+                        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,
+                        ?,?,?,?,?,?,?
+                    )""", (
+                        first,
+                        g('father_name') or g('اسم الأب'),
+                        last,
+                        g('mother_name') or g('اسم الأم'),
+                        g('gender') or g('الجنس'),
+                        gi('birth_day') or gi('يوم الميلاد') or None,
+                        gi('birth_month') or gi('شهر الميلاد') or None,
+                        gi('birth_year') or gi('سنة الميلاد') or None,
+                        g('blood_type') or g('فصيلة الدم'),
+                        g('national_id') or g('الرقم الوطني'),
+                        g('phone') or g('الهاتف'),
+                        g('province') or g('المحافظة'),
+                        g('address') or g('العنوان'),
+                        g('address_area') or g('المنطقة'),
+                        g('housing_type') or g('نوع السكن'),
+                        g('rent_amount') or g('مبلغ الإيجار'),
+                        g('status') or g('الحالة'),
+                        g('marital') or g('الحالة الاجتماعية'),
+                        g('case_type') or g('نوع القضية'),
+                        gi('arrest_day') or gi('يوم الاعتقال') or None,
+                        gi('arrest_month') or gi('شهر الاعتقال') or None,
+                        gi('arrest_year') or gi('سنة الاعتقال') or None,
+                        g('arrest_place') or g('مكان الاعتقال'),
+                        g('arrest_authority') or g('جهة الاعتقال'),
+                        g('arrest_reason') or g('سبب الاعتقال'),
+                        g('arrest_causer') or g('المتسبب بالاعتقال'),
+                        gi('release_day') or gi('يوم الإفراج') or None,
+                        gi('release_month') or gi('شهر الإفراج') or None,
+                        gi('release_year') or gi('سنة الإفراج') or None,
+                        gi('death_day') or gi('يوم الوفاة') or None,
+                        gi('death_month') or gi('شهر الوفاة') or None,
+                        gi('death_year') or gi('سنة الوفاة') or None,
+                        g('death_place') or g('مكان الوفاة'),
+                        g('spouse_name') or g('اسم الزوج/ة'),
+                        g('spouse_phone') or g('هاتف الزوج/ة'),
+                        g('has_kids') or g('لديه أطفال'),
+                        gi('kids_count') or gi('عدد الأطفال') or None,
+                        g('guardian_name') or g('اسم الوصي'),
+                        g('guardian_relation') or g('صلة الوصي'),
+                        g('guardian_phone') or g('هاتف الوصي'),
+                        g('education') or g('التعليم'),
+                        g('edu_type') or g('نوع التعليم'),
+                        g('edu_specialization') or g('التخصص'),
+                        g('edu_university') or g('الجامعة/المعهد'),
+                        g('employment') or g('العمل'),
+                        g('profession') or g('المهنة'),
+                        g('employer') or g('جهة العمل'),
+                        g('chronic') or g('أمراض مزمنة'),
+                        gi('has_hypertension') or gi('ضغط') or None,
+                        gi('has_diabetes') or gi('سكري') or None,
+                        gi('has_special_needs') or gi('احتياجات خاصة') or None,
+                        g('special_needs_details') or g('تفاصيل الاحتياجات'),
+                        g('breadwinner') or g('المعيل'),
+                        g('breadwinner_job') or g('عمل المعيل'),
+                        g('breadwinner_relation') or g('صلة المعيل'),
+                        g('legal') or g('وضع قانوني'),
+                        g('legal_details') or g('تفاصيل قانونية'),
+                        gi('is_officially_registered') or gi('مسجل رسمياً') or None,
+                        g('civil_registry_status') or g('حالة السجل المدني'),
+                        g('civil_registry_date') or g('تاريخ السجل المدني'),
+                        g('family_book_number') or g('رقم دفتر العائلة'),
+                        g('reporter_name') or g('اسم المبلّغ'),
+                        g('reporter_relation') or g('صلة المبلّغ'),
+                        g('reporter_phone') or g('هاتف المبلّغ'),
+                        g('reporter_id') or g('هوية المبلّغ'),
+                        gi('informant_consent') or gi('موافقة المبلّغ') or None,
+                        g('evidence_level') or g('مستوى الأدلة') or 'unverified',
+                        g('source_type') or g('نوع المصدر'),
+                        g('collection_date') or g('تاريخ الجمع'),
+                        g('collector_name') or g('اسم الجامع'),
+                        g('methodology_notes') or g('ملاحظات المنهجية'),
+                        g('notes') or g('ملاحظات'),
+                        slug,
+                    ))
                     inserted += 1
                 except Exception as e:
                     skipped.append(f'سطر {row_num}: {e}')
@@ -6668,32 +6766,167 @@ def admin_import():
 @admin_required
 def admin_import_template():
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
     import_type = request.args.get('type', 'records')
     wb = Workbook()
     ws = wb.active
     ws.sheet_view.rightToLeft = True
 
+    # Each entry: (Arabic header, English db column name, column width, example/hint)
     if import_type == 'volunteers':
-        headers = ['الاسم', 'الهاتف', 'البريد', 'الرقم الوطني', 'المحافظة', 'العنوان', 'الدور', 'التخصص']
+        columns = [
+            ('الاسم', 'full_name', 22, 'أحمد محمد'),
+            ('الهاتف', 'phone', 16, '0912345678'),
+            ('البريد', 'email', 24, 'example@email.com'),
+            ('الرقم الوطني', 'national_id', 18, ''),
+            ('المحافظة', 'province', 16, 'دمشق'),
+            ('العنوان', 'address', 24, ''),
+            ('الدور', 'role', 16, 'ميداني / إداري'),
+            ('التخصص', 'specialization', 20, ''),
+        ]
         ws.title = 'متطوعون'
     elif import_type == 'members':
-        headers = ['الاسم', 'اسم الأب', 'الهاتف', 'البريد', 'الرقم الوطني', 'المحافظة', 'العنوان', 'نوع العضوية']
+        columns = [
+            ('الاسم', 'full_name', 22, 'أحمد'),
+            ('اسم الأب', 'father_name', 18, 'محمد'),
+            ('الهاتف', 'phone', 16, '0912345678'),
+            ('البريد', 'email', 24, 'example@email.com'),
+            ('الرقم الوطني', 'national_id', 18, ''),
+            ('المحافظة', 'province', 16, 'دمشق'),
+            ('العنوان', 'address', 24, ''),
+            ('نوع العضوية', 'membership_type', 18, 'عامل / داعم'),
+        ]
         ws.title = 'منتسبون'
     else:
-        headers = ['الاسم', 'اسم الأب', 'الكنية', 'اسم الأم', 'الجنس', 'الحالة', 'المحافظة',
-                    'الرقم الوطني', 'الهاتف', 'سنة الميلاد', 'الحالة الاجتماعية', 'العنوان', 'نوع السكن']
+        columns = [
+            # --- المعلومات الأساسية ---
+            ('الاسم', 'first_name', 18, 'أحمد'),
+            ('اسم الأب', 'father_name', 18, 'محمد'),
+            ('الكنية', 'last_name', 18, 'الأحمد'),
+            ('اسم الأم', 'mother_name', 18, 'فاطمة'),
+            ('الجنس', 'gender', 12, 'ذكر / أنثى'),
+            ('يوم الميلاد', 'birth_day', 12, '15'),
+            ('شهر الميلاد', 'birth_month', 12, '6'),
+            ('سنة الميلاد', 'birth_year', 12, '1990'),
+            ('فصيلة الدم', 'blood_type', 12, 'A+ / B- / O+'),
+            ('الرقم الوطني', 'national_id', 18, ''),
+            ('الهاتف', 'phone', 16, '0912345678'),
+            ('المحافظة', 'province', 16, 'دمشق'),
+            ('العنوان', 'address', 24, ''),
+            ('المنطقة', 'address_area', 18, ''),
+            ('نوع السكن', 'housing_type', 14, 'ملك / إيجار'),
+            ('مبلغ الإيجار', 'rent_amount', 14, ''),
+            # --- الحالة ---
+            ('الحالة', 'status', 14, 'survivor / enforced / deceased'),
+            ('الحالة الاجتماعية', 'marital', 16, 'أعزب / متزوج / أرمل / مطلق'),
+            ('نوع القضية', 'case_type', 16, ''),
+            # --- معلومات الاعتقال ---
+            ('يوم الاعتقال', 'arrest_day', 12, '1'),
+            ('شهر الاعتقال', 'arrest_month', 12, '3'),
+            ('سنة الاعتقال', 'arrest_year', 12, '2012'),
+            ('مكان الاعتقال', 'arrest_place', 22, ''),
+            ('جهة الاعتقال', 'arrest_authority', 20, ''),
+            ('سبب الاعتقال', 'arrest_reason', 22, ''),
+            ('المتسبب بالاعتقال', 'arrest_causer', 20, ''),
+            # --- الإفراج ---
+            ('يوم الإفراج', 'release_day', 12, ''),
+            ('شهر الإفراج', 'release_month', 12, ''),
+            ('سنة الإفراج', 'release_year', 12, ''),
+            # --- الوفاة ---
+            ('يوم الوفاة', 'death_day', 12, ''),
+            ('شهر الوفاة', 'death_month', 12, ''),
+            ('سنة الوفاة', 'death_year', 12, ''),
+            ('مكان الوفاة', 'death_place', 20, ''),
+            # --- الأسرة ---
+            ('اسم الزوج/ة', 'spouse_name', 20, ''),
+            ('هاتف الزوج/ة', 'spouse_phone', 16, ''),
+            ('لديه أطفال', 'has_kids', 12, 'نعم / لا'),
+            ('عدد الأطفال', 'kids_count', 12, '3'),
+            ('اسم الوصي', 'guardian_name', 20, ''),
+            ('صلة الوصي', 'guardian_relation', 16, ''),
+            ('هاتف الوصي', 'guardian_phone', 16, ''),
+            # --- التعليم والعمل ---
+            ('التعليم', 'education', 16, 'جامعي / ثانوي / إعدادي / ابتدائي'),
+            ('نوع التعليم', 'edu_type', 16, ''),
+            ('التخصص', 'edu_specialization', 18, ''),
+            ('الجامعة/المعهد', 'edu_university', 20, ''),
+            ('العمل', 'employment', 16, ''),
+            ('المهنة', 'profession', 18, ''),
+            ('جهة العمل', 'employer', 20, ''),
+            # --- الصحة ---
+            ('أمراض مزمنة', 'chronic', 20, ''),
+            ('ضغط', 'has_hypertension', 10, '0 / 1'),
+            ('سكري', 'has_diabetes', 10, '0 / 1'),
+            ('احتياجات خاصة', 'has_special_needs', 14, '0 / 1'),
+            ('تفاصيل الاحتياجات', 'special_needs_details', 22, ''),
+            # --- المعيل ---
+            ('المعيل', 'breadwinner', 14, ''),
+            ('عمل المعيل', 'breadwinner_job', 18, ''),
+            ('صلة المعيل', 'breadwinner_relation', 16, ''),
+            # --- القانون ---
+            ('وضع قانوني', 'legal', 14, ''),
+            ('تفاصيل قانونية', 'legal_details', 22, ''),
+            ('مسجل رسمياً', 'is_officially_registered', 14, '0 / 1'),
+            # --- السجل المدني ---
+            ('حالة السجل المدني', 'civil_registry_status', 18, ''),
+            ('تاريخ السجل المدني', 'civil_registry_date', 16, ''),
+            ('رقم دفتر العائلة', 'family_book_number', 16, ''),
+            # --- المبلّغ ---
+            ('اسم المبلّغ', 'reporter_name', 20, ''),
+            ('صلة المبلّغ', 'reporter_relation', 16, ''),
+            ('هاتف المبلّغ', 'reporter_phone', 16, ''),
+            ('هوية المبلّغ', 'reporter_id', 16, ''),
+            ('موافقة المبلّغ', 'informant_consent', 14, '0 / 1'),
+            # --- التوثيق ---
+            ('مستوى الأدلة', 'evidence_level', 16, 'unverified / low / medium / high'),
+            ('نوع المصدر', 'source_type', 16, ''),
+            ('تاريخ الجمع', 'collection_date', 14, '2024-01-15'),
+            ('اسم الجامع', 'collector_name', 18, ''),
+            ('ملاحظات المنهجية', 'methodology_notes', 24, ''),
+            ('ملاحظات', 'notes', 28, ''),
+        ]
         ws.title = 'سجلات'
 
-    hfont = Font(bold=True, color='FFFFFF')
+    # --- Row 1: Arabic headers ---
+    hfont = Font(bold=True, color='FFFFFF', size=11)
     hfill = PatternFill(start_color='1565C0', end_color='1565C0', fill_type='solid')
-    for i, h in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=i, value=h)
+    thin_border = Border(
+        left=Side(style='thin', color='CCCCCC'),
+        right=Side(style='thin', color='CCCCCC'),
+        bottom=Side(style='thin', color='CCCCCC'),
+    )
+
+    for i, (ar, en, width, hint) in enumerate(columns, 1):
+        cell = ws.cell(row=1, column=i, value=ar)
         cell.font = hfont
         cell.fill = hfill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin_border
+        col_letter = cell.column_letter
+        ws.column_dimensions[col_letter].width = width
+
+    # --- Row 2: English column names (for developer reference) ---
+    enfont = Font(italic=True, color='888888', size=9)
+    enfill = PatternFill(start_color='E3F2FD', end_color='E3F2FD', fill_type='solid')
+    for i, (ar, en, width, hint) in enumerate(columns, 1):
+        cell = ws.cell(row=2, column=i, value=en)
+        cell.font = enfont
+        cell.fill = enfill
         cell.alignment = Alignment(horizontal='center')
-        ws.column_dimensions[chr(64 + i)].width = 18
+        cell.border = thin_border
+
+    # --- Row 3: Example/hint values ---
+    hintfont = Font(color='999999', size=9)
+    for i, (ar, en, width, hint) in enumerate(columns, 1):
+        if hint:
+            cell = ws.cell(row=3, column=i, value=hint)
+            cell.font = hintfont
+            cell.alignment = Alignment(horizontal='center')
+            cell.border = thin_border
+
+    # Freeze header rows
+    ws.freeze_panes = 'A4'
 
     buf = BytesIO()
     wb.save(buf)

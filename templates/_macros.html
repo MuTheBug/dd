@@ -1,0 +1,8 @@
+{# Reusable macros for the HAQQUNA template system #}
+
+{# Tooltip ? button for a field. Usage: {{ tip('field_name') }} #}
+{% macro tip(field_name) %}
+{% if FIELD_TOOLTIPS and FIELD_TOOLTIPS.get(field_name) %}
+<span class="field-tip-btn" role="button" tabindex="0" aria-label="معلومات">?<span class="field-tip-popup">{{ FIELD_TOOLTIPS[field_name] }}</span></span>
+{% endif %}
+{% endmacro %}

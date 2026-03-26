@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import tip %}
 {% block title %}سجل {{ record.first_name }} {{ record.last_name }} - حقنا{% endblock %}
 
 {% block content %}
@@ -71,39 +72,39 @@
             <h3>البيانات الشخصية</h3>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">الاسم الكامل</div>
+            <div class="detail-field-label">الاسم الكامل {{ tip('first_name') }}</div>
             <div class="detail-field-value">{{ record.first_name }} {{ record.father_name }} {{ record.last_name }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">اسم الأم</div>
+            <div class="detail-field-label">اسم الأم {{ tip('mother_name') }}</div>
             <div class="detail-field-value">{{ record.mother_name or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">الجنس</div>
+            <div class="detail-field-label">الجنس {{ tip('gender') }}</div>
             <div class="detail-field-value">{{ 'ذكر' if record.gender == 'male' else 'أنثى' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">تاريخ الميلاد</div>
+            <div class="detail-field-label">تاريخ الميلاد {{ tip('birth_year') }}</div>
             <div class="detail-field-value">
                 {% if record.birth_year %}{{ record.birth_day or '?' }}/{{ record.birth_month or '?' }}/{{ record.birth_year }}{% else %}-{% endif %}
             </div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">الرقم الوطني</div>
+            <div class="detail-field-label">الرقم الوطني {{ tip('national_id') }}</div>
             <div class="detail-field-value">{{ record.national_id or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">رقم دفتر العائلة</div>
+            <div class="detail-field-label">رقم دفتر العائلة {{ tip('family_book_number') }}</div>
             <div class="detail-field-value">{{ record.family_book_number or '-' }}</div>
         </div>
         {% if record.status not in ('deceased', 'enforced') %}
         <div class="detail-field">
-            <div class="detail-field-label">الهاتف</div>
+            <div class="detail-field-label">الهاتف {{ tip('phone') }}</div>
             <div class="detail-field-value">{{ record.phone or '-' }}</div>
         </div>
         {% endif %}
         <div class="detail-field">
-            <div class="detail-field-label">زمرة الدم</div>
+            <div class="detail-field-label">زمرة الدم {{ tip('blood_type') }}</div>
             <div class="detail-field-value">{{ record.blood_type or '-' }}</div>
         </div>
     </div>
@@ -115,30 +116,30 @@
             <h3>تفاصيل الاعتقال</h3>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">تاريخ الاعتقال</div>
+            <div class="detail-field-label">تاريخ الاعتقال {{ tip('arrest_year') }}</div>
             <div class="detail-field-value">
                 {% if record.arrest_year %}{{ record.arrest_day or '?' }}/{{ record.arrest_month or '?' }}/{{ record.arrest_year }}{% else %}-{% endif %}
             </div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">الجهة المعتقِلة</div>
+            <div class="detail-field-label">الجهة المعتقِلة {{ tip('arrest_authority') }}</div>
             <div class="detail-field-value">{{ record.arrest_authority or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">مكان الاحتجاز</div>
+            <div class="detail-field-label">مكان الاحتجاز {{ tip('arrest_place') }}</div>
             <div class="detail-field-value">{{ record.arrest_place or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">سبب الاعتقال</div>
+            <div class="detail-field-label">سبب الاعتقال {{ tip('arrest_reason') }}</div>
             <div class="detail-field-value">{{ record.arrest_reason or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">المتسبب بالاعتقال</div>
+            <div class="detail-field-label">المتسبب بالاعتقال {{ tip('arrest_causer') }}</div>
             <div class="detail-field-value">{{ record.arrest_causer or '-' }}</div>
         </div>
         {% if record.status == 'survivor' %}
         <div class="detail-field">
-            <div class="detail-field-label">تاريخ الإفراج</div>
+            <div class="detail-field-label">تاريخ الإفراج {{ tip('release_year') }}</div>
             <div class="detail-field-value">
                 {% if record.release_year %}{{ record.release_day or '?' }}/{{ record.release_month or '?' }}/{{ record.release_year }}{% else %}-{% endif %}
             </div>
@@ -146,13 +147,13 @@
         {% endif %}
         {% if record.status == 'deceased' %}
         <div class="detail-field">
-            <div class="detail-field-label">تاريخ الوفاة</div>
+            <div class="detail-field-label">تاريخ الوفاة {{ tip('death_year') }}</div>
             <div class="detail-field-value">
                 {% if record.death_year %}{{ record.death_day or '?' }}/{{ record.death_month or '?' }}/{{ record.death_year }}{% else %}-{% endif %}
             </div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">مكان الوفاة</div>
+            <div class="detail-field-label">مكان الوفاة {{ tip('death_place') }}</div>
             <div class="detail-field-value">{{ record.death_place or '-' }}</div>
         </div>
         {% endif %}
@@ -162,10 +163,10 @@
     <div class="card">
         <div class="card-header">
             <div class="card-icon">&#x1F50D;</div>
-            <h3>الأدلة والتحقق (بيركلي)</h3>
+            <h3>الأدلة والتحقق (بيركلي) {{ tip('evidence_level') }}</h3>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">نوع الحالة</div>
+            <div class="detail-field-label">نوع الحالة {{ tip('case_type') }}</div>
             <div class="detail-field-value">
                 {% for code, label in CASE_TYPES %}
                     {% if record.case_type == code %}{{ label }}{% endif %}
@@ -174,7 +175,7 @@
             </div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">مستوى الأدلة</div>
+            <div class="detail-field-label">مستوى الأدلة {{ tip('evidence_level') }}</div>
             <div class="detail-field-value">
                 {% for code, label in EVIDENCE_LEVELS %}
                     {% if record.evidence_level == code %}{{ label }}{% endif %}
@@ -183,7 +184,7 @@
             </div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">حالة التحقق</div>
+            <div class="detail-field-label">حالة التحقق {{ tip('verification_status') }}</div>
             <div class="detail-field-value">
                 {% for code, label in VERIFICATION_STATUSES %}
                     {% if record.verification_status == code %}{{ label }}{% endif %}
@@ -192,12 +193,12 @@
             </div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">عدد مصادر الأدلة</div>
+            <div class="detail-field-label">عدد مصادر الأدلة {{ tip('evidence_sources_count') }}</div>
             <div class="detail-field-value">{{ record.evidence_sources_count or 0 }}</div>
         </div>
         {% if record.digital_evidence_type %}
         <div class="detail-field">
-            <div class="detail-field-label">نوع الدليل الرقمي</div>
+            <div class="detail-field-label">نوع الدليل الرقمي {{ tip('digital_evidence_type') }}</div>
             <div class="detail-field-value">
                 {% for code, label in DIGITAL_EVIDENCE_TYPES %}
                     {% if record.digital_evidence_type == code %}{{ label }}{% endif %}
@@ -206,13 +207,13 @@
         </div>
         {% if record.digital_evidence_description %}
         <div class="detail-field">
-            <div class="detail-field-label">وصف الدليل</div>
+            <div class="detail-field-label">وصف الدليل {{ tip('digital_evidence_description') }}</div>
             <div class="detail-field-value">{{ record.digital_evidence_description }}</div>
         </div>
         {% endif %}
         {% endif %}
         <div class="detail-field">
-            <div class="detail-field-label">حالة السجل المدني</div>
+            <div class="detail-field-label">حالة السجل المدني {{ tip('civil_registry_status') }}</div>
             <div class="detail-field-value">
                 {% for code, label in CIVIL_REGISTRY_STATUSES %}
                     {% if record.civil_registry_status == code %}{{ label }}{% endif %}
@@ -235,32 +236,32 @@
             <h3>بيانات المُبلِّغ</h3>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">اسم المُبلِّغ</div>
+            <div class="detail-field-label">اسم المُبلِّغ {{ tip('reporter_name') }}</div>
             <div class="detail-field-value">{{ record.reporter_name or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">صلة المُبلِّغ</div>
+            <div class="detail-field-label">صلة المُبلِّغ {{ tip('reporter_relation') }}</div>
             <div class="detail-field-value">{{ record.reporter_relation or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">هاتف المُبلِّغ</div>
+            <div class="detail-field-label">هاتف المُبلِّغ {{ tip('reporter_phone') }}</div>
             <div class="detail-field-value">{{ record.reporter_phone or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">موافقة واعية</div>
+            <div class="detail-field-label">موافقة واعية {{ tip('informant_consent') }}</div>
             <div class="detail-field-value">{{ 'نعم' if record.informant_consent else 'لا' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">جامع البيانات</div>
+            <div class="detail-field-label">جامع البيانات {{ tip('collector_name') }}</div>
             <div class="detail-field-value">{{ record.collector_name or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">تاريخ الجمع</div>
+            <div class="detail-field-label">تاريخ الجمع {{ tip('collection_date') }}</div>
             <div class="detail-field-value">{{ record.collection_date or record.created_at or '-' }}</div>
         </div>
         {% if record.witnesses_data and record.witnesses_data != '[]' %}
         <div class="detail-field" style="margin-top: 0.8rem;">
-            <div class="detail-field-label">الشهود</div>
+            <div class="detail-field-label">الشهود {{ tip('witnesses') }}</div>
             {% set witnesses = record.witnesses_data | tojson %}
             <div class="detail-field-value" style="font-size: 0.82rem;">
                 {% for w in (record.witnesses_data | default('[]', true)) | safe | tojson %}
@@ -278,7 +279,7 @@
             <h3>البيانات العائلية</h3>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">الحالة الاجتماعية</div>
+            <div class="detail-field-label">الحالة الاجتماعية {{ tip('marital') }}</div>
             <div class="detail-field-value">
                 {% for code, label in MARITAL_STATUSES %}
                     {% if record.marital == code %}{{ label }}{% endif %}
@@ -300,7 +301,7 @@
         {% endif %}
         {% if record.spouse_name %}
         <div class="detail-field">
-            <div class="detail-field-label">اسم الزوج/ة</div>
+            <div class="detail-field-label">اسم الزوج/ة {{ tip('spouse_name') }}</div>
             <div class="detail-field-value">
                 {{ record.spouse_name }}
                 {% if record.marital == 'married' and record.gender == 'male' and record.status in ('deceased', 'enforced') %}
@@ -317,7 +318,7 @@
         </div>
         {% if record.guardian_name %}
         <div class="detail-field">
-            <div class="detail-field-label">ولي الأمر</div>
+            <div class="detail-field-label">ولي الأمر {{ tip('guardian_name') }}</div>
             <div class="detail-field-value">{{ record.guardian_name }} ({{ record.guardian_relation or '-' }})</div>
         </div>
         {% endif %}
@@ -373,27 +374,27 @@
             <h3>البيانات الاجتماعية والاقتصادية</h3>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">المنطقة / الحي</div>
+            <div class="detail-field-label">المنطقة / الحي {{ tip('address_area') }}</div>
             <div class="detail-field-value">{{ record.address_area or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">العنوان</div>
+            <div class="detail-field-label">العنوان {{ tip('address') }}</div>
             <div class="detail-field-value">{{ record.address or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">نوع السكن</div>
+            <div class="detail-field-label">نوع السكن {{ tip('housing_type') }}</div>
             <div class="detail-field-value">{{ record.housing_type or '-' }} {% if record.rent_amount %}({{ record.rent_amount }} ل.س){% endif %}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">التحصيل العلمي</div>
+            <div class="detail-field-label">التحصيل العلمي {{ tip('education') }}</div>
             <div class="detail-field-value">{{ record.education or '-' }} {% if record.edu_specialization %}- {{ record.edu_specialization }}{% endif %}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">المهنة</div>
+            <div class="detail-field-label">المهنة {{ tip('profession') }}</div>
             <div class="detail-field-value">{{ record.profession or '-' }}</div>
         </div>
         <div class="detail-field">
-            <div class="detail-field-label">المعيل</div>
+            <div class="detail-field-label">المعيل {{ tip('breadwinner') }}</div>
             <div class="detail-field-value">{{ record.breadwinner or '-' }} {% if record.breadwinner_job %}({{ record.breadwinner_job }}){% endif %}</div>
         </div>
     </div>
@@ -460,7 +461,7 @@
         </div>
         {% if record.chronic %}
         <div class="detail-field">
-            <div class="detail-field-label">أمراض مزمنة</div>
+            <div class="detail-field-label">أمراض مزمنة {{ tip('chronic') }}</div>
             <div class="detail-field-value">{{ record.chronic }}</div>
         </div>
         {% endif %}
@@ -496,7 +497,7 @@
 <div class="card" style="margin-top: 1rem;">
     <div class="card-header">
         <div class="card-icon">&#x1F4DD;</div>
-        <h3>ملاحظات</h3>
+        <h3>ملاحظات {{ tip('notes') }}</h3>
     </div>
     <p style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.8;">{{ record.notes }}</p>
 </div>
@@ -537,7 +538,7 @@
 <div class="card" style="margin-top: 1rem;">
     <div class="card-header">
         <div class="card-icon">&#x2705;</div>
-        <h3>حالة التحقق والقفل</h3>
+        <h3>حالة التحقق والقفل {{ tip('record_status') }}</h3>
     </div>
     {% set rs = record.record_status or 'draft' %}
     <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 0.5rem 0;">
@@ -568,6 +569,39 @@
     {% if rs == 'locked' %}
     <div style="padding: 0.5rem; background: #fef2f2; border-radius: 6px; color: #991b1b; font-size: 0.88rem; margin-top: 0.5rem;">
         &#x26A0; هذا السجل مقفل. يجب إلغاء القفل أولاً لتعديله.
+    </div>
+    {% endif %}
+    {% if rs == 'draft' %}
+    <div style="padding: 0.6rem 0.8rem; background: #eff6ff; border-radius: 6px; color: #1e40af; font-size: 0.84rem; margin-top: 0.5rem; line-height: 1.7; border-right: 3px solid #3b82f6;">
+        <strong>للترقية إلى "مراجَع" يجب ملء:</strong>
+        الاسم، اسم الأب، الكنية، الحالة، <strong>نوع المصدر</strong>، اسم جامع البيانات، تاريخ الجمع.
+        {% set missing_fields = [] %}
+        {% if not record.source_type %}{% set _ = missing_fields.append('نوع المصدر') %}{% endif %}
+        {% if not record.collector_name %}{% set _ = missing_fields.append('اسم جامع البيانات') %}{% endif %}
+        {% if not record.collection_date %}{% set _ = missing_fields.append('تاريخ الجمع') %}{% endif %}
+        {% if not record.first_name %}{% set _ = missing_fields.append('الاسم') %}{% endif %}
+        {% if not record.status %}{% set _ = missing_fields.append('الحالة') %}{% endif %}
+        {% if missing_fields %}
+        <br><span style="color: #dc2626;">&#x26A0; ناقص حالياً: {{ missing_fields|join('، ') }}</span>
+        — <a href="{{ url_for('admin_record_edit', record_id=record.id) }}" style="color: #2563eb; text-decoration: underline;">تعديل السجل</a>
+        {% else %}
+        <br><span style="color: #16a34a;">&#x2705; جميع الحقول المطلوبة مكتملة.</span>
+        {% endif %}
+    </div>
+    {% elif rs == 'reviewed' %}
+    <div style="padding: 0.6rem 0.8rem; background: #f0fdf4; border-radius: 6px; color: #166534; font-size: 0.84rem; margin-top: 0.5rem; line-height: 1.7; border-right: 3px solid #22c55e;">
+        <strong>للترقية إلى "موثّق" يجب أيضاً ملء:</strong>
+        مستوى الأدلة، حالة التحقق.
+        {% if not record.evidence_level or not record.verification_status %}
+        <br><span style="color: #dc2626;">&#x26A0; ناقص:
+        {% if not record.evidence_level %}مستوى الأدلة{% endif %}
+        {% if not record.evidence_level and not record.verification_status %}، {% endif %}
+        {% if not record.verification_status %}حالة التحقق{% endif %}
+        </span>
+        — <a href="{{ url_for('admin_record_edit', record_id=record.id) }}" style="color: #2563eb; text-decoration: underline;">تعديل السجل</a>
+        {% else %}
+        <br><span style="color: #16a34a;">&#x2705; جميع الحقول المطلوبة مكتملة.</span>
+        {% endif %}
     </div>
     {% endif %}
 </div>

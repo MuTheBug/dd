@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import tip %}
 {% block title %}إدخال حالة جديدة - حقنا{% endblock %}
 
 {% block content %}
@@ -200,7 +201,7 @@
         <div class="entry-section-desc">حدد تصنيف الحالة أولاً، ثم أدخل بيانات المُبلِّغ. الحقول المرمّزة بـ <span class="required">*</span> إلزامية.</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>تصنيف الحالة <span class="required">*</span></label>
+                <label>تصنيف الحالة {{ tip('status') }} <span class="required">*</span></label>
                 <select name="status" id="statusSelect" required onchange="handleStatusChange()">
                     <option value="">-- اختر التصنيف --</option>
                     <option value="survivor">ناجٍ (شخص أُفرج عنه / هرب)</option>
@@ -209,18 +210,18 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>نوع الحالة التفصيلي</label>
+                <label>نوع الحالة التفصيلي {{ tip('case_type') }}</label>
                 <select name="case_type" id="caseTypeSelect">
                     <option value="">-- اختر التصنيف أولاً --</option>
                 </select>
                 <span class="hint">سيتم تحديث الخيارات تلقائياً بناءً على التصنيف</span>
             </div>
             <div class="form-group">
-                <label>اسم المُبلِّغ <span class="required">*</span></label>
+                <label>اسم المُبلِّغ {{ tip('reporter_name') }} <span class="required">*</span></label>
                 <input type="text" name="reporter_name" required placeholder="الاسم الكامل للمُبلِّغ">
             </div>
             <div class="form-group">
-                <label>صلة المُبلِّغ بالضحية <span class="required">*</span></label>
+                <label>صلة المُبلِّغ بالضحية {{ tip('reporter_relation') }} <span class="required">*</span></label>
                 <select name="reporter_relation" required>
                     <option value="">-- اختر الصلة --</option>
                     {% for rel in REPORTER_RELATIONS %}
@@ -229,15 +230,15 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>هاتف المُبلِّغ</label>
+                <label>هاتف المُبلِّغ {{ tip('reporter_phone') }}</label>
                 <input type="tel" name="reporter_phone" placeholder="رقم الهاتف">
             </div>
             <div class="form-group">
-                <label>رقم هوية المُبلِّغ</label>
+                <label>رقم هوية المُبلِّغ {{ tip('reporter_id') }}</label>
                 <input type="text" name="reporter_id" placeholder="الرقم الوطني للمُبلِّغ">
             </div>
             <div class="form-group">
-                <label>اسم جامع البيانات</label>
+                <label>اسم جامع البيانات {{ tip('collector_name') }}</label>
                 <input type="text" name="collector_name" placeholder="اسم الموظف/المتطوع" list="volunteer_list">
                 <datalist id="volunteer_list">
                     {% for vname in volunteer_names %}
@@ -246,13 +247,27 @@
                 </datalist>
             </div>
             <div class="form-group">
-                <label>تاريخ جمع البيانات</label>
+                <label>تاريخ جمع البيانات {{ tip('collection_date') }}</label>
                 <input type="date" name="collection_date" value="{{ now }}">
+            </div>
+            <div class="form-group">
+                <label>نوع المصدر {{ tip('source_type') }} <span class="required">*</span></label>
+                <select name="source_type" required>
+                    <option value="">-- اختر نوع المصدر --</option>
+                    <option value="مقابلة مباشرة">مقابلة مباشرة</option>
+                    <option value="مقابلة هاتفية">مقابلة هاتفية</option>
+                    <option value="وثائق رسمية">وثائق رسمية</option>
+                    <option value="مصادر مفتوحة">مصادر مفتوحة (إنترنت / إعلام)</option>
+                    <option value="شهادة شاهد">شهادة شاهد</option>
+                    <option value="تسريبات">تسريبات</option>
+                    <option value="إحالة">إحالة من منظمة / جهة أخرى</option>
+                    <option value="أخرى">أخرى</option>
+                </select>
             </div>
             <div class="form-group full-width">
                 <label class="checkbox-label">
                     <input type="checkbox" name="informant_consent" value="1">
-                    أقرّ بموافقتي الواعية على جمع هذه المعلومات واستخدامها لأغراض التوثيق وفق بروتوكول بيركلي
+                    أقرّ بموافقتي الواعية على جمع هذه المعلومات واستخدامها لأغراض التوثيق وفق بروتوكول بيركلي {{ tip('informant_consent') }}
                 </label>
             </div>
         </div>
@@ -270,23 +285,23 @@
         <div class="entry-section-desc">أدخل البيانات الشخصية للضحية. هذه البيانات أساسية للتوثيق والمطابقة.</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>الاسم الأول <span class="required">*</span></label>
+                <label>الاسم الأول {{ tip('first_name') }} <span class="required">*</span></label>
                 <input type="text" name="first_name" required placeholder="الاسم الأول">
             </div>
             <div class="form-group">
-                <label>اسم الأب <span class="required">*</span></label>
+                <label>اسم الأب {{ tip('father_name') }} <span class="required">*</span></label>
                 <input type="text" name="father_name" required placeholder="اسم الأب">
             </div>
             <div class="form-group">
-                <label>الكنية (اسم العائلة) <span class="required">*</span></label>
+                <label>الكنية (اسم العائلة) {{ tip('last_name') }} <span class="required">*</span></label>
                 <input type="text" name="last_name" required placeholder="اسم العائلة">
             </div>
             <div class="form-group">
-                <label>اسم الأم <span class="required">*</span></label>
+                <label>اسم الأم {{ tip('mother_name') }} <span class="required">*</span></label>
                 <input type="text" name="mother_name" required placeholder="اسم الأم الكامل">
             </div>
             <div class="form-group">
-                <label>الجنس <span class="required">*</span></label>
+                <label>الجنس {{ tip('gender') }} <span class="required">*</span></label>
                 <select name="gender" required>
                     <option value="">-- اختر --</option>
                     <option value="male">ذكر</option>
@@ -294,7 +309,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>تاريخ الميلاد</label>
+                <label>تاريخ الميلاد {{ tip('birth_year') }}</label>
                 <div class="form-date-group">
                     <input type="number" name="birth_day" placeholder="اليوم" min="0" max="31">
                     <input type="number" name="birth_month" placeholder="الشهر" min="0" max="12">
@@ -302,7 +317,7 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>المحافظة <span class="required">*</span></label>
+                <label>المحافظة {{ tip('province') }} <span class="required">*</span></label>
                 <select name="province" required>
                     <option value="">-- اختر المحافظة --</option>
                     {% for p in PROVINCES %}
@@ -311,19 +326,19 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>الرقم الوطني <span class="required">*</span></label>
+                <label>الرقم الوطني {{ tip('national_id') }} <span class="required">*</span></label>
                 <input type="text" name="national_id" required placeholder="الرقم الوطني">
             </div>
             <div class="form-group">
-                <label>رقم دفتر العائلة</label>
+                <label>رقم دفتر العائلة {{ tip('family_book_number') }}</label>
                 <input type="text" name="family_book_number" placeholder="رقم دفتر العائلة">
             </div>
             <div class="form-group" id="phoneGroup">
-                <label>رقم الهاتف</label>
+                <label>رقم الهاتف {{ tip('phone') }}</label>
                 <input type="tel" name="phone" placeholder="رقم الهاتف">
             </div>
             <div class="form-group" id="bloodTypeGroup">
-                <label>زمرة الدم</label>
+                <label>زمرة الدم {{ tip('blood_type') }}</label>
                 <select name="blood_type">
                     <option value="">-- اختر --</option>
                     {% for bt in BLOOD_TYPES %}
@@ -340,7 +355,7 @@
         <div class="entry-section-desc">الحد الأقصى لحجم كل ملف: 15 ميغابايت. الصيغ المقبولة: JPG, PNG, PDF.</div>
         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
             <div class="form-group">
-                <label>صورة شخصية</label>
+                <label>صورة شخصية {{ tip('photo') }}</label>
                 <div class="file-upload-area" id="photoArea">
                     <div class="file-upload-icon">&#x1F4F7;</div>
                     <div class="file-upload-text">اضغط لاختيار صورة</div>
@@ -350,7 +365,7 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>وثيقة هوية</label>
+                <label>وثيقة هوية {{ tip('document') }}</label>
                 <div class="file-upload-area" id="docArea">
                     <div class="file-upload-icon">&#x1F4C4;</div>
                     <div class="file-upload-text">اضغط لاختيار وثيقة</div>
@@ -376,7 +391,7 @@
         <div class="entry-section-desc">أدخل تفاصيل الاعتقال. إن لم تكن متأكداً من بعض التفاصيل اتركها فارغة.</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>تاريخ الاعتقال</label>
+                <label>تاريخ الاعتقال {{ tip('arrest_year') }}</label>
                 <div class="form-date-group">
                     <input type="number" name="arrest_day" placeholder="اليوم" min="0" max="31">
                     <input type="number" name="arrest_month" placeholder="الشهر" min="0" max="12">
@@ -384,7 +399,7 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>الجهة المعتقِلة <span class="required">*</span></label>
+                <label>الجهة المعتقِلة {{ tip('arrest_authority') }} <span class="required">*</span></label>
                 <select name="arrest_authority" required>
                     <option value="">-- اختر --</option>
                     {% for a in ARREST_AUTHORITIES %}
@@ -393,7 +408,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>مكان الاحتجاز / المعتقل</label>
+                <label>مكان الاحتجاز / المعتقل {{ tip('arrest_place') }}</label>
                 <select name="arrest_place" id="arrestPlace">
                     <option value="">-- اختر --</option>
                     {% for f in DETENTION_FACILITIES %}
@@ -402,19 +417,19 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>سبب الاعتقال <span class="required">*</span></label>
+                <label>سبب الاعتقال {{ tip('arrest_reason') }} <span class="required">*</span></label>
                 <input type="text" name="arrest_reason" required placeholder="مثال: مظاهرة، تقرير كيدي، حاجز...">
             </div>
             <div class="form-group">
-                <label>المتسبب بالاعتقال (إن وُجد)</label>
+                <label>المتسبب بالاعتقال (إن وُجد) {{ tip('arrest_causer') }}</label>
                 <input type="text" name="arrest_causer" placeholder="اسم الشخص أو الجهة">
             </div>
             <div class="form-group">
-                <label>آخر مكان معروف</label>
+                <label>آخر مكان معروف {{ tip('last_known_location') }}</label>
                 <input type="text" name="last_known_location" placeholder="آخر مكان عُرف أن الشخص كان فيه">
             </div>
             <div class="form-group">
-                <label>آخر تاريخ عُرف أنه حي</label>
+                <label>آخر تاريخ عُرف أنه حي {{ tip('last_known_alive_date') }}</label>
                 <input type="date" name="last_known_alive_date">
             </div>
         </div>
@@ -425,7 +440,7 @@
         <div class="entry-section-title">&#x1F513; بيانات الإفراج (للناجين)</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>تاريخ الإفراج</label>
+                <label>تاريخ الإفراج {{ tip('release_year') }}</label>
                 <div class="form-date-group">
                     <input type="number" name="release_day" placeholder="اليوم" min="0" max="31">
                     <input type="number" name="release_month" placeholder="الشهر" min="0" max="12">
@@ -433,7 +448,7 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>ملخص التجربة / السيرة الذاتية</label>
+                <label>ملخص التجربة / السيرة الذاتية {{ tip('survivor_cv') }}</label>
                 <div class="file-upload-area" id="cvArea">
                     <div class="file-upload-icon">&#x1F4C3;</div>
                     <div class="file-upload-text">اضغط لاختيار ملف</div>
@@ -443,7 +458,7 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>صورة بعد الإفراج</label>
+                <label>صورة بعد الإفراج {{ tip('survivor_cv_photo') }}</label>
                 <div class="file-upload-area" id="cvPhotoArea">
                     <div class="file-upload-icon">&#x1F4F7;</div>
                     <div class="file-upload-text">اضغط لاختيار صورة</div>
@@ -453,7 +468,7 @@
                 </div>
             </div>
             <div class="form-group full-width">
-                <label>وصف تجربة الاعتقال</label>
+                <label>وصف تجربة الاعتقال {{ tip('survivor_cv_text') }}</label>
                 <textarea name="survivor_cv_text" rows="4" placeholder="وصف مختصر لتجربة الاعتقال والاحتجاز..."></textarea>
             </div>
         </div>
@@ -464,7 +479,7 @@
         <div class="entry-section-title">&#x1F3F4; بيانات الوفاة</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>تاريخ الوفاة</label>
+                <label>تاريخ الوفاة {{ tip('death_year') }}</label>
                 <div class="form-date-group">
                     <input type="number" name="death_day" placeholder="اليوم" min="0" max="31">
                     <input type="number" name="death_month" placeholder="الشهر" min="0" max="12">
@@ -472,7 +487,7 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>مكان الوفاة</label>
+                <label>مكان الوفاة {{ tip('death_place') }}</label>
                 <input type="text" name="death_place" placeholder="مكان الوفاة إن عُرف">
             </div>
         </div>
@@ -492,7 +507,7 @@
         <div class="entry-section-desc">وثّق أي أدلة رقمية متوفرة. هذا يعزز مصداقية الحالة.</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>نوع الدليل الرقمي</label>
+                <label>نوع الدليل الرقمي {{ tip('digital_evidence_type') }}</label>
                 <select name="digital_evidence_type" id="digitalEvidenceType" onchange="handleDigitalEvidence()">
                     <option value="">-- لا يوجد --</option>
                     {% for code, label in DIGITAL_EVIDENCE_TYPES %}
@@ -501,7 +516,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>مستوى الأدلة</label>
+                <label>مستوى الأدلة {{ tip('evidence_level') }}</label>
                 <select name="evidence_level">
                     {% for code, label in EVIDENCE_LEVELS %}
                     <option value="{{ code }}">{{ label }}</option>
@@ -509,7 +524,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>عدد مصادر الأدلة</label>
+                <label>عدد مصادر الأدلة {{ tip('evidence_sources_count') }}</label>
                 <input type="number" name="evidence_sources_count" min="0" value="0">
             </div>
         </div>
@@ -520,7 +535,7 @@
         <div class="entry-section-title">&#x1F4F1; تفاصيل الدليل الرقمي</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>رابط الدليل (إن وُجد)</label>
+                <label>رابط الدليل (إن وُجد) {{ tip('digital_evidence_url') }}</label>
                 <input type="url" name="digital_evidence_url" placeholder="https://...">
             </div>
             <div class="form-group">
@@ -534,7 +549,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>لقطة شاشة للدليل</label>
+                <label>لقطة شاشة للدليل {{ tip('digital_evidence_screenshot') }}</label>
                 <div class="file-upload-area" id="screenshotArea">
                     <div class="file-upload-icon">&#x1F4F1;</div>
                     <div class="file-upload-text">اضغط لاختيار لقطة شاشة</div>
@@ -548,15 +563,15 @@
                 <input type="date" name="digital_evidence_date">
             </div>
             <div class="form-group">
-                <label>الاسم الوارد في الدليل</label>
+                <label>الاسم الوارد في الدليل {{ tip('digital_evidence_person_name') }}</label>
                 <input type="text" name="digital_evidence_person_name" placeholder="الاسم كما ظهر في التسريبات">
             </div>
             <div class="form-group">
-                <label>تاريخ الوفاة الوارد في الدليل</label>
+                <label>تاريخ الوفاة الوارد في الدليل {{ tip('digital_evidence_death_date') }}</label>
                 <input type="date" name="digital_evidence_death_date">
             </div>
             <div class="form-group full-width">
-                <label>وصف الدليل</label>
+                <label>وصف الدليل {{ tip('digital_evidence_description') }}</label>
                 <textarea name="digital_evidence_description" rows="3" placeholder="وصف تفصيلي للدليل الرقمي..."></textarea>
             </div>
         </div>
@@ -567,7 +582,7 @@
         <div class="entry-section-title">&#x1F4C4; حالة السجل المدني (النفوس)</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>حالة السجل المدني</label>
+                <label>حالة السجل المدني {{ tip('civil_registry_status') }}</label>
                 <select name="civil_registry_status">
                     {% for code, label in CIVIL_REGISTRY_STATUSES %}
                     <option value="{{ code }}">{{ label }}</option>
@@ -575,11 +590,11 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>تاريخ مراجعة النفوس</label>
+                <label>تاريخ مراجعة النفوس {{ tip('civil_registry_date') }}</label>
                 <input type="date" name="civil_registry_date">
             </div>
             <div class="form-group">
-                <label>وثيقة من النفوس</label>
+                <label>وثيقة من النفوس {{ tip('civil_registry_document') }}</label>
                 <div class="file-upload-area" id="civilArea">
                     <div class="file-upload-icon">&#x1F4C4;</div>
                     <div class="file-upload-text">اضغط لرفع إخراج قيد</div>
@@ -598,12 +613,12 @@
             <div class="form-group">
                 <label class="checkbox-label">
                     <input type="checkbox" name="has_conflicting_info" value="1" id="conflictCheck" onchange="document.getElementById('conflictDetails').style.display=this.checked?'block':'none'">
-                    يوجد تضارب في المعلومات
+                    يوجد تضارب في المعلومات {{ tip('has_conflicting_info') }}
                 </label>
                 <span class="hint">مثال: التسريبات تقول متوفى لكن النفوس تقول حي</span>
             </div>
             <div class="form-group full-width" id="conflictDetails" style="display:none">
-                <label>تفاصيل التضارب</label>
+                <label>تفاصيل التضارب {{ tip('conflicting_info_details') }}</label>
                 <textarea name="conflicting_info_details" rows="3" placeholder="اشرح التضارب بالتفصيل..."></textarea>
             </div>
         </div>
@@ -611,7 +626,7 @@
 
     <!-- Witnesses -->
     <div class="entry-section">
-        <div class="entry-section-title">&#x1F465; الشهود</div>
+        <div class="entry-section-title">&#x1F465; الشهود {{ tip('witnesses') }}</div>
         <div class="entry-section-desc">أضف شهوداً لتعزيز مصداقية الحالة (اختياري).</div>
         <div id="witnessesContainer"></div>
         <button type="button" class="btn btn-outline btn-sm" onclick="addWitness()" style="margin-top: 0.5rem;">+ إضافة شاهد</button>
@@ -631,7 +646,7 @@
         <div class="entry-section-title">&#x1F46A; البيانات العائلية والاجتماعية</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>الحالة الاجتماعية</label>
+                <label>الحالة الاجتماعية {{ tip('marital') }}</label>
                 <select name="marital" id="maritalSelect" onchange="handleMarital()">
                     <option value="">-- اختر --</option>
                     {% for code, label in MARITAL_STATUSES %}
@@ -640,15 +655,15 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>اسم ولي الأمر / المعرّف</label>
+                <label>اسم ولي الأمر / المعرّف {{ tip('guardian_name') }}</label>
                 <input type="text" name="guardian_name">
             </div>
             <div class="form-group">
-                <label>صلة ولي الأمر</label>
+                <label>صلة ولي الأمر {{ tip('guardian_relation') }}</label>
                 <input type="text" name="guardian_relation">
             </div>
             <div class="form-group">
-                <label>هاتف ولي الأمر</label>
+                <label>هاتف ولي الأمر {{ tip('guardian_phone') }}</label>
                 <input type="tel" name="guardian_phone">
             </div>
         </div>
@@ -658,11 +673,11 @@
         <div class="entry-section-title">&#x1F48D; بيانات الزوج/ة</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>اسم الزوج/ة</label>
+                <label>اسم الزوج/ة {{ tip('spouse_name') }}</label>
                 <input type="text" name="spouse_name">
             </div>
             <div class="form-group">
-                <label>هاتف الزوج/ة</label>
+                <label>هاتف الزوج/ة {{ tip('spouse_phone') }}</label>
                 <input type="tel" name="spouse_phone">
             </div>
         </div>
@@ -688,7 +703,7 @@
         <div class="entry-section-title">بيانات الزوج/ة السابق/ة</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>اسم الزوج/ة السابق/ة</label>
+                <label>اسم الزوج/ة السابق/ة {{ tip('ex_spouse_name') }}</label>
                 <input type="text" name="ex_spouse_name">
             </div>
             <div class="form-group">
@@ -718,7 +733,7 @@
         <div class="entry-section-title">&#x1F3E0; البيانات السكنية والاقتصادية</div>
         <div class="form-grid">
             <div class="form-group">
-                <label>المنطقة / الحي</label>
+                <label>المنطقة / الحي {{ tip('address_area') }}</label>
                 <select name="address_area" id="addressAreaSelect" onchange="onAreaChange()">
                     <option value="">-- اختر المنطقة --</option>
                     {% for area in ADDRESS_AREAS %}
@@ -727,12 +742,12 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>العنوان الحالي <span class="required">*</span></label>
+                <label>العنوان الحالي {{ tip('address') }} <span class="required">*</span></label>
                 <input type="text" name="address" id="addressInput" required placeholder="العنوان التفصيلي" list="addressSuggestions" oninput="suggestArea()">
                 <datalist id="addressSuggestions"></datalist>
             </div>
             <div class="form-group">
-                <label>نوع السكن <span class="required">*</span></label>
+                <label>نوع السكن {{ tip('housing_type') }} <span class="required">*</span></label>
                 <select name="housing_type" required>
                     <option value="">-- اختر --</option>
                     {% for h in HOUSING_TYPES %}
@@ -741,23 +756,23 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>مبلغ الإيجار (إن وُجد)</label>
+                <label>مبلغ الإيجار (إن وُجد) {{ tip('rent_amount') }}</label>
                 <input type="text" name="rent_amount" placeholder="بالليرة السورية">
             </div>
             <div class="form-group status-alive-only">
-                <label>الوضع الوظيفي</label>
+                <label>الوضع الوظيفي {{ tip('employment') }}</label>
                 <input type="text" name="employment" placeholder="يعمل / لا يعمل">
             </div>
             <div class="form-group status-alive-only">
-                <label>المهنة</label>
+                <label>المهنة {{ tip('profession') }}</label>
                 <input type="text" name="profession">
             </div>
             <div class="form-group status-alive-only">
-                <label>جهة العمل</label>
+                <label>جهة العمل {{ tip('employer') }}</label>
                 <input type="text" name="employer">
             </div>
             <div class="form-group">
-                <label>المعيل</label>
+                <label>المعيل {{ tip('breadwinner') }}</label>
                 <input type="text" name="breadwinner" placeholder="اسم المعيل">
             </div>
             <div class="form-group">

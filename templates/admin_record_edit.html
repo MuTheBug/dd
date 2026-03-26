@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import tip %}
 {% block title %}تعديل سجل {{ record.first_name }} {{ record.last_name }} - حقنا{% endblock %}
 
 {% block content %}
@@ -30,7 +31,7 @@
     <div class="form-section-title">&#x1F4DD; التصنيف وبيانات المُبلِّغ</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>تصنيف الحالة</label>
+            <label>تصنيف الحالة {{ tip('status') }}</label>
             <select name="status" id="statusSelect" onchange="handleStatusChange()">
                 <option value="">-- اختر --</option>
                 <option value="survivor" {{ 'selected' if record.status=='survivor' }}>ناجٍ</option>
@@ -39,7 +40,7 @@
             </select>
         </div>
         <div class="form-group">
-            <label>نوع الحالة التفصيلي</label>
+            <label>نوع الحالة التفصيلي {{ tip('case_type') }}</label>
             <select name="case_type" id="caseTypeSelect">
                 <option value="">-- اختر --</option>
                 {% for code, label in CASE_TYPES %}
@@ -48,11 +49,11 @@
             </select>
         </div>
         <div class="form-group">
-            <label>اسم المُبلِّغ</label>
+            <label>اسم المُبلِّغ {{ tip('reporter_name') }}</label>
             <input type="text" name="reporter_name" value="{{ record.reporter_name or '' }}">
         </div>
         <div class="form-group">
-            <label>صلة المُبلِّغ</label>
+            <label>صلة المُبلِّغ {{ tip('reporter_relation') }}</label>
             <select name="reporter_relation">
                 <option value="">-- اختر --</option>
                 {% for rel in REPORTER_RELATIONS %}
@@ -61,15 +62,15 @@
             </select>
         </div>
         <div class="form-group">
-            <label>هاتف المُبلِّغ</label>
+            <label>هاتف المُبلِّغ {{ tip('reporter_phone') }}</label>
             <input type="tel" name="reporter_phone" value="{{ record.reporter_phone or '' }}">
         </div>
         <div class="form-group">
-            <label>رقم هوية المُبلِّغ</label>
+            <label>رقم هوية المُبلِّغ {{ tip('reporter_id') }}</label>
             <input type="text" name="reporter_id" value="{{ record.reporter_id or '' }}">
         </div>
         <div class="form-group">
-            <label>جامع البيانات</label>
+            <label>جامع البيانات {{ tip('collector_name') }}</label>
             <input type="text" name="collector_name" value="{{ record.collector_name or '' }}" list="volunteer_list">
             <datalist id="volunteer_list">
                 {% for vname in volunteer_names %}
@@ -78,11 +79,11 @@
             </datalist>
         </div>
         <div class="form-group">
-            <label>تاريخ الجمع</label>
+            <label>تاريخ الجمع {{ tip('collection_date') }}</label>
             <input type="date" name="collection_date" value="{{ record.collection_date or '' }}">
         </div>
         <div class="form-group">
-            <label>حالة التحقق</label>
+            <label>حالة التحقق {{ tip('verification_status') }}</label>
             <select name="verification_status">
                 {% for code, label in VERIFICATION_STATUSES %}
                 <option value="{{ code }}" {{ 'selected' if record.verification_status==code }}>{{ label }}</option>
@@ -90,7 +91,7 @@
             </select>
         </div>
         <div class="form-group">
-            <label>مستوى الأدلة</label>
+            <label>مستوى الأدلة {{ tip('evidence_level') }}</label>
             <select name="evidence_level">
                 {% for code, label in EVIDENCE_LEVELS %}
                 <option value="{{ code }}" {{ 'selected' if record.evidence_level==code }}>{{ label }}</option>
@@ -98,13 +99,13 @@
             </select>
         </div>
         <div class="form-group">
-            <label>عدد مصادر الأدلة</label>
+            <label>عدد مصادر الأدلة {{ tip('evidence_sources_count') }}</label>
             <input type="number" name="evidence_sources_count" value="{{ record.evidence_sources_count or 0 }}">
         </div>
         <div class="form-group">
             <label class="checkbox-label">
                 <input type="checkbox" name="informant_consent" value="1" {{ 'checked' if record.informant_consent }}>
-                موافقة واعية
+                موافقة واعية {{ tip('informant_consent') }}
             </label>
         </div>
     </div>
@@ -115,30 +116,30 @@
     <div class="form-section-title">&#x1F464; البيانات الشخصية</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>الاسم الأول</label>
+            <label>الاسم الأول {{ tip('first_name') }}</label>
             <input type="text" name="first_name" value="{{ record.first_name }}" required>
         </div>
         <div class="form-group">
-            <label>اسم الأب</label>
+            <label>اسم الأب {{ tip('father_name') }}</label>
             <input type="text" name="father_name" value="{{ record.father_name }}" required>
         </div>
         <div class="form-group">
-            <label>الكنية</label>
+            <label>الكنية {{ tip('last_name') }}</label>
             <input type="text" name="last_name" value="{{ record.last_name }}" required>
         </div>
         <div class="form-group">
-            <label>اسم الأم</label>
+            <label>اسم الأم {{ tip('mother_name') }}</label>
             <input type="text" name="mother_name" value="{{ record.mother_name }}" required>
         </div>
         <div class="form-group">
-            <label>الجنس</label>
+            <label>الجنس {{ tip('gender') }}</label>
             <select name="gender" required>
                 <option value="male" {{ 'selected' if record.gender=='male' }}>ذكر</option>
                 <option value="female" {{ 'selected' if record.gender=='female' }}>أنثى</option>
             </select>
         </div>
         <div class="form-group">
-            <label>تاريخ الميلاد</label>
+            <label>تاريخ الميلاد {{ tip('birth_year') }}</label>
             <div class="form-date-group">
                 <input type="number" name="birth_day" value="{{ record.birth_day or '' }}" placeholder="اليوم">
                 <input type="number" name="birth_month" value="{{ record.birth_month or '' }}" placeholder="الشهر">
@@ -146,7 +147,7 @@
             </div>
         </div>
         <div class="form-group">
-            <label>المحافظة</label>
+            <label>المحافظة {{ tip('province') }}</label>
             <select name="province" required>
                 {% for p in PROVINCES %}
                 <option value="{{ p }}" {{ 'selected' if record.province==p }}>{{ p }}</option>
@@ -154,19 +155,19 @@
             </select>
         </div>
         <div class="form-group">
-            <label>الرقم الوطني</label>
+            <label>الرقم الوطني {{ tip('national_id') }}</label>
             <input type="text" name="national_id" value="{{ record.national_id }}" required>
         </div>
         <div class="form-group">
-            <label>رقم دفتر العائلة</label>
+            <label>رقم دفتر العائلة {{ tip('family_book_number') }}</label>
             <input type="text" name="family_book_number" value="{{ record.family_book_number or '' }}">
         </div>
         <div class="form-group" {% if record.status in ('deceased', 'enforced') %}style="display:none"{% endif %}>
-            <label>الهاتف</label>
+            <label>الهاتف {{ tip('phone') }}</label>
             <input type="tel" name="phone" value="{{ record.phone or '' }}">
         </div>
         <div class="form-group">
-            <label>زمرة الدم</label>
+            <label>زمرة الدم {{ tip('blood_type') }}</label>
             <select name="blood_type">
                 <option value="">-- اختر --</option>
                 {% for bt in BLOOD_TYPES %}
@@ -175,7 +176,7 @@
             </select>
         </div>
         <div class="form-group">
-            <label>صورة شخصية {% if record.photo_path %}(موجودة){% endif %}</label>
+            <label>صورة شخصية {{ tip('photo') }} {% if record.photo_path %}(موجودة){% endif %}</label>
             <input type="file" name="photo" accept="image/*">
             {% if record.photo_path %}
             <span class="hint">الحالي: <a href="{% if record.photo_path.startswith('http') %}{{ record.photo_path }}{% else %}{{ url_for('uploaded_file', filename='photos/' + record.photo_path) }}{% endif %}" target="_blank">{{ record.photo_path[:60] }}{% if record.photo_path|length > 60 %}...{% endif %}</a></span>
@@ -187,7 +188,7 @@
             <span class="hint">يمكنك إدخال رابط خارجي للصورة بدلاً من رفع ملف</span>
         </div>
         <div class="form-group">
-            <label>وثيقة هوية {% if record.document_path %}(موجودة){% endif %}</label>
+            <label>وثيقة هوية {{ tip('document') }} {% if record.document_path %}(موجودة){% endif %}</label>
             <input type="file" name="document" accept="image/*,.pdf">
             {% if record.document_path %}
             <span class="hint">الحالي: <a href="{% if record.document_path.startswith('http') %}{{ record.document_path }}{% else %}{{ url_for('uploaded_file', filename='documents/' + record.document_path) }}{% endif %}" target="_blank">{{ record.document_path[:60] }}{% if record.document_path|length > 60 %}...{% endif %}</a></span>
@@ -206,7 +207,7 @@
     <div class="form-section-title">&#x26D3;&#xFE0F; تفاصيل الاعتقال</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>تاريخ الاعتقال</label>
+            <label>تاريخ الاعتقال {{ tip('arrest_year') }}</label>
             <div class="form-date-group">
                 <input type="number" name="arrest_day" value="{{ record.arrest_day or '' }}" placeholder="اليوم">
                 <input type="number" name="arrest_month" value="{{ record.arrest_month or '' }}" placeholder="الشهر">
@@ -214,7 +215,7 @@
             </div>
         </div>
         <div class="form-group">
-            <label>الجهة المعتقِلة</label>
+            <label>الجهة المعتقِلة {{ tip('arrest_authority') }}</label>
             <select name="arrest_authority" required>
                 <option value="">-- اختر --</option>
                 {% for a in ARREST_AUTHORITIES %}
@@ -226,7 +227,7 @@
             </select>
         </div>
         <div class="form-group">
-            <label>مكان الاحتجاز</label>
+            <label>مكان الاحتجاز {{ tip('arrest_place') }}</label>
             <select name="arrest_place">
                 <option value="">-- اختر --</option>
                 {% for f in DETENTION_FACILITIES %}
@@ -238,19 +239,19 @@
             </select>
         </div>
         <div class="form-group">
-            <label>سبب الاعتقال</label>
+            <label>سبب الاعتقال {{ tip('arrest_reason') }}</label>
             <input type="text" name="arrest_reason" value="{{ record.arrest_reason }}" required>
         </div>
         <div class="form-group">
-            <label>المتسبب</label>
+            <label>المتسبب {{ tip('arrest_causer') }}</label>
             <input type="text" name="arrest_causer" value="{{ record.arrest_causer or '' }}">
         </div>
         <div class="form-group">
-            <label>آخر مكان معروف</label>
+            <label>آخر مكان معروف {{ tip('last_known_location') }}</label>
             <input type="text" name="last_known_location" value="{{ record.last_known_location or '' }}">
         </div>
         <div class="form-group">
-            <label>آخر تاريخ عُرف أنه حي</label>
+            <label>آخر تاريخ عُرف أنه حي {{ tip('last_known_alive_date') }}</label>
             <input type="date" name="last_known_alive_date" value="{{ record.last_known_alive_date or '' }}">
         </div>
     </div>
@@ -261,7 +262,7 @@
     <div class="form-section-title">&#x1F513; بيانات الإفراج</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>تاريخ الإفراج</label>
+            <label>تاريخ الإفراج {{ tip('release_year') }}</label>
             <div class="form-date-group">
                 <input type="number" name="release_day" value="{{ record.release_day or '' }}" placeholder="اليوم">
                 <input type="number" name="release_month" value="{{ record.release_month or '' }}" placeholder="الشهر">
@@ -269,11 +270,11 @@
             </div>
         </div>
         <div class="form-group">
-            <label>سيرة الناجي</label>
+            <label>سيرة الناجي {{ tip('survivor_cv') }}</label>
             <input type="file" name="survivor_cv" accept="image/*,.pdf">
         </div>
         <div class="form-group full-width">
-            <label>وصف تجربة الاعتقال</label>
+            <label>وصف تجربة الاعتقال {{ tip('survivor_cv_text') }}</label>
             <textarea name="survivor_cv_text" rows="3">{{ record.survivor_cv_text or '' }}</textarea>
         </div>
     </div>
@@ -284,7 +285,7 @@
     <div class="form-section-title">&#x1F3F4; بيانات الوفاة</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>تاريخ الوفاة</label>
+            <label>تاريخ الوفاة {{ tip('death_year') }}</label>
             <div class="form-date-group">
                 <input type="number" name="death_day" value="{{ record.death_day or '' }}" placeholder="اليوم">
                 <input type="number" name="death_month" value="{{ record.death_month or '' }}" placeholder="الشهر">
@@ -292,7 +293,7 @@
             </div>
         </div>
         <div class="form-group">
-            <label>مكان الوفاة</label>
+            <label>مكان الوفاة {{ tip('death_place') }}</label>
             <input type="text" name="death_place" value="{{ record.death_place or '' }}">
         </div>
     </div>
@@ -303,7 +304,7 @@
     <div class="form-section-title">&#x1F50D; الأدلة الرقمية</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>نوع الدليل الرقمي</label>
+            <label>نوع الدليل الرقمي {{ tip('digital_evidence_type') }}</label>
             <select name="digital_evidence_type">
                 <option value="">-- لا يوجد --</option>
                 {% for code, label in DIGITAL_EVIDENCE_TYPES %}
@@ -312,7 +313,7 @@
             </select>
         </div>
         <div class="form-group">
-            <label>رابط الدليل</label>
+            <label>رابط الدليل {{ tip('digital_evidence_url') }}</label>
             <input type="url" name="digital_evidence_url" value="{{ record.digital_evidence_url or '' }}">
         </div>
         <div class="form-group">
@@ -326,7 +327,7 @@
             </select>
         </div>
         <div class="form-group">
-            <label>لقطة شاشة {% if record.digital_evidence_screenshot_path %}(موجودة){% endif %}</label>
+            <label>لقطة شاشة {{ tip('digital_evidence_screenshot') }} {% if record.digital_evidence_screenshot_path %}(موجودة){% endif %}</label>
             <input type="file" name="digital_evidence_screenshot" accept="image/*,.pdf">
         </div>
         <div class="form-group">
@@ -334,15 +335,15 @@
             <input type="date" name="digital_evidence_date" value="{{ record.digital_evidence_date or '' }}">
         </div>
         <div class="form-group">
-            <label>الاسم في الدليل</label>
+            <label>الاسم في الدليل {{ tip('digital_evidence_person_name') }}</label>
             <input type="text" name="digital_evidence_person_name" value="{{ record.digital_evidence_person_name or '' }}">
         </div>
         <div class="form-group">
-            <label>تاريخ الوفاة في الدليل</label>
+            <label>تاريخ الوفاة في الدليل {{ tip('digital_evidence_death_date') }}</label>
             <input type="date" name="digital_evidence_death_date" value="{{ record.digital_evidence_death_date or '' }}">
         </div>
         <div class="form-group full-width">
-            <label>وصف الدليل</label>
+            <label>وصف الدليل {{ tip('digital_evidence_description') }}</label>
             <textarea name="digital_evidence_description" rows="2">{{ record.digital_evidence_description or '' }}</textarea>
         </div>
     </div>
@@ -353,7 +354,7 @@
     <div class="form-section-title">&#x1F4C4; السجل المدني</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>حالة السجل المدني</label>
+            <label>حالة السجل المدني {{ tip('civil_registry_status') }}</label>
             <select name="civil_registry_status">
                 {% for code, label in CIVIL_REGISTRY_STATUSES %}
                 <option value="{{ code }}" {{ 'selected' if record.civil_registry_status==code }}>{{ label }}</option>
@@ -361,21 +362,21 @@
             </select>
         </div>
         <div class="form-group">
-            <label>تاريخ المراجعة</label>
+            <label>تاريخ المراجعة {{ tip('civil_registry_date') }}</label>
             <input type="date" name="civil_registry_date" value="{{ record.civil_registry_date or '' }}">
         </div>
         <div class="form-group">
-            <label>وثيقة {% if record.civil_registry_document_path %}(موجودة){% endif %}</label>
+            <label>وثيقة {{ tip('civil_registry_document') }} {% if record.civil_registry_document_path %}(موجودة){% endif %}</label>
             <input type="file" name="civil_registry_document" accept="image/*,.pdf">
         </div>
         <div class="form-group">
             <label class="checkbox-label">
                 <input type="checkbox" name="has_conflicting_info" value="1" {{ 'checked' if record.has_conflicting_info }}>
-                معلومات متضاربة
+                معلومات متضاربة {{ tip('has_conflicting_info') }}
             </label>
         </div>
         <div class="form-group full-width">
-            <label>تفاصيل التضارب</label>
+            <label>تفاصيل التضارب {{ tip('conflicting_info_details') }}</label>
             <textarea name="conflicting_info_details" rows="2">{{ record.conflicting_info_details or '' }}</textarea>
         </div>
     </div>
@@ -385,7 +386,7 @@
 <div class="form-section">
     <div class="form-section-title">&#x1F465; الشهود</div>
     <div class="form-group full-width">
-        <label>بيانات الشهود (JSON)</label>
+        <label>بيانات الشهود (JSON) {{ tip('witnesses') }}</label>
         <textarea name="witnesses_data" rows="3">{{ record.witnesses_data or '[]' }}</textarea>
         <span class="hint">تنسيق JSON: [{"name":"...","phone":"...","relation":"...","testimony":"..."}]</span>
     </div>
@@ -396,7 +397,7 @@
     <div class="form-section-title">&#x1F46A; البيانات العائلية</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>الحالة الاجتماعية</label>
+            <label>الحالة الاجتماعية {{ tip('marital') }}</label>
             <select name="marital">
                 <option value="">-- اختر --</option>
                 {% for code, label in MARITAL_STATUSES %}
@@ -405,27 +406,27 @@
             </select>
         </div>
         <div class="form-group">
-            <label>ولي الأمر</label>
+            <label>ولي الأمر {{ tip('guardian_name') }}</label>
             <input type="text" name="guardian_name" value="{{ record.guardian_name or '' }}">
         </div>
         <div class="form-group">
-            <label>صلة ولي الأمر</label>
+            <label>صلة ولي الأمر {{ tip('guardian_relation') }}</label>
             <input type="text" name="guardian_relation" value="{{ record.guardian_relation or '' }}">
         </div>
         <div class="form-group">
-            <label>هاتف ولي الأمر</label>
+            <label>هاتف ولي الأمر {{ tip('guardian_phone') }}</label>
             <input type="tel" name="guardian_phone" value="{{ record.guardian_phone or '' }}">
         </div>
         <div class="form-group">
-            <label>اسم الزوج/ة</label>
+            <label>اسم الزوج/ة {{ tip('spouse_name') }}</label>
             <input type="text" name="spouse_name" value="{{ record.spouse_name or '' }}">
         </div>
         <div class="form-group">
-            <label>هاتف الزوج/ة</label>
+            <label>هاتف الزوج/ة {{ tip('spouse_phone') }}</label>
             <input type="tel" name="spouse_phone" value="{{ record.spouse_phone or '' }}">
         </div>
         <div class="form-group">
-            <label>زوج/ة سابق/ة</label>
+            <label>زوج/ة سابق/ة {{ tip('ex_spouse_name') }}</label>
             <input type="text" name="ex_spouse_name" value="{{ record.ex_spouse_name or '' }}">
         </div>
     </div>
@@ -457,7 +458,7 @@
     <div class="form-section-title">&#x1F3E0; البيانات السكنية والاقتصادية</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>المنطقة / الحي</label>
+            <label>المنطقة / الحي {{ tip('address_area') }}</label>
             <select name="address_area">
                 <option value="">-- اختر المنطقة --</option>
                 {% for area in ADDRESS_AREAS %}
@@ -466,11 +467,11 @@
             </select>
         </div>
         <div class="form-group">
-            <label>العنوان</label>
+            <label>العنوان {{ tip('address') }}</label>
             <input type="text" name="address" value="{{ record.address }}" required>
         </div>
         <div class="form-group">
-            <label>نوع السكن</label>
+            <label>نوع السكن {{ tip('housing_type') }}</label>
             <select name="housing_type" required>
                 {% for h in HOUSING_TYPES %}
                 <option value="{{ h }}" {{ 'selected' if record.housing_type==h }}>{{ h }}</option>
@@ -478,31 +479,31 @@
             </select>
         </div>
         <div class="form-group">
-            <label>مبلغ الإيجار</label>
+            <label>مبلغ الإيجار {{ tip('rent_amount') }}</label>
             <input type="text" name="rent_amount" value="{{ record.rent_amount or '' }}">
         </div>
         <div class="form-group">
-            <label>الوضع الوظيفي</label>
+            <label>الوضع الوظيفي {{ tip('employment') }}</label>
             <input type="text" name="employment" value="{{ record.employment or '' }}">
         </div>
         <div class="form-group">
-            <label>المهنة</label>
+            <label>المهنة {{ tip('profession') }}</label>
             <input type="text" name="profession" value="{{ record.profession or '' }}">
         </div>
         <div class="form-group">
-            <label>جهة العمل</label>
+            <label>جهة العمل {{ tip('employer') }}</label>
             <input type="text" name="employer" value="{{ record.employer or '' }}">
         </div>
         <div class="form-group">
-            <label>المعيل</label>
+            <label>المعيل {{ tip('breadwinner') }}</label>
             <input type="text" name="breadwinner" value="{{ record.breadwinner or '' }}">
         </div>
         <div class="form-group">
-            <label>مهنة المعيل</label>
+            <label>مهنة المعيل {{ tip('breadwinner_job') }}</label>
             <input type="text" name="breadwinner_job" value="{{ record.breadwinner_job or '' }}">
         </div>
         <div class="form-group">
-            <label>صلة المعيل</label>
+            <label>صلة المعيل {{ tip('breadwinner_relation') }}</label>
             <select name="breadwinner_relation">
                 <option value="">-- اختر --</option>
                 {% for rel in REPORTER_RELATIONS %}
@@ -522,7 +523,7 @@
     <div class="form-section-title">&#x1F3EB; التحصيل العلمي</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>المستوى التعليمي</label>
+            <label>المستوى التعليمي {{ tip('education') }}</label>
             <select name="education">
                 <option value="">-- اختر --</option>
                 {% for e in EDUCATION_LEVELS %}
@@ -531,7 +532,7 @@
             </select>
         </div>
         <div class="form-group">
-            <label>النوع</label>
+            <label>النوع {{ tip('edu_type') }}</label>
             <select name="edu_type">
                 <option value="">-- اختر --</option>
                 {% for e in EDU_TYPES %}
@@ -540,11 +541,11 @@
             </select>
         </div>
         <div class="form-group">
-            <label>الاختصاص</label>
+            <label>الاختصاص {{ tip('edu_specialization') }}</label>
             <input type="text" name="edu_specialization" value="{{ record.edu_specialization or '' }}">
         </div>
         <div class="form-group">
-            <label>الجامعة</label>
+            <label>الجامعة {{ tip('edu_university') }}</label>
             <input type="text" name="edu_university" value="{{ record.edu_university or '' }}">
         </div>
     </div>
@@ -556,7 +557,7 @@
     <div class="form-grid">
         {% set current_chronic = (record.chronic or '') %}
         <div class="form-group full-width">
-            <label>الأمراض المزمنة (اختر ما ينطبق)</label>
+            <label>الأمراض المزمنة (اختر ما ينطبق) {{ tip('chronic') }}</label>
             <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:0.3rem; padding:0.4rem 0;">
                 {% for disease in CHRONIC_DISEASES %}
                 <label class="checkbox-label" style="font-size:0.88rem;">
@@ -570,11 +571,11 @@
         <div class="form-group">
             <label class="checkbox-label">
                 <input type="checkbox" name="has_special_needs" value="1" {{ 'checked' if record.has_special_needs }}>
-                احتياجات خاصة
+                احتياجات خاصة {{ tip('has_special_needs') }}
             </label>
         </div>
         <div class="form-group">
-            <label>تفاصيل</label>
+            <label>تفاصيل {{ tip('special_needs_details') }}</label>
             <input type="text" name="special_needs_details" value="{{ record.special_needs_details or '' }}">
         </div>
     </div>
@@ -585,11 +586,11 @@
     <div class="form-section-title">&#x2696;&#xFE0F; المشاكل القانونية والجمعيات</div>
     <div class="form-grid">
         <div class="form-group">
-            <label>مشاكل قانونية</label>
+            <label>مشاكل قانونية {{ tip('legal') }}</label>
             <input type="text" name="legal" value="{{ record.legal or '' }}">
         </div>
         <div class="form-group full-width">
-            <label>تفاصيل المشاكل القانونية</label>
+            <label>تفاصيل المشاكل القانونية {{ tip('legal_details') }}</label>
             <textarea name="legal_details" rows="2">{{ record.legal_details or '' }}</textarea>
         </div>
         <div class="form-group">
@@ -624,8 +625,16 @@
         <textarea name="methodology_notes" rows="3">{{ record.methodology_notes or '' }}</textarea>
     </div>
     <div class="form-group full-width">
-        <label>نوع المصدر</label>
-        <input type="text" name="source_type" value="{{ record.source_type or '' }}">
+        <label>نوع المصدر {{ tip('source_type') }}</label>
+        <select name="source_type">
+            <option value="">-- اختر نوع المصدر --</option>
+            {% for val in ['مقابلة مباشرة', 'مقابلة هاتفية', 'وثائق رسمية', 'مصادر مفتوحة', 'شهادة شاهد', 'تسريبات', 'إحالة', 'أخرى'] %}
+            <option value="{{ val }}" {{ 'selected' if record.source_type == val else '' }}>{{ val }}</option>
+            {% endfor %}
+            {% if record.source_type and record.source_type not in ['مقابلة مباشرة', 'مقابلة هاتفية', 'وثائق رسمية', 'مصادر مفتوحة', 'شهادة شاهد', 'تسريبات', 'إحالة', 'أخرى'] %}
+            <option value="{{ record.source_type }}" selected>{{ record.source_type }}</option>
+            {% endif %}
+        </select>
     </div>
 </div>
 

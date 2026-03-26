@@ -984,6 +984,8 @@ function handleFileSelect(input, areaId, nameId, maxSizeMB) {
         }
         area.classList.add('has-file');
         nameEl.textContent = file.name + ' (' + sizeMB.toFixed(1) + 'MB)';
+        // Cache the file in localStorage so it survives page refresh
+        saveFileToDraft(input);
     } else {
         area.classList.remove('has-file');
         nameEl.textContent = '';
@@ -1284,8 +1286,11 @@ function submitForm() {
     doSend(formData);
 }
 
-// === Auto-save draft to localStorage ===
+// === Auto-save draft to localStorage (with file support) ===
 var draftKey = 'haqquna_entry_draft';
+var draftFilesKey = 'haqquna_entry_draft_files';
+var MAX_FILE_CACHE_MB = 10; // Max size per file to cache in localStorage
+
 function saveDraft() {
     try {
         var form = document.getElementById('entryForm');
@@ -1306,6 +1311,81 @@ function saveDraft() {
     } catch(e) {}
 }
 
+// Save a file input as base64 into localStorage
+function saveFileToDraft(inputEl) {
+    if (!inputEl.name || !inputEl.files || !inputEl.files[0]) return;
+    var file = inputEl.files[0];
+    if (file.size > MAX_FILE_CACHE_MB * 1024 * 1024) return; // Skip large files
+    var reader = new FileReader();
+    reader.onload = function() {
+        try {
+            var filesData = {};
+            try { filesData = JSON.parse(localStorage.getItem(draftFilesKey) || '{}'); } catch(e) {}
+            filesData[inputEl.name] = {
+                data: reader.result,
+                name: file.name,
+                type: file.type,
+                size: file.size
+            };
+            localStorage.setItem(draftFilesKey, JSON.stringify(filesData));
+        } catch(e) {
+            // localStorage quota exceeded — silently ignore
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// Convert a base64 data URL to a File object
+function dataURLtoFile(dataurl, filename, mimeType) {
+    var arr = dataurl.split(',');
+    var bstr = atob(arr[1]);
+    var n = bstr.length;
+    var u8arr = new Uint8Array(n);
+    for (var i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
+    return new File([u8arr], filename, { type: mimeType });
+}
+
+// Restore cached files into file inputs using DataTransfer
+function restoreFiles() {
+    try {
+        var filesData = JSON.parse(localStorage.getItem(draftFilesKey) || '{}');
+        if (!Object.keys(filesData).length) return false;
+        var restored = false;
+        var fileAreaMap = {
+            'photo': { area: 'photoArea', nameEl: 'photoName' },
+            'document': { area: 'docArea', nameEl: 'docName' },
+            'survivor_cv': { area: 'cvArea', nameEl: 'cvName' },
+            'survivor_cv_photo': { area: 'cvPhotoArea', nameEl: 'cvPhotoName' },
+            'digital_evidence_screenshot': { area: 'screenshotArea', nameEl: 'screenshotName' },
+            'civil_registry_document': { area: 'civilArea', nameEl: 'civilName' }
+        };
+        for (var fieldName in filesData) {
+            var info = filesData[fieldName];
+            if (!info || !info.data) continue;
+            var input = document.querySelector('#entryForm input[type="file"][name="' + fieldName + '"]');
+            if (!input) continue;
+            try {
+                var file = dataURLtoFile(info.data, info.name, info.type);
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                // Update the UI
+                var mapping = fileAreaMap[fieldName];
+                if (mapping) {
+                    var area = document.getElementById(mapping.area);
+                    var nameEl = document.getElementById(mapping.nameEl);
+                    if (area) area.classList.add('has-file');
+                    if (nameEl) nameEl.textContent = info.name + ' (' + (info.size / (1024*1024)).toFixed(1) + 'MB)';
+                }
+                restored = true;
+            } catch(e) {
+                // DataTransfer not supported on older browsers — skip
+            }
+        }
+        return restored;
+    } catch(e) { return false; }
+}
+
 function loadDraft() {
     try {
         var saved = localStorage.getItem(draftKey);
@@ -1313,26 +1393,55 @@ function loadDraft() {
         var data = JSON.parse(saved);
         var form = document.getElementById('entryForm');
         var restored = false;
+
+        // Phase 1: Restore simple fields first (but skip dependent selects)
+        var deferredSelects = ['case_type', 'digital_evidence_type'];
         for (var key in data) {
-            if (key === '_step') continue;
+            if (key === '_step' || deferredSelects.indexOf(key) !== -1) continue;
             var el = form.querySelector('[name="' + key + '"]');
             if (el) {
                 if (el.type === 'checkbox') el.checked = data[key];
                 else { el.value = data[key]; restored = true; }
             }
         }
-        if (data._step) { currentStep = data._step; updateStepUI(); }
+
+        // Phase 2: Fire change handlers to rebuild dependent options
         if (data.status) handleStatusChange();
         if (data.marital) handleMarital();
-        // Show file re-attach reminder if draft was restored
+        if (typeof handleDigitalEvidence === 'function' && data.digital_evidence_type) {
+            // Set the type first, then fire handler
+            var deTypeEl = document.getElementById('digitalEvidenceType');
+            if (deTypeEl) deTypeEl.value = data.digital_evidence_type;
+            handleDigitalEvidence();
+        }
+
+        // Phase 3: Now restore dependent select values (options are now populated)
+        for (var j = 0; j < deferredSelects.length; j++) {
+            var dKey = deferredSelects[j];
+            if (data[dKey]) {
+                var dEl = form.querySelector('[name="' + dKey + '"]');
+                if (dEl) dEl.value = data[dKey];
+            }
+        }
+
+        // Phase 4: Restore step
+        if (data._step) { currentStep = data._step; updateStepUI(); }
+
+        // Phase 5: Restore cached files
+        var filesRestored = restoreFiles();
+
+        // Show reminder message
         if (restored) {
             var resultMsg = document.getElementById('resultMsg');
             if (resultMsg) {
                 resultMsg.className = 'result-msg';
+                resultMsg.style.display = 'block';
                 resultMsg.style.background = '#fff3cd';
                 resultMsg.style.color = '#856404';
                 resultMsg.style.border = '1px solid #ffc107';
-                resultMsg.textContent = '\u062a\u0645 \u0627\u0633\u062a\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u0633\u0648\u062f\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629. \u064a\u0631\u062c\u0649 \u0625\u0639\u0627\u062f\u0629 \u0625\u0631\u0641\u0627\u0642 \u0627\u0644\u0635\u0648\u0631 \u0648\u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0625\u0646 \u0648\u062c\u062f\u062a.';
+                resultMsg.textContent = filesRestored
+                    ? '\u062a\u0645 \u0627\u0633\u062a\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u0633\u0648\u062f\u0629 \u0648\u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0631\u0641\u0642\u0629.'
+                    : '\u062a\u0645 \u0627\u0633\u062a\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u0633\u0648\u062f\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629. \u064a\u0631\u062c\u0649 \u0625\u0639\u0627\u062f\u0629 \u0625\u0631\u0641\u0627\u0642 \u0627\u0644\u0635\u0648\u0631 \u0648\u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0625\u0646 \u0648\u062c\u062f\u062a.';
             }
         }
     } catch(e) {}
@@ -1340,6 +1449,7 @@ function loadDraft() {
 
 function clearDraft() {
     try { localStorage.removeItem(draftKey); } catch(e) {}
+    try { localStorage.removeItem(draftFilesKey); } catch(e) {}
 }
 
 // Auto-save every 30 seconds

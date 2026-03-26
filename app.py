@@ -1421,14 +1421,17 @@ def internal_error(error):
 
 
 # ---------------------------------------------------------------------------
-# Routes – Public data entry
+# Routes – Data entry (login required)
 # ---------------------------------------------------------------------------
 @app.route('/')
 def index():
+    if not session.get('is_admin'):
+        return redirect(url_for('admin_login'))
     return render_template('index.html')
 
 
 @app.route('/entry', methods=['GET'])
+@admin_required
 def entry_form():
     db = get_db()
     volunteer_names = db.execute(
@@ -1500,6 +1503,7 @@ def _validate_entry(form):
 
 
 @app.route('/entry', methods=['POST'])
+@admin_required
 def entry_submit():
     db = get_db()
     form = request.form
@@ -4085,6 +4089,7 @@ def export_kids_no_birthdate():
 # API endpoints for dynamic data
 # ---------------------------------------------------------------------------
 @app.route('/api/stats')
+@admin_required
 def api_stats():
     db = get_db()
     total = db.execute("SELECT COUNT(*) FROM records WHERE deleted_at IS NULL").fetchone()[0]

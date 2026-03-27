@@ -3163,10 +3163,58 @@ def admin_record_link_companion(record_id, comp_id):
     return redirect(url_for('admin_record_detail', record_id=record_id))
 
 
+def _score_name_match(comp_parts, record):
+    """Score how well a companion's name parts match a record. Higher = better match."""
+    score = 0
+    rec_fields = {
+        'first_name': (record['first_name'] or '').strip(),
+        'father_name': (record['father_name'] or '').strip(),
+        'last_name': (record['last_name'] or '').strip(),
+        'mother_name': (record['mother_name'] or '').strip(),
+    }
+    rec_values = [v.lower() for v in rec_fields.values() if v]
+
+    # Exact field-to-field matches (strongest signal)
+    for comp_field, comp_val in comp_parts.items():
+        if not comp_val:
+            continue
+        comp_lower = comp_val.lower()
+        rec_val = rec_fields.get(comp_field, '').lower()
+        if rec_val and comp_lower == rec_val:
+            score += 10  # Exact match in same field
+        elif rec_val and comp_lower in rec_val:
+            score += 6   # Partial match in same field
+        elif rec_val and rec_val in comp_lower:
+            score += 5   # Record value contained in companion value
+
+    # Cross-field matches (e.g. companion first_name matches record father_name)
+    for comp_field, comp_val in comp_parts.items():
+        if not comp_val:
+            continue
+        comp_lower = comp_val.lower()
+        for rec_field, rec_val in rec_fields.items():
+            if rec_field == comp_field or not rec_val:
+                continue
+            if comp_lower == rec_val.lower():
+                score += 4  # Exact match in different field
+            elif comp_lower in rec_val.lower() or rec_val.lower() in comp_lower:
+                score += 2  # Partial cross-field match
+
+    # Bonus: first_name + last_name both match (strong identifier even without father)
+    cf = (comp_parts.get('first_name') or '').lower()
+    cl = (comp_parts.get('last_name') or '').lower()
+    rf = rec_fields['first_name'].lower()
+    rl = rec_fields['last_name'].lower()
+    if cf and cl and cf == rf and cl == rl:
+        score += 8  # Both first+last exact match bonus
+
+    return score
+
+
 @app.route('/api/companion_cross_ref/<int:record_id>')
 @admin_required
 def api_companion_cross_ref(record_id):
-    """Find existing records that match companion names for cross-referencing."""
+    """Find existing records that match companion names using deep fuzzy search."""
     db = get_db()
     companions = db.execute(
         "SELECT * FROM record_companions WHERE record_id = ? AND linked_record_id IS NULL",
@@ -3174,32 +3222,57 @@ def api_companion_cross_ref(record_id):
     ).fetchall()
     results = []
     for comp in companions:
-        matches = []
-        parts = [comp['first_name'], comp['father_name'], comp['last_name']]
-        parts = [p for p in parts if p]
-        if not parts:
+        comp_parts = {
+            'first_name': (comp['first_name'] or '').strip(),
+            'father_name': (comp['father_name'] or '').strip(),
+            'last_name': (comp['last_name'] or '').strip(),
+            'mother_name': (comp['mother_name'] or '').strip(),
+        }
+        name_parts = [v for v in comp_parts.values() if v]
+        if not name_parts:
             continue
+
+        # Build a broad OR query — match ANY name part against ANY name field
         conditions = []
         params = []
-        for part in parts:
-            if part:
-                conditions.append("(first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ?)")
-                params.extend([f'%{part}%', f'%{part}%', f'%{part}%'])
-        if conditions:
-            query = f"SELECT id, first_name, father_name, last_name, status, province FROM records WHERE deleted_at IS NULL AND ({' OR '.join(conditions)}) AND id != ? LIMIT 5"
-            params.append(record_id)
-            found = db.execute(query, params).fetchall()
-            for r in found:
-                matches.append({
-                    'id': r['id'],
-                    'name': f"{r['first_name']} {r['father_name']} {r['last_name']}",
-                    'status': r['status'],
-                    'province': r['province'],
-                })
+        for part in name_parts:
+            conditions.append(
+                "(first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? OR mother_name LIKE ?)"
+            )
+            params.extend([f'%{part}%'] * 4)
+
+        query = (
+            "SELECT id, first_name, father_name, last_name, mother_name, status, province "
+            "FROM records WHERE deleted_at IS NULL "
+            f"AND ({' OR '.join(conditions)}) AND id != ? LIMIT 30"
+        )
+        params.append(record_id)
+        candidates = db.execute(query, params).fetchall()
+
+        # Score and rank candidates
+        scored = []
+        for r in candidates:
+            s = _score_name_match(comp_parts, r)
+            if s >= 4:  # Minimum threshold: at least one meaningful match
+                scored.append((s, r))
+        scored.sort(key=lambda x: -x[0])
+
+        matches = []
+        for s, r in scored[:8]:
+            name = ' '.join(filter(None, [r['first_name'], r['father_name'], r['last_name']]))
+            mother = r['mother_name'] or ''
+            matches.append({
+                'id': r['id'],
+                'name': name,
+                'mother_name': mother,
+                'status': r['status'],
+                'province': r['province'],
+                'score': s,
+            })
         if matches:
             results.append({
                 'companion_id': comp['id'],
-                'companion_name': ' '.join(filter(None, [comp['first_name'], comp['father_name'], comp['last_name']])),
+                'companion_name': ' '.join(filter(None, [comp_parts['first_name'], comp_parts['father_name'], comp_parts['last_name']])),
                 'matches': matches,
             })
     return jsonify(results)
@@ -3208,26 +3281,56 @@ def api_companion_cross_ref(record_id):
 @app.route('/api/search_records_for_link')
 @admin_required
 def api_search_records_for_link():
-    """Search records by name for linking UI."""
+    """Search records by name for linking UI — deep search across all name fields."""
     q = request.args.get('q', '').strip()
     exclude_id = safe_int(request.args.get('exclude'), 0)
     if len(q) < 2:
         return jsonify([])
     db = get_db()
-    search_term = f"%{q}%"
-    records = db.execute(
-        "SELECT id, first_name, father_name, last_name, status, province FROM records "
-        "WHERE deleted_at IS NULL AND (first_name LIKE ? OR last_name LIKE ? OR father_name LIKE ? "
-        "OR (COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?) "
-        "AND id != ? LIMIT 10",
-        (search_term, search_term, search_term, search_term, exclude_id)
-    ).fetchall()
+
+    # Split query into individual words for multi-word search
+    words = [w.strip() for w in q.split() if w.strip()]
+
+    # Strategy 1: Full query as single term
+    full_term = f"%{q}%"
+    # Strategy 2: Each word individually
+    conditions = [
+        "(COALESCE(first_name,'') || ' ' || COALESCE(father_name,'') || ' ' || COALESCE(last_name,'')) LIKE ?"
+    ]
+    params = [full_term]
+
+    for word in words:
+        conditions.append(
+            "(first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? OR mother_name LIKE ?)"
+        )
+        params.extend([f'%{word}%'] * 4)
+
+    query = (
+        "SELECT id, first_name, father_name, last_name, mother_name, status, province "
+        "FROM records WHERE deleted_at IS NULL "
+        f"AND ({' OR '.join(conditions)}) AND id != ? LIMIT 20"
+    )
+    params.append(exclude_id)
+    records = db.execute(query, params).fetchall()
+
+    # Score results: more matching words = higher rank
+    scored = []
+    for r in records:
+        rec_full = f"{r['first_name'] or ''} {r['father_name'] or ''} {r['last_name'] or ''} {r['mother_name'] or ''}".lower()
+        s = sum(1 for w in words if w.lower() in rec_full)
+        # Bonus for exact first_name match
+        if words and (r['first_name'] or '').lower() == words[0].lower():
+            s += 2
+        scored.append((s, r))
+    scored.sort(key=lambda x: -x[0])
+
     return jsonify([{
         'id': r['id'],
-        'name': f"{r['first_name']} {r['father_name']} {r['last_name']}",
+        'name': f"{r['first_name']} {r['father_name']} {r['last_name']}".strip(),
+        'mother_name': r['mother_name'] or '',
         'status': r['status'],
         'province': r['province'],
-    } for r in records])
+    } for _, r in scored[:10]])
 
 
 # Berkeley Protocol: Valid record status transitions (workflow enforcement)

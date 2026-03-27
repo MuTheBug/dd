@@ -996,6 +996,7 @@ function crossRefCompanions() {
                 html += '<a href="/admin/record/' + m.id + '" style="color: var(--primary); font-weight: 500;">' + m.name + '</a>';
                 html += '<span style="font-size: 0.78rem; color: ' + statusColor + ';">(' + statusLabel + ' - ' + (m.province || '') + ')</span>';
                 html += '<form method="POST" action="/admin/record/{{ record.id }}/companion/' + comp.companion_id + '/link" style="display:inline;">';
+                html += '<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">';
                 html += '<input type="hidden" name="linked_record_id" value="' + m.id + '">';
                 html += '<button type="submit" class="btn btn-sm" style="background: #22c55e; color: white; border: none; padding: 2px 8px; font-size: 0.78rem;">&#x1F517; ربط</button>';
                 html += '</form>';

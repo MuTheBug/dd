@@ -106,20 +106,36 @@
     </footer>
 
     <script>
-    // Auto-inject CSRF token into all forms
+    // Auto-inject CSRF token into all forms (including dynamically added ones)
     (function(){
         var token = '{{ csrf_token() }}';
+        function injectCsrf(form) {
+            if (!form.querySelector('input[name="_csrf_token"]')) {
+                var inp = document.createElement('input');
+                inp.type = 'hidden'; inp.name = '_csrf_token'; inp.value = token;
+                form.prepend(inp);
+            }
+        }
         document.addEventListener('DOMContentLoaded', function(){
-            document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(function(f){
-                if (!f.querySelector('input[name="_csrf_token"]')) {
-                    var inp = document.createElement('input');
-                    inp.type = 'hidden'; inp.name = '_csrf_token'; inp.value = token;
-                    f.prepend(inp);
-                }
-            });
-            // Also catch forms without explicit method (default GET) that use POST via JS
+            document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(injectCsrf);
         });
-        // Patch fetch/XMLHttpRequest to include CSRF header on same-origin
+        // Watch for dynamically added forms
+        new MutationObserver(function(mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+                var nodes = mutations[i].addedNodes;
+                for (var j = 0; j < nodes.length; j++) {
+                    var node = nodes[j];
+                    if (node.nodeType !== 1) continue;
+                    if (node.tagName === 'FORM' && (node.method === 'post' || node.getAttribute('method') === 'POST')) {
+                        injectCsrf(node);
+                    }
+                    if (node.querySelectorAll) {
+                        node.querySelectorAll('form[method="post"], form[method="POST"]').forEach(injectCsrf);
+                    }
+                }
+            }
+        }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+        // Patch fetch to include CSRF header on same-origin
         var origFetch = window.fetch;
         window.fetch = function(url, opts) {
             opts = opts || {};

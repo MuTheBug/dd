@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">{% if record %}تعديل السجل{% else %}إضافة سجل جديد{% endif %}</h2>
+
+<form method="POST" enctype="multipart/form-data" id="recordForm">
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab" aria-controls="personal" aria-selected="true">البيانات الشخصية</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="arrest-tab" data-bs-toggle="tab" data-bs-target="#arrest" type="button" role="tab" aria-controls="arrest" aria-selected="false">بيانات الاعتقال</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="family-tab" data-bs-toggle="tab" data-bs-target="#family" type="button" role="tab" aria-controls="family" aria-selected="false">البيانات العائلية</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="socio-tab" data-bs-toggle="tab" data-bs-target="#socio" type="button" role="tab" aria-controls="socio" aria-selected="false">الوضع الاجتماعي</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="verify-tab" data-bs-toggle="tab" data-bs-target="#verify" type="button" role="tab" aria-controls="verify" aria-selected="false">التوثيق والأدلة</button>
+        </li>
+    </ul>
+
+    <div class="tab-content p-4 border border-top-0 bg-light" id="myTabContent">
+        <!-- Personal Info -->
+        <div class="tab-pane fade show active" id="personal" role="tabpanel" aria-labelledby="personal-tab">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">الاسم الأول</label>
+                    <input type="text" class="form-control" name="first_name" value="{{ record.first_name if record else '' }}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">اسم الأب</label>
+                    <input type="text" class="form-control" name="father_name" value="{{ record.father_name if record else '' }}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">الكنية</label>
+                    <input type="text" class="form-control" name="last_name" value="{{ record.last_name if record else '' }}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">اسم الأم</label>
+                    <input type="text" class="form-control" name="mother_name" value="{{ record.mother_name if record else '' }}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">الجنس</label>
+                    <select class="form-select" name="gender">
+                        <option value="male" {% if record and record.gender == 'male' %}selected{% endif %}>ذكر</option>
+                        <option value="female" {% if record and record.gender == 'female' %}selected{% endif %}>أنثى</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">سنة الولادة</label>
+                    <input type="number" class="form-control" name="birth_year" value="{{ record.birth_year if record else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">المحافظة</label>
+                    <select class="form-select" name="province">
+                        <option value="دمشق" {% if record and record.province == 'دمشق' %}selected{% endif %}>دمشق</option>
+                        <!-- Add other provinces -->
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">الرقم الوطني</label>
+                    <input type="text" class="form-control" name="national_id" value="{{ record.national_id if record else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">الهاتف</label>
+                    <input type="text" class="form-control" name="phone" value="{{ record.phone if record else '' }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">العنوان الحالي</label>
+                    <input type="text" class="form-control" name="address" value="{{ record.address if record else '' }}">
+                </div>
+            </div>
+        </div>
+
+        <!-- Arrest Info -->
+        <div class="tab-pane fade" id="arrest" role="tabpanel" aria-labelledby="arrest-tab">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">الحالة</label>
+                    <select class="form-select" name="status">
+                        <option value="survivor" {% if record and record.status == 'survivor' %}selected{% endif %}>ناج</option>
+                        <option value="deceased" {% if record and record.status == 'deceased' %}selected{% endif %}>متوفي</option>
+                        <option value="disappeared" {% if record and record.status == 'disappeared' %}selected{% endif %}>مغيب قسرا</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">سنة الاعتقال</label>
+                    <input type="number" class="form-control" name="arrest_year" value="{{ record.arrest_year if record else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">مكان الاعتقال</label>
+                    <input type="text" class="form-control" name="arrest_place" value="{{ record.arrest_place if record else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">الجهة المعتقلة</label>
+                    <input type="text" class="form-control" name="arrest_authority" value="{{ record.arrest_authority if record else '' }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">سبب الاعتقال</label>
+                    <textarea class="form-control" name="arrest_reason">{{ record.arrest_reason if record else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Family Info -->
+        <div class="tab-pane fade" id="family" role="tabpanel" aria-labelledby="family-tab">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">الوضع العائلي</label>
+                    <select class="form-select" name="marital">
+                        <option value="single" {% if record and record.marital == 'single' %}selected{% endif %}>أعزب</option>
+                        <option value="married" {% if record and record.marital == 'married' %}selected{% endif %}>متزوج</option>
+                        <option value="widowed" {% if record and record.marital == 'widowed' %}selected{% endif %}>أرمل</option>
+                        <option value="divorced" {% if record and record.marital == 'divorced' %}selected{% endif %}>مطلق</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">اسم الزوج/الزوجة</label>
+                    <input type="text" class="form-control" name="spouse_name" value="{{ record.spouse_name if record else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">عدد الأطفال تحت 18</label>
+                    <input type="number" class="form-control" name="kids_under_18_count" value="{{ record.kids_under_18_count if record else 0 }}">
+                </div>
+
+                <div class="col-12 mt-4">
+                    <h5>بيانات الأطفال</h5>
+                    <table class="table table-bordered" id="childrenTable">
+                        <thead>
+                            <tr>
+                                <th>الاسم</th>
+                                <th>العمر</th>
+                                <th>التعليم</th>
+                                <th>حذف</th>
+                            </tr>
+                        </thead>
+                        <tbody id="childrenBody">
+                            <!-- JS will populate this -->
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="addChildRow()">إضافة طفل</button>
+                    <input type="hidden" name="children_data_json" id="children_data_json">
+                </div>
+            </div>
+        </div>
+
+        <!-- Socio-Economic & Health -->
+        <div class="tab-pane fade" id="socio" role="tabpanel" aria-labelledby="socio-tab">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">التعليم</label>
+                    <input type="text" class="form-control" name="education" value="{{ record.education if record else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">المهنة</label>
+                    <input type="text" class="form-control" name="profession" value="{{ record.profession if record else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">نوع السكن</label>
+                    <input type="text" class="form-control" name="housing_type" value="{{ record.housing_type if record else '' }}">
+                </div>
+                <div class="col-md-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="has_special_needs" id="has_special_needs" {% if record and record.has_special_needs %}checked{% endif %}>
+                        <label class="form-check-label" for="has_special_needs">
+                            ذوي احتياجات خاصة
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">تفاصيل الاحتياجات الخاصة</label>
+                    <textarea class="form-control" name="special_needs_details">{{ record.special_needs_details if record else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Verification & Evidence -->
+        <div class="tab-pane fade" id="verify" role="tabpanel" aria-labelledby="verify-tab">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">حالة التوثيق (بروتوكول بيركلي)</label>
+                    <select class="form-select" name="verification_status">
+                        <option value="verified" {% if record and record.verification_status == 'verified' %}selected{% endif %}>موثق</option>
+                        <option value="unverified" {% if record and record.verification_status == 'unverified' %}selected{% endif %}>غير موثق</option>
+                        <option value="under_review" {% if record and record.verification_status == 'under_review' %}selected{% endif %}>قيد المراجعة</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">نوع المصدر</label>
+                    <input type="text" class="form-control" name="source_type" value="{{ record.source_type if record else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">وضع السجل المدني</label>
+                    <select class="form-select" name="civil_registry_status">
+                        <option value="">غير محدد</option>
+                        <option value="alive" {% if record and record.civil_registry_status == 'alive' %}selected{% endif %}>حي</option>
+                        <option value="deceased" {% if record and record.civil_registry_status == 'deceased' %}selected{% endif %}>متوفي</option>
+                    </select>
+                </div>
+                <div class="col-md-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="has_conflicting_info" id="has_conflicting_info" {% if record and record.has_conflicting_info %}checked{% endif %}>
+                        <label class="form-check-label" for="has_conflicting_info">
+                            يوجد تضارب في المعلومات (مثال: مسرب صورة وفاة ولكن النفوس لا يؤكد)
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">تفاصيل التضارب</label>
+                    <textarea class="form-control" name="conflicting_info_details">{{ record.conflicting_info_details if record else '' }}</textarea>
+                </div>
+
+                <hr>
+                <h5>المرفقات</h5>
+                <div class="col-md-6">
+                    <label class="form-label">الصورة الشخصية</label>
+                    <input type="file" class="form-control" name="photo">
+                    {% if record and record.photo_path %}
+                        <small class="text-muted">الملف الحالي: {{ record.photo_path }}</small>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">وثائق أخرى</label>
+                    <input type="file" class="form-control" name="document">
+                    {% if record and record.document_path %}
+                        <small class="text-muted">الملف الحالي: {{ record.document_path }}</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="mt-4 mb-5">
+        <button type="submit" class="btn btn-primary btn-lg" onclick="prepareJson()">حفظ السجل</button>
+        <a href="{{ url_for('list_records') }}" class="btn btn-secondary btn-lg">إلغاء</a>
+    </div>
+</form>
+
+<script>
+    let children = [];
+    {% if record and record.children_data %}
+        try {
+            children = JSON.parse('{{ record.children_data | safe }}');
+        } catch(e) {
+            console.error("Error parsing children data", e);
+        }
+    {% endif %}
+
+    function renderChildren() {
+        const tbody = document.getElementById('childrenBody');
+        tbody.innerHTML = '';
+        children.forEach((child, index) => {
+            const row = `
+                <tr>
+                    <td><input type="text" class="form-control form-control-sm" value="${child.name || ''}" onchange="updateChild(${index}, 'name', this.value)"></td>
+                    <td><input type="text" class="form-control form-control-sm" value="${child.age || ''}" onchange="updateChild(${index}, 'age', this.value)"></td>
+                    <td><input type="text" class="form-control form-control-sm" value="${child.education || ''}" onchange="updateChild(${index}, 'education', this.value)"></td>
+                    <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChildRow(${index})">x</button></td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function addChildRow() {
+        children.push({name: '', age: '', education: ''});
+        renderChildren();
+    }
+
+    function removeChildRow(index) {
+        children.splice(index, 1);
+        renderChildren();
+    }
+
+    function updateChild(index, field, value) {
+        children[index][field] = value;
+    }
+
+    function prepareJson() {
+        document.getElementById('children_data_json').value = JSON.stringify(children);
+    }
+
+    // Initial render
+    renderChildren();
+</script>
+
+{% endblock %}

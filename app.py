@@ -3232,28 +3232,80 @@ def api_companion_cross_ref(record_id):
         if not name_parts:
             continue
 
-        # Build a broad OR query — match ANY name part against ANY name field
-        conditions = []
-        params = []
-        for part in name_parts:
-            conditions.append(
-                "(first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? OR mother_name LIKE ?)"
+        # Strategy: run multiple queries from precise to broad, collect candidates
+        candidates_dict = {}  # id -> row (dedup)
+
+        # Query 1: Records matching 2+ name parts (high precision, fast)
+        if len(name_parts) >= 2:
+            and_conditions = []
+            and_params = []
+            for part in name_parts:
+                and_conditions.append(
+                    "(first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? OR mother_name LIKE ?)"
+                )
+                and_params.extend([f'%{part}%'] * 4)
+            # At least 2 conditions must match — use pairwise AND combos
+            from itertools import combinations
+            pair_clauses = []
+            pair_params = []
+            for combo in combinations(range(len(and_conditions)), min(2, len(and_conditions))):
+                pair_clauses.append("(" + " AND ".join(and_conditions[i] for i in combo) + ")")
+                for i in combo:
+                    pair_params.extend(and_params[i*4:(i+1)*4])
+            q1 = (
+                "SELECT id, first_name, father_name, last_name, mother_name, status, province "
+                "FROM records WHERE deleted_at IS NULL "
+                f"AND ({' OR '.join(pair_clauses)}) AND id != ? LIMIT 50"
             )
-            params.extend([f'%{part}%'] * 4)
+            pair_params.append(record_id)
+            for r in db.execute(q1, pair_params).fetchall():
+                candidates_dict[r['id']] = r
 
-        query = (
-            "SELECT id, first_name, father_name, last_name, mother_name, status, province "
-            "FROM records WHERE deleted_at IS NULL "
-            f"AND ({' OR '.join(conditions)}) AND id != ? LIMIT 30"
-        )
-        params.append(record_id)
-        candidates = db.execute(query, params).fetchall()
+        # Query 2: Exact field matches (first_name=X AND last_name=Y, etc.)
+        if comp_parts['first_name'] and comp_parts['last_name']:
+            for r in db.execute(
+                "SELECT id, first_name, father_name, last_name, mother_name, status, province "
+                "FROM records WHERE deleted_at IS NULL AND first_name LIKE ? AND last_name LIKE ? AND id != ? LIMIT 10",
+                (f"%{comp_parts['first_name']}%", f"%{comp_parts['last_name']}%", record_id)
+            ).fetchall():
+                candidates_dict[r['id']] = r
 
-        # Score and rank candidates
+        if comp_parts['first_name'] and comp_parts['father_name']:
+            for r in db.execute(
+                "SELECT id, first_name, father_name, last_name, mother_name, status, province "
+                "FROM records WHERE deleted_at IS NULL AND first_name LIKE ? AND father_name LIKE ? AND id != ? LIMIT 10",
+                (f"%{comp_parts['first_name']}%", f"%{comp_parts['father_name']}%", record_id)
+            ).fetchall():
+                candidates_dict[r['id']] = r
+
+        # Query 3: Broad single-part match (only if we have few candidates)
+        if len(candidates_dict) < 5:
+            or_conditions = []
+            or_params = []
+            # Use the rarest name part (not first_name which is often common like محمد)
+            rare_parts = [p for p in [comp_parts.get('last_name'), comp_parts.get('father_name'), comp_parts.get('mother_name')] if p]
+            if not rare_parts:
+                rare_parts = name_parts[:1]
+            for part in rare_parts:
+                or_conditions.append(
+                    "(first_name LIKE ? OR father_name LIKE ? OR last_name LIKE ? OR mother_name LIKE ?)"
+                )
+                or_params.extend([f'%{part}%'] * 4)
+            if or_conditions:
+                q3 = (
+                    "SELECT id, first_name, father_name, last_name, mother_name, status, province "
+                    "FROM records WHERE deleted_at IS NULL "
+                    f"AND ({' OR '.join(or_conditions)}) AND id != ? LIMIT 20"
+                )
+                or_params.append(record_id)
+                for r in db.execute(q3, or_params).fetchall():
+                    candidates_dict[r['id']] = r
+
+        # Score and rank all collected candidates
         scored = []
-        for r in candidates:
+        for r in candidates_dict.values():
             s = _score_name_match(comp_parts, r)
-            if s >= 4:  # Minimum threshold: at least one meaningful match
+            if s >= 4:
                 scored.append((s, r))
         scored.sort(key=lambda x: -x[0])
 

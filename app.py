@@ -352,6 +352,21 @@ DIGITAL_EVIDENCE_TYPES = [
     ('other', 'أخرى')
 ]
 
+DOCUMENT_TYPES = [
+    ('court_order', 'أمر محكمة'),
+    ('visit_card', 'كرت زيارة سجين'),
+    ('release_paper', 'ورقة إفراج'),
+    ('death_certificate', 'شهادة وفاة'),
+    ('leaked_screenshot', 'لقطة شاشة تسريب'),
+    ('witness_letter', 'رسالة / شهادة شاهد'),
+    ('id_document', 'وثيقة هوية'),
+    ('civil_registry_doc', 'إخراج قيد / سجل مدني'),
+    ('medical_report', 'تقرير طبي'),
+    ('ngo_report', 'تقرير منظمة'),
+    ('photo_evidence', 'صورة كدليل'),
+    ('other', 'أخرى'),
+]
+
 CIVIL_REGISTRY_STATUSES = [
     ('alive', 'حي في السجل المدني'),
     ('deceased', 'متوفى في السجل المدني'),
@@ -1041,6 +1056,24 @@ def migrate_db():
         )
     """)
 
+    # -- Berkeley Protocol: record_documents table (multiple evidence uploads per record) --
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS record_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id INTEGER NOT NULL,
+            doc_type TEXT NOT NULL DEFAULT 'other',
+            file_path TEXT NOT NULL,
+            file_hash TEXT DEFAULT '',
+            original_filename TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            document_date TEXT DEFAULT '',
+            source_url TEXT DEFAULT '',
+            uploaded_by TEXT DEFAULT '',
+            uploaded_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+        )
+    """)
+
     # -- Add user_id column to audit_log for Berkeley Protocol chain of custody --
     cursor.execute("PRAGMA table_info(audit_log)")
     audit_existing = {row[1] for row in cursor.fetchall()}
@@ -1168,6 +1201,7 @@ def migrate_db():
         "CREATE INDEX IF NOT EXISTS idx_record_witnesses_record_id ON record_witnesses(record_id)",
         "CREATE INDEX IF NOT EXISTS idx_record_detentions_record_id ON record_detentions(record_id)",
         "CREATE INDEX IF NOT EXISTS idx_record_detentions_facility ON record_detentions(facility_name)",
+        "CREATE INDEX IF NOT EXISTS idx_record_documents_record_id ON record_documents(record_id)",
     ]
     for stmt in index_statements:
         try:
@@ -1385,6 +1419,7 @@ def inject_constants():
         'MEMBER_STATUSES': MEMBER_STATUSES,
         'MEMBERSHIP_TYPES': MEMBERSHIP_TYPES,
         'METHODOLOGY_TYPES': METHODOLOGY_TYPES,
+        'DOCUMENT_TYPES': DOCUMENT_TYPES,
         'STATUS_LABELS': STATUS_LABELS,
         'VALID_STATUS_TRANSITIONS': VALID_STATUS_TRANSITIONS,
         'user_role': session.get('user_role', 'admin'),
@@ -1626,8 +1661,8 @@ def entry_submit():
         evidence_level, evidence_sources_count,
         last_known_alive_date, last_known_location,
         detention_facilities_data,
-        source_type, collection_date, collector_name,
-        verification_status, methodology_notes,
+        source_type, source_url, collection_date, collector_name,
+        verification_status, methodology_notes, methodology_type,
         record_slug, photo_hash, document_hash,
         survivor_cv_path, survivor_cv_text, survivor_cv_photo_path,
         address_area, screenshot_hash
@@ -1638,7 +1673,7 @@ def entry_submit():
         ?,?, ?,?,?,?, ?,?, ?,?,?,?,?, ?,
         ?,?,?,?,?, ?,?, ?,?,?, ?,?, ?,?, ?,
         ?,?,?, ?,?, ?,?, ?,?, ?,
-        ?,?,?, ?,?, ?,?,?, ?,?,?,?,?
+        ?,?,?,?, ?,?, ?,?,?,?, ?,?,?,?,?
     )""", (
         form.get('first_name', ''), form.get('father_name', ''), form.get('last_name', ''),
         form.get('gender', ''), form.get('mother_name', ''),
@@ -1701,9 +1736,9 @@ def entry_submit():
         int(form.get('evidence_sources_count', 0) or 0),
         form.get('last_known_alive_date', ''), form.get('last_known_location', ''),
         detention_facilities,
-        form.get('source_type', ''), form.get('collection_date', ''),
+        form.get('source_type', ''), form.get('source_url', ''), form.get('collection_date', ''),
         form.get('collector_name', ''),
-        'Unverified', form.get('methodology_notes', ''),
+        'Unverified', form.get('methodology_notes', ''), form.get('methodology_type', ''),
         slug, photo_hash, doc_hash,
         cv_path, form.get('survivor_cv_text', ''), cv_photo_path,
         form.get('address_area', ''), screenshot_hash
@@ -1719,6 +1754,27 @@ def entry_submit():
                 time.sleep(0.5 * (attempt + 1))
                 continue
             raise
+
+    # Save additional documents to record_documents table
+    new_record_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    doc_count = int(form.get('record_doc_count', 0) or 0)
+    for i in range(doc_count):
+        file_key = f'record_doc_file_{i}'
+        if file_key in request.files and request.files[file_key].filename:
+            doc_path, doc_hash = save_upload(request.files[file_key], 'documents')
+            if doc_path:
+                db.execute("""INSERT INTO record_documents
+                    (record_id, doc_type, file_path, file_hash, original_filename,
+                     description, document_date, source_url, uploaded_by)
+                    VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (new_record_id, form.get(f'record_doc_type_{i}', 'other'),
+                     doc_path, doc_hash or '', request.files[file_key].filename,
+                     form.get(f'record_doc_desc_{i}', ''),
+                     form.get(f'record_doc_date_{i}', ''),
+                     form.get(f'record_doc_url_{i}', ''),
+                     form.get('collector_name', '')))
+    if doc_count > 0:
+        db.commit()
 
     log_audit('record_create', 'record', details=form.get('first_name', '') + ' ' + form.get('last_name', ''))
     resp_msg = 'تم حفظ السجل بنجاح. شكراً لمساهمتك في التوثيق.'
@@ -2808,10 +2864,14 @@ def admin_record_detail(record_id):
         else:
             comp_data['linked_record'] = None
         companions_with_links.append(comp_data)
+    record_documents = db.execute(
+        "SELECT * FROM record_documents WHERE record_id=? ORDER BY uploaded_at DESC", (record_id,)
+    ).fetchall()
     return_to = request.args.get('return_to', '')
     return render_template('admin_record_detail.html', record=record, services=services,
                            linked_records=linked_records, changes=changes,
-                           companions=companions_with_links, return_to=return_to)
+                           companions=companions_with_links, return_to=return_to,
+                           record_documents=record_documents)
 
 
 @app.route('/admin/record/<int:record_id>/edit', methods=['GET', 'POST'])
@@ -2922,8 +2982,8 @@ def admin_record_edit(record_id):
             evidence_level=?, evidence_sources_count=?,
             last_known_alive_date=?, last_known_location=?,
             detention_facilities_data=?,
-            source_type=?, collection_date=?, collector_name=?,
-            verification_status=?, methodology_notes=?,
+            source_type=?, source_url=?, collection_date=?, collector_name=?,
+            verification_status=?, methodology_notes=?, methodology_type=?,
             photo_hash=?, document_hash=?,
             survivor_cv_path=?, survivor_cv_text=?, survivor_cv_photo_path=?,
             address_area=?
@@ -2989,10 +3049,10 @@ def admin_record_edit(record_id):
             int(form.get('evidence_sources_count', 0) or 0),
             form.get('last_known_alive_date', ''), form.get('last_known_location', ''),
             form.get('detention_facilities_data', '[]'),
-            form.get('source_type', ''), form.get('collection_date', ''),
+            form.get('source_type', ''), form.get('source_url', ''), form.get('collection_date', ''),
             form.get('collector_name', ''),
             form.get('verification_status', 'Unverified'),
-            form.get('methodology_notes', ''),
+            form.get('methodology_notes', ''), form.get('methodology_type', ''),
             photo_hash, doc_hash,
             cv_path, form.get('survivor_cv_text', ''), cv_photo_path,
             form.get('address_area', ''),
@@ -3017,6 +3077,29 @@ def admin_record_edit(record_id):
                 )
                 changed_fields.append(key)
 
+        # Save new additional documents
+        doc_count = int(form.get('record_doc_count', 0) or 0)
+        for i in range(doc_count):
+            file_key = f'record_doc_file_{i}'
+            if file_key in request.files and request.files[file_key].filename:
+                doc_path, doc_hash = save_upload(request.files[file_key], 'documents')
+                if doc_path:
+                    db.execute("""INSERT INTO record_documents
+                        (record_id, doc_type, file_path, file_hash, original_filename,
+                         description, document_date, source_url, uploaded_by)
+                        VALUES (?,?,?,?,?,?,?,?,?)""",
+                        (record_id, form.get(f'record_doc_type_{i}', 'other'),
+                         doc_path, doc_hash or '', request.files[file_key].filename,
+                         form.get(f'record_doc_desc_{i}', ''),
+                         form.get(f'record_doc_date_{i}', ''),
+                         form.get(f'record_doc_url_{i}', ''),
+                         changed_by))
+
+        # Delete documents marked for removal
+        docs_to_delete = form.getlist('delete_doc_ids')
+        for doc_id in docs_to_delete:
+            db.execute("DELETE FROM record_documents WHERE id=? AND record_id=?", (doc_id, record_id))
+
         db.commit()
         log_audit('record_edit', 'record', record_id, {
             'fields_changed': changed_fields,
@@ -3036,10 +3119,14 @@ def admin_record_edit(record_id):
     services = db.execute(
         "SELECT * FROM record_services WHERE record_id=? ORDER BY created_at DESC", (record_id,)
     ).fetchall()
+    record_documents = db.execute(
+        "SELECT * FROM record_documents WHERE record_id=? ORDER BY uploaded_at DESC", (record_id,)
+    ).fetchall()
     return_to = request.args.get('return_to', '')
     return render_template('admin_record_edit.html', record=record,
                            volunteer_names=[v['full_name'] for v in volunteer_names],
-                           services=services, return_to=return_to)
+                           services=services, record_documents=record_documents,
+                           return_to=return_to)
 
 
 @app.route('/admin/record/<int:record_id>/history')
@@ -3638,6 +3725,10 @@ FIELD_TOOLTIPS = {
     'conflicting_info_details': 'تفاصيل التضارب في المعلومات.\nمثال: مصدر يقول أُفرج عنه عام 2015، ومصدر آخر يقول لا يزال معتقلاً',
     'last_known_alive_date': 'آخر تاريخ معروف كان فيه الشخص على قيد الحياة.\nمثال: 2013-08-20',
     'last_known_location': 'آخر مكان معروف كان فيه الشخص.\nمثال: فرع المخابرات الجوية - المزة',
+    # --- الوثائق المتعددة ---
+    'source_url': 'رابط المصدر الأصلي للمعلومات. حتى لو كان الرابط محذوفاً الآن، وثّقه هنا لإثبات المصدر.\nمثال: رابط الموقع الإخباري الذي نشر تسريبات عن المعتقلين',
+    'extra_documents': 'يمكنك رفع عدة وثائق لهذه الحالة: أوامر محكمة، كروت زيارة سجين، أوراق إفراج، لقطات شاشة تسريبات، شهادات وفاة.\nكل وثيقة تُحفظ مع بصمتها الرقمية SHA-256 لضمان سلامة سلسلة الحفظ.',
+    'digital_evidence_url_status': 'حالة رابط الدليل الرقمي:\nفعّال: الرابط يعمل\nمحذوف: كان موجوداً وحُذف\nمؤرشف: متاح في أرشيف الإنترنت\nغير معروف: لم يتم التحقق\nلم يكن هناك رابط: وصلت اللقطة عبر واتساب أو شخصياً\nالرابط غير متاح (نُسي): الأهل لا يتذكرون الرابط',
 }
 
 
@@ -5263,6 +5354,20 @@ def admin_record_delete_service(record_id, sid):
     db.commit()
     flash('تم حذف الخدمة', 'success')
     return redirect(url_for('admin_record_edit', record_id=record_id) + '#services-section')
+
+
+@app.route('/admin/record/<int:record_id>/document/<int:doc_id>/delete', methods=['POST'])
+@admin_required
+def admin_record_delete_document(record_id, doc_id):
+    db = get_db()
+    db.execute("DELETE FROM record_documents WHERE id=? AND record_id=?", (doc_id, record_id))
+    db.commit()
+    log_audit('document_delete', 'record', record_id, {'document_id': doc_id})
+    flash('تم حذف الوثيقة', 'success')
+    return_to = request.form.get('return_to', '')
+    if return_to == 'detail':
+        return redirect(url_for('admin_record_detail', record_id=record_id) + '#documents-section')
+    return redirect(url_for('admin_record_edit', record_id=record_id) + '#documents-section')
 
 
 # ---------------------------------------------------------------------------

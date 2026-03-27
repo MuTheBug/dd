@@ -505,6 +505,30 @@
     <div class="entry-section">
         <div class="entry-section-title">&#x1F50D; الأدلة والتحقق - بروتوكول بيركلي</div>
         <div class="entry-section-desc">وثّق أي أدلة رقمية متوفرة. هذا يعزز مصداقية الحالة.</div>
+
+        <!-- Guidance: Leaked Screenshots -->
+        <div style="background:#fffbeb;border-right:4px solid #f59e0b;padding:0.75rem;border-radius:6px;margin-bottom:0.75rem;font-size:0.88rem;">
+            <strong style="color:#b45309;">لقطات شاشة من تسريبات مواقع إعلامية:</strong>
+            <ol style="margin:0.4rem 0 0 1.2rem;padding:0;line-height:1.6;">
+                <li>اختر نوع الدليل: <strong>تسريبات قاعدة بيانات</strong> أو <strong>تقرير إخباري</strong></li>
+                <li>وثّق الرابط الأصلي حتى لو كان محذوفاً - أو اختر <strong>"الرابط غير متاح (نُسي)"</strong> أو <strong>"لم يكن هناك رابط أصلاً"</strong></li>
+                <li>ارفع لقطة الشاشة في حقل <strong>"لقطة شاشة الدليل"</strong></li>
+                <li>اكتب وصفاً لما تظهره اللقطة: اسم الشخص، المعلومة المذكورة</li>
+                <li>أضف التاريخ التقريبي إن أمكن</li>
+            </ol>
+        </div>
+        <!-- Guidance: Official Prison Documents -->
+        <div style="background:#f5f3ff;border-right:4px solid #8b5cf6;padding:0.75rem;border-radius:6px;margin-bottom:0.75rem;font-size:0.88rem;">
+            <strong style="color:#6d28d9;">وثائق سجن رسمية (أمر محكمة، كرت زيارة، ورقة إفراج):</strong>
+            <ol style="margin:0.4rem 0 0 1.2rem;padding:0;line-height:1.6;">
+                <li>صوّر/امسح كل وثيقة بوضوح</li>
+                <li>استخدم قسم <strong>"وثائق وأدلة إضافية"</strong> أدناه</li>
+                <li>حدد نوع كل وثيقة (أمر محكمة / كرت زيارة سجين / ورقة إفراج)</li>
+                <li>أضف تاريخ الوثيقة ووصفاً مختصراً</li>
+                <li>يمكنك رفع عدة وثائق لنفس الشخص</li>
+            </ol>
+        </div>
+
         <div class="form-grid">
             <div class="form-group">
                 <label>نوع الدليل الرقمي {{ tip('digital_evidence_type') }}</label>
@@ -546,7 +570,14 @@
                     <option value="deleted">محذوف</option>
                     <option value="archived">مؤرشف</option>
                     <option value="unknown">غير معروف</option>
+                    <option value="no_url">لم يكن هناك رابط أصلاً</option>
+                    <option value="url_forgotten">الرابط غير متاح (نُسي)</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label>رابط المصدر الأصلي {{ tip('source_url') }}</label>
+                <input type="url" name="source_url" placeholder="https://... حتى لو كان الرابط محذوفاً، وثّقه هنا">
+                <span style="font-size:0.8rem;color:var(--text-light);">وثّق الرابط حتى لو كان محذوفاً - مهم لإثبات المصدر</span>
             </div>
             <div class="form-group">
                 <label>لقطة شاشة للدليل {{ tip('digital_evidence_screenshot') }}</label>
@@ -604,6 +635,18 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Multiple Documents Upload -->
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F4C1; وثائق وأدلة إضافية {{ tip('extra_documents') }}</div>
+        <div style="font-size:0.88rem;color:var(--text-light);margin-bottom:1rem;">
+            يمكنك رفع عدة وثائق لهذه الحالة: أوامر محكمة، كروت زيارة سجين، أوراق إفراج، لقطات شاشة تسريبات، شهادات وفاة، إلخ.
+            <br>كل وثيقة سيتم حفظها مع بصمتها الرقمية (SHA-256) لضمان سلامة الأدلة.
+        </div>
+        <div id="documentsContainer"></div>
+        <input type="hidden" name="record_doc_count" id="recordDocCount" value="0">
+        <button type="button" class="btn btn-outline btn-sm" onclick="addDocumentRow()" style="margin-top:0.5rem;">+ إضافة وثيقة</button>
     </div>
 
     <!-- Conflicting Info -->
@@ -928,6 +971,15 @@
             </div>
             <textarea name="methodology_notes" id="methodologyNotes" rows="2" placeholder="ملاحظات إضافية حول المنهجية..." style="margin-top: 0.5rem;"></textarea>
         </div>
+        <div class="form-group">
+            <label>نوع المنهجية {{ tip('methodology_type') }}</label>
+            <select name="methodology_type">
+                <option value="">-- اختر --</option>
+                {% for code, label in METHODOLOGY_TYPES %}
+                <option value="{{ code }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
     </div>
 
     <div class="step-actions">
@@ -981,6 +1033,44 @@ function nextStep() {
 }
 function prevStep() {
     if (currentStep > 1) { currentStep--; updateStepUI(); }
+}
+
+// === Multi-document upload ===
+var docRowCounter = 0;
+function addDocumentRow() {
+    var i = docRowCounter++;
+    document.getElementById('recordDocCount').value = docRowCounter;
+    var container = document.getElementById('documentsContainer');
+    var row = document.createElement('div');
+    row.className = 'doc-upload-row';
+    row.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.75rem;background:var(--surface);';
+    row.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">' +
+        '<strong style="font-size:0.9rem;">وثيقة #' + (i+1) + '</strong>' +
+        '<button type="button" onclick="this.closest(\'.doc-upload-row\').remove()" class="btn btn-outline btn-sm" style="color:#e53e3e;border-color:#e53e3e;padding:0.2rem 0.5rem;font-size:0.8rem;">حذف</button>' +
+        '</div>' +
+        '<div class="form-grid" style="gap:0.5rem;">' +
+        '<div class="form-group">' +
+        '<label>نوع الوثيقة</label>' +
+        '<select name="record_doc_type_' + i + '">' +
+        '<option value="">-- اختر --</option>' +
+        {% for code, label in DOCUMENT_TYPES %}
+        '<option value="{{ code }}">{{ label }}</option>' +
+        {% endfor %}
+        '</select></div>' +
+        '<div class="form-group">' +
+        '<label>تاريخ الوثيقة</label>' +
+        '<input type="date" name="record_doc_date_' + i + '"></div>' +
+        '<div class="form-group">' +
+        '<label>الملف</label>' +
+        '<input type="file" name="record_doc_file_' + i + '" accept="image/*,.pdf,.doc,.docx" style="font-size:0.85rem;"></div>' +
+        '<div class="form-group">' +
+        '<label>رابط المصدر (إن وجد)</label>' +
+        '<input type="url" name="record_doc_url_' + i + '" placeholder="https://..."></div>' +
+        '<div class="form-group full-width">' +
+        '<label>وصف مختصر</label>' +
+        '<input type="text" name="record_doc_desc_' + i + '" placeholder="مثال: أمر محكمة ميدانية صادر بتاريخ..."></div>' +
+        '</div>';
+    container.appendChild(row);
 }
 
 // === File upload handler ===

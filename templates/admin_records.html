@@ -493,6 +493,8 @@
                         <option value="deleted" {{ 'selected' if filters.digital_evidence_url_status=='deleted' }}>محذوف</option>
                         <option value="archived" {{ 'selected' if filters.digital_evidence_url_status=='archived' }}>مؤرشف</option>
                         <option value="unknown" {{ 'selected' if filters.digital_evidence_url_status=='unknown' }}>غير معروف</option>
+                        <option value="no_url" {{ 'selected' if filters.digital_evidence_url_status=='no_url' }}>لم يكن هناك رابط أصلاً</option>
+                        <option value="url_forgotten" {{ 'selected' if filters.digital_evidence_url_status=='url_forgotten' }}>الرابط غير متاح (نُسي)</option>
                     </select>
                 </div>
 

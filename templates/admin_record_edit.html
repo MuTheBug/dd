@@ -324,6 +324,8 @@
                 <option value="deleted" {{ 'selected' if record.digital_evidence_url_status=='deleted' }}>محذوف</option>
                 <option value="archived" {{ 'selected' if record.digital_evidence_url_status=='archived' }}>مؤرشف</option>
                 <option value="unknown" {{ 'selected' if record.digital_evidence_url_status=='unknown' }}>غير معروف</option>
+                <option value="no_url" {{ 'selected' if record.digital_evidence_url_status=='no_url' }}>لم يكن هناك رابط أصلاً</option>
+                <option value="url_forgotten" {{ 'selected' if record.digital_evidence_url_status=='url_forgotten' }}>الرابط غير متاح (نُسي)</option>
             </select>
         </div>
         <div class="form-group">
@@ -621,8 +623,21 @@
         <textarea name="notes" rows="4">{{ record.notes or '' }}</textarea>
     </div>
     <div class="form-group full-width">
-        <label>ملاحظات منهجية</label>
+        <label>ملاحظات منهجية {{ tip('methodology_notes') }}</label>
         <textarea name="methodology_notes" rows="3">{{ record.methodology_notes or '' }}</textarea>
+    </div>
+    <div class="form-group">
+        <label>نوع المنهجية {{ tip('methodology_type') }}</label>
+        <select name="methodology_type">
+            <option value="">-- اختر --</option>
+            {% for code, label in METHODOLOGY_TYPES %}
+            <option value="{{ code }}" {{ 'selected' if record.methodology_type==code }}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group full-width">
+        <label>رابط المصدر الأصلي {{ tip('source_url') }}</label>
+        <input type="url" name="source_url" value="{{ record.source_url or '' }}" placeholder="https://... حتى لو كان الرابط محذوفاً">
     </div>
     <div class="form-group full-width">
         <label>نوع المصدر {{ tip('source_type') }}</label>
@@ -637,6 +652,62 @@
         </select>
     </div>
 </div>
+
+<!-- Documents Management Section -->
+<div class="form-section" id="documents-section">
+    <div class="form-section-title">&#x1F4DA; وثائق وأدلة إضافية</div>
+    {% if record_documents %}
+    <div style="margin-bottom:1rem;">
+        {% for doc in record_documents %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;border:1px solid var(--border);border-radius:6px;margin-bottom:0.5rem;background:var(--surface);">
+            <div style="flex:1;">
+                <span style="background:var(--primary);color:#fff;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.78rem;">
+                    {{ dict(DOCUMENT_TYPES).get(doc.doc_type, doc.doc_type) }}
+                </span>
+                <span style="font-size:0.85rem;margin-right:0.3rem;">{{ doc.original_filename or doc.file_path }}</span>
+                {% if doc.document_date %}<span style="font-size:0.8rem;color:var(--text-light);">- {{ doc.document_date }}</span>{% endif %}
+            </div>
+            <div style="display:flex;gap:0.3rem;align-items:center;">
+                <a href="{{ url_for('uploaded_file', filename='documents/' + doc.file_path) }}" target="_blank" class="btn btn-outline btn-sm" style="padding:0.15rem 0.4rem;font-size:0.78rem;">عرض</a>
+                <label style="font-size:0.78rem;color:#e53e3e;display:flex;align-items:center;gap:0.2rem;cursor:pointer;">
+                    <input type="checkbox" name="delete_doc_ids" value="{{ doc.id }}"> حذف
+                </label>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <div style="font-size:0.88rem;color:var(--text-light);margin-bottom:0.5rem;">إضافة وثائق جديدة:</div>
+    <div id="editDocsContainer"></div>
+    <input type="hidden" name="record_doc_count" id="editDocCount" value="0">
+    <button type="button" class="btn btn-outline btn-sm" onclick="addEditDocRow()" style="margin-top:0.3rem;">+ إضافة وثيقة</button>
+</div>
+<script>
+var editDocCounter = 0;
+function addEditDocRow() {
+    var i = editDocCounter++;
+    document.getElementById('editDocCount').value = editDocCounter;
+    var c = document.getElementById('editDocsContainer');
+    var row = document.createElement('div');
+    row.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:0.6rem;margin-bottom:0.5rem;background:var(--surface);';
+    row.innerHTML = '<div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">' +
+        '<strong style="font-size:0.85rem;">وثيقة جديدة #' + (i+1) + '</strong>' +
+        '<button type="button" onclick="this.closest(\'div[style]\').remove()" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:0.8rem;">حذف</button></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">' +
+        '<div><label style="font-size:0.82rem;">نوع الوثيقة</label>' +
+        '<select name="record_doc_type_' + i + '" style="width:100%;">' +
+        '<option value="">-- اختر --</option>' +
+        {% for code, label in DOCUMENT_TYPES %}
+        '<option value="{{ code }}">{{ label }}</option>' +
+        {% endfor %}
+        '</select></div>' +
+        '<div><label style="font-size:0.82rem;">تاريخ</label><input type="date" name="record_doc_date_' + i + '" style="width:100%;"></div>' +
+        '<div><label style="font-size:0.82rem;">الملف</label><input type="file" name="record_doc_file_' + i + '" accept="image/*,.pdf,.doc,.docx" style="font-size:0.82rem;width:100%;"></div>' +
+        '<div><label style="font-size:0.82rem;">رابط المصدر</label><input type="url" name="record_doc_url_' + i + '" placeholder="https://..." style="width:100%;"></div>' +
+        '<div style="grid-column:1/-1;"><label style="font-size:0.82rem;">وصف</label><input type="text" name="record_doc_desc_' + i + '" placeholder="وصف مختصر..." style="width:100%;"></div></div>';
+    c.appendChild(row);
+}
+</script>
 
 <!-- Hidden fields for data not shown in grid -->
 <input type="hidden" name="detention_facilities_data" value="{{ record.detention_facilities_data or '[]' }}">

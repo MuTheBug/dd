@@ -16,6 +16,7 @@
                 <label>نوع البيانات</label>
                 <select name="import_type" id="importType" style="width: 100%;">
                     <option value="records">سجلات (ضحايا)</option>
+                    <option value="services">الخدمات المقدمة</option>
                     <option value="volunteers">متطوعون</option>
                     <option value="members">منتسبون</option>
                 </select>
@@ -36,6 +37,7 @@
         </p>
         <div style="display: flex; flex-direction: column; gap: 0.5rem;">
             <a href="{{ url_for('admin_import_template', type='records') }}" class="btn btn-outline btn-sm">قالب السجلات</a>
+            <a href="{{ url_for('admin_import_template', type='services') }}" class="btn btn-outline btn-sm">قالب الخدمات المقدمة</a>
             <a href="{{ url_for('admin_import_template', type='volunteers') }}" class="btn btn-outline btn-sm">قالب المتطوعين</a>
             <a href="{{ url_for('admin_import_template', type='members') }}" class="btn btn-outline btn-sm">قالب المنتسبين</a>
         </div>

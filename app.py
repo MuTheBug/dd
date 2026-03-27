@@ -7137,6 +7137,66 @@ def admin_import():
                 except Exception as e:
                     skipped.append(f'سطر {row_num}: {e}')
 
+        elif import_type == 'services':
+            col_map = {h: i for i, h in enumerate(headers) if h}
+            for row_num, row in enumerate(rows, 2):
+                def g(col):
+                    idx = col_map.get(col)
+                    return str(row[idx]).strip() if idx is not None and idx < len(row) and row[idx] else ''
+
+                service_name = g('service_name') or g('اسم الخدمة')
+                if not service_name:
+                    skipped.append(f'سطر {row_num}: اسم الخدمة مطلوب')
+                    continue
+
+                # Resolve record_id: try numeric ID first, then name search
+                record_id_val = g('record_id') or g('رقم السجل')
+                record_id = None
+                if record_id_val:
+                    try:
+                        record_id = int(float(record_id_val))
+                        exists = db.execute("SELECT id FROM records WHERE id=? AND deleted_at IS NULL", (record_id,)).fetchone()
+                        if not exists:
+                            skipped.append(f'سطر {row_num}: السجل رقم {record_id} غير موجود')
+                            continue
+                    except (ValueError, TypeError):
+                        skipped.append(f'سطر {row_num}: رقم السجل غير صالح: {record_id_val}')
+                        continue
+
+                if not record_id:
+                    record_name = g('record_name') or g('الاسم (بديل عن الرقم)')
+                    if not record_name:
+                        skipped.append(f'سطر {row_num}: رقم السجل أو الاسم مطلوب')
+                        continue
+                    # Search by name parts
+                    name_parts = record_name.split()
+                    if len(name_parts) >= 2:
+                        match = db.execute(
+                            "SELECT id FROM records WHERE deleted_at IS NULL AND first_name LIKE ? AND (last_name LIKE ? OR father_name LIKE ?) LIMIT 1",
+                            (f'%{name_parts[0]}%', f'%{name_parts[-1]}%', f'%{name_parts[-1]}%')
+                        ).fetchone()
+                    else:
+                        match = db.execute(
+                            "SELECT id FROM records WHERE deleted_at IS NULL AND first_name LIKE ? LIMIT 1",
+                            (f'%{name_parts[0]}%',)
+                        ).fetchone()
+                    if not match:
+                        skipped.append(f'سطر {row_num}: لم يتم العثور على سجل باسم "{record_name}"')
+                        continue
+                    record_id = match['id']
+
+                try:
+                    db.execute(
+                        "INSERT INTO record_services (record_id, service_name, service_date, provider, notes) VALUES (?,?,?,?,?)",
+                        (record_id, service_name,
+                         g('service_date') or g('تاريخ الخدمة'),
+                         g('provider') or g('مقدم الخدمة'),
+                         g('notes') or g('ملاحظات'))
+                    )
+                    inserted += 1
+                except Exception as e:
+                    skipped.append(f'سطر {row_num}: {e}')
+
         db.commit()
         log_audit('bulk_import', import_type, details=f'{inserted} inserted, {len(skipped)} skipped')
         flash(f'تم استيراد {inserted} سجل بنجاح' + (f'، تم تخطي {len(skipped)} سطر' if skipped else ''), 'success')
@@ -7160,7 +7220,17 @@ def admin_import_template():
     ws.sheet_view.rightToLeft = True
 
     # Each entry: (Arabic header, English db column name, column width, example/hint)
-    if import_type == 'volunteers':
+    if import_type == 'services':
+        columns = [
+            ('رقم السجل', 'record_id', 14, '101'),
+            ('الاسم (بديل عن الرقم)', 'record_name', 22, 'أحمد محمد الأحمد'),
+            ('اسم الخدمة', 'service_name', 24, 'مساعدة قانونية / دعم نفسي / مساعدة مادية'),
+            ('تاريخ الخدمة', 'service_date', 16, '2024-06-15'),
+            ('مقدم الخدمة', 'provider', 22, 'منظمة حقنا'),
+            ('ملاحظات', 'notes', 30, ''),
+        ]
+        ws.title = 'خدمات'
+    elif import_type == 'volunteers':
         columns = [
             ('الاسم', 'full_name', 22, 'أحمد محمد'),
             ('الهاتف', 'phone', 16, '0912345678'),

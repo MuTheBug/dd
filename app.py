@@ -3333,6 +3333,113 @@ def api_search_records_for_link():
     } for _, r in scored[:10]])
 
 
+@app.route('/api/search_unlinked_companions')
+@admin_required
+def api_search_unlinked_companions():
+    """Search all unlinked companions across all records to find cross-references.
+
+    Matches current record's person (or its companions) against unlinked companions
+    in OTHER records. This reveals when the same person appears as a companion
+    in multiple records, indicating they were detained together.
+    """
+    record_id = safe_int(request.args.get('record_id'), 0)
+    if not record_id:
+        return jsonify([])
+    db = get_db()
+
+    # Get the main record's details
+    record = db.execute(
+        "SELECT first_name, father_name, last_name, mother_name FROM records WHERE id = ?",
+        (record_id,)
+    ).fetchone()
+    if not record:
+        return jsonify([])
+
+    # Collect all name parts to search: from the record itself + its companions
+    search_names = []
+    # The record's own name
+    rec_parts = {
+        'first_name': (record['first_name'] or '').strip(),
+        'father_name': (record['father_name'] or '').strip(),
+        'last_name': (record['last_name'] or '').strip(),
+        'mother_name': (record['mother_name'] or '').strip(),
+    }
+    if any(rec_parts.values()):
+        search_names.append({
+            'label': f"{rec_parts['first_name']} {rec_parts['father_name']} {rec_parts['last_name']}".strip(),
+            'source': 'record',
+            'source_id': record_id,
+            'parts': rec_parts,
+        })
+
+    # The record's companions
+    companions = db.execute(
+        "SELECT id, first_name, father_name, last_name, mother_name FROM record_companions WHERE record_id = ?",
+        (record_id,)
+    ).fetchall()
+    for comp in companions:
+        c_parts = {
+            'first_name': (comp['first_name'] or '').strip(),
+            'father_name': (comp['father_name'] or '').strip(),
+            'last_name': (comp['last_name'] or '').strip(),
+            'mother_name': (comp['mother_name'] or '').strip(),
+        }
+        if any(c_parts.values()):
+            search_names.append({
+                'label': ' '.join(filter(None, c_parts.values())),
+                'source': 'companion',
+                'source_id': comp['id'],
+                'parts': c_parts,
+            })
+
+    # Get all unlinked companions from OTHER records
+    all_unlinked = db.execute(
+        """SELECT c.id, c.record_id, c.first_name, c.father_name, c.last_name, c.mother_name, c.notes,
+                  r.first_name AS rec_first, r.father_name AS rec_father, r.last_name AS rec_last,
+                  r.status AS rec_status, r.province AS rec_province
+           FROM record_companions c
+           JOIN records r ON c.record_id = r.id AND r.deleted_at IS NULL
+           WHERE c.record_id != ? AND c.linked_record_id IS NULL""",
+        (record_id,)
+    ).fetchall()
+
+    results = []
+    for search in search_names:
+        matches = []
+        for uc in all_unlinked:
+            uc_parts = {
+                'first_name': (uc['first_name'] or '').strip(),
+                'father_name': (uc['father_name'] or '').strip(),
+                'last_name': (uc['last_name'] or '').strip(),
+                'mother_name': (uc['mother_name'] or '').strip(),
+            }
+            # Use the scoring function, treating unlinked companion as a "record"
+            score = _score_name_match(search['parts'], uc)
+            if score >= 4:
+                rec_name = f"{uc['rec_first']} {uc['rec_father']} {uc['rec_last']}".strip()
+                comp_name = ' '.join(filter(None, [uc['first_name'], uc['father_name'], uc['last_name']]))
+                matches.append({
+                    'companion_id': uc['id'],
+                    'companion_name': comp_name,
+                    'mother_name': uc['mother_name'] or '',
+                    'notes': uc['notes'] or '',
+                    'record_id': uc['record_id'],
+                    'record_name': rec_name,
+                    'record_status': uc['rec_status'] or '',
+                    'record_province': uc['rec_province'] or '',
+                    'score': score,
+                })
+        matches.sort(key=lambda x: -x['score'])
+        if matches:
+            results.append({
+                'search_label': search['label'],
+                'search_source': search['source'],
+                'matches': matches[:10],
+            })
+
+    return jsonify(results)
+
+
 # Berkeley Protocol: Valid record status transitions (workflow enforcement)
 VALID_STATUS_TRANSITIONS = {
     'draft': ['reviewed'],           # data_entry or admin

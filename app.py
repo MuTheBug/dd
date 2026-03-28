@@ -116,24 +116,40 @@ def check_session_timeout():
 
 @app.before_request
 def enforce_role_permissions():
-    """Restrict viewer role from write operations."""
+    """Enforce role-based access control.
+    - admin: full access
+    - data_entry: entry form only (submit new records)
+    - viewer: read-only access to dashboard, records list, record detail
+    """
     if not session.get('is_admin'):
         return
     role = session.get('user_role', 'admin')
     if role == 'admin':
         return
-    # Viewer can only GET
-    if role == 'viewer' and request.method != 'GET':
-        if request.endpoint and request.endpoint not in ('admin_login', 'admin_logout'):
-            flash('ليس لديك صلاحية لتنفيذ هذا الإجراء', 'error')
-            return redirect(request.referrer or url_for('admin_dashboard'))
-    # data_entry can't access admin-only routes
+
+    endpoint = request.endpoint or ''
+    # Common allowed endpoints for all logged-in roles
+    common_allowed = ('admin_login', 'admin_logout', 'static', 'uploaded_file')
+
     if role == 'data_entry':
-        admin_only = ('admin_users', 'admin_user_add', 'admin_user_toggle', 'admin_user_reset_password',
-                      'admin_backup', 'admin_backup_create', 'admin_backup_restore', 'admin_backup_delete',
-                      'admin_trash_empty', 'admin_import')
-        if request.endpoint in admin_only:
-            flash('ليس لديك صلاحية للوصول لهذه الصفحة', 'error')
+        # data_entry can ONLY access the entry form and submit
+        allowed = common_allowed + ('entry_form', 'entry_submit', 'admin_dashboard')
+        if endpoint not in allowed:
+            flash('صلاحيتك محدودة بصفحة إدخال البيانات فقط', 'error')
+            return redirect(url_for('entry_form'))
+
+    elif role == 'viewer':
+        # Viewer: read-only (GET only) on dashboard, records, record detail, stats, PDF
+        if request.method != 'GET':
+            if endpoint not in common_allowed:
+                flash('ليس لديك صلاحية لتنفيذ هذا الإجراء (مشاهد فقط)', 'error')
+                return redirect(request.referrer or url_for('admin_dashboard'))
+        viewer_allowed = common_allowed + (
+            'admin_dashboard', 'admin_dashboard_print', 'admin_records', 'admin_record_detail',
+            'admin_record_pdf', 'api_stats', 'api_records_export',
+        )
+        if endpoint not in viewer_allowed:
+            flash('صلاحيتك محدودة بمشاهدة السجلات فقط', 'error')
             return redirect(url_for('admin_dashboard'))
 
 ADMIN_PASSWORD_FILE = os.path.join(BASE_DIR, 'admin_password.hash')
@@ -1776,6 +1792,23 @@ def entry_submit():
     if doc_count > 0:
         db.commit()
 
+    # Save companions to record_companions table
+    comp_count = int(form.get('companions_count', 0) or 0)
+    for i in range(comp_count):
+        comp_first = form.get(f'comp_first_{i}', '').strip()
+        if not comp_first:
+            continue
+        db.execute("""INSERT INTO record_companions
+            (record_id, first_name, father_name, last_name, mother_name, notes)
+            VALUES (?,?,?,?,?,?)""",
+            (new_record_id, comp_first,
+             form.get(f'comp_father_{i}', '').strip(),
+             form.get(f'comp_last_{i}', '').strip(),
+             form.get(f'comp_mother_{i}', '').strip(),
+             form.get(f'comp_notes_{i}', '').strip()))
+    if comp_count > 0:
+        db.commit()
+
     log_audit('record_create', 'record', details=form.get('first_name', '') + ' ' + form.get('last_name', ''))
     resp_msg = 'تم حفظ السجل بنجاح. شكراً لمساهمتك في التوثيق.'
     if warnings:
@@ -1838,6 +1871,9 @@ def admin_login():
             session.permanent = True
             _login_attempts.pop(ip, None)
             log_audit('login', 'user', 0, {'description': f'User logged in: {username or "admin"} ({user_role})'})
+            # Redirect based on role
+            if user_role == 'data_entry':
+                return redirect(url_for('entry_form'))
             return redirect(url_for('admin_dashboard'))
         _login_attempts.setdefault(ip, []).append(now)
         attempts_left = LOGIN_MAX_ATTEMPTS - len(_login_attempts[ip])

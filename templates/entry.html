@@ -493,6 +493,17 @@
         </div>
     </div>
 
+    <!-- Companions Section -->
+    <div class="entry-section">
+        <div class="entry-section-title">&#x1F465; أشخاص كانوا معه (مرافقون)</div>
+        <div style="font-size:0.88rem;color:var(--text-light);margin-bottom:0.75rem;">
+            إذا كان المعتقل برفقة أشخاص آخرين أثناء الاعتقال أو الاحتجاز، أضف أسماءهم هنا. يكفي الاسم الأول أو ما تتذكره.
+        </div>
+        <div id="companionsContainer"></div>
+        <input type="hidden" name="companions_count" id="companionsCount" value="0">
+        <button type="button" class="btn btn-outline btn-sm" onclick="addCompanionRow()" style="margin-top:0.5rem;">+ إضافة مرافق</button>
+    </div>
+
     <div class="step-actions">
         <button type="button" class="btn btn-outline" onclick="prevStep()">&#x2192; السابق</button>
         <span class="step-counter">الخطوة 3 من 7</span>
@@ -1033,6 +1044,34 @@ function nextStep() {
 }
 function prevStep() {
     if (currentStep > 1) { currentStep--; updateStepUI(); }
+}
+
+// === Companions ===
+var compRowCounter = 0;
+function addCompanionRow() {
+    var i = compRowCounter++;
+    document.getElementById('companionsCount').value = compRowCounter;
+    var container = document.getElementById('companionsContainer');
+    var row = document.createElement('div');
+    row.className = 'comp-upload-row';
+    row.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.75rem;background:var(--surface);';
+    row.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">' +
+        '<strong style="font-size:0.9rem;">مرافق #' + (i+1) + '</strong>' +
+        '<button type="button" onclick="this.closest(\'.comp-upload-row\').remove()" class="btn btn-outline btn-sm" style="color:#e53e3e;border-color:#e53e3e;padding:0.2rem 0.5rem;font-size:0.8rem;">حذف</button>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">' +
+        '<div><label style="font-size:0.82rem;color:var(--text-light);">الاسم الأول *</label>' +
+        '<input type="text" name="comp_first_' + i + '" placeholder="الاسم الأول" required></div>' +
+        '<div><label style="font-size:0.82rem;color:var(--text-light);">اسم الأب</label>' +
+        '<input type="text" name="comp_father_' + i + '" placeholder="اختياري"></div>' +
+        '<div><label style="font-size:0.82rem;color:var(--text-light);">الكنية</label>' +
+        '<input type="text" name="comp_last_' + i + '" placeholder="اختياري"></div>' +
+        '<div><label style="font-size:0.82rem;color:var(--text-light);">اسم الأم</label>' +
+        '<input type="text" name="comp_mother_' + i + '" placeholder="اختياري"></div>' +
+        '</div>' +
+        '<div style="margin-top:0.4rem;"><label style="font-size:0.82rem;color:var(--text-light);">ملاحظة</label>' +
+        '<input type="text" name="comp_notes_' + i + '" placeholder="مثال: كان معه في نفس الزنزانة..." style="width:100%;"></div>';
+    container.appendChild(row);
 }
 
 // === Multi-document upload ===

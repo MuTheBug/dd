@@ -52,8 +52,25 @@
             </button>
             <div class="nav-links">
                 <a href="{{ url_for('index') }}">الرئيسية</a>
-                <a href="{{ url_for('entry_form') }}">إدخال بيانات</a>
                 {% if session.get('is_admin') %}
+                {% set role = session.get('user_role', 'admin') %}
+
+                {% if role == 'data_entry' %}
+                {# data_entry: entry form only #}
+                <a href="{{ url_for('entry_form') }}">إدخال بيانات</a>
+                <span style="background:#f59e0b;color:#fff;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;">{{ display_name or 'مُدخِل بيانات' }}</span>
+                <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
+
+                {% elif role == 'viewer' %}
+                {# viewer: dashboard + records (read-only) #}
+                <a href="{{ url_for('admin_dashboard') }}">لوحة التحكم</a>
+                <a href="{{ url_for('admin_records') }}">السجلات</a>
+                <span style="background:#6366f1;color:#fff;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;">{{ display_name or 'مشاهد' }}</span>
+                <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
+
+                {% else %}
+                {# admin: full access #}
+                <a href="{{ url_for('entry_form') }}">إدخال بيانات</a>
                 <a href="{{ url_for('admin_dashboard') }}">لوحة التحكم</a>
                 <a href="{{ url_for('admin_records') }}">السجلات</a>
                 <a href="{{ url_for('admin_volunteers') }}">المتطوعون</a>
@@ -71,6 +88,8 @@
                 <a href="{{ url_for('admin_users') }}">المستخدمون</a>
                 <a href="{{ url_for('admin_change_password') }}">كلمة المرور</a>
                 <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
+                {% endif %}
+
                 {% else %}
                 <a href="{{ url_for('admin_login') }}">دخول الإدارة</a>
                 {% endif %}

@@ -25,6 +25,38 @@
     </form>
 </div>
 
+<!-- Merge Two Lists -->
+{% if lists|length >= 2 %}
+<div class="card" style="padding: 0.75rem 1rem; margin-bottom: 1rem;">
+    <div style="font-size: 0.88rem; font-weight: 600; color: #8b5cf6; margin-bottom: 0.5rem;">&#x1F500; دمج قائمتين</div>
+    <form method="POST" action="{{ url_for('admin_merge_lists') }}" style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: end;">
+        <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 180px;">
+            <label style="font-size: 0.82rem;">القائمة الأولى <span style="color: var(--deceased);">*</span></label>
+            <select name="list_a" required style="width:100%;">
+                <option value="">-- اختر --</option>
+                {% for l in lists %}
+                <option value="{{ l.id }}">{{ l.name }} ({{ l.item_count }} سجل)</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 180px;">
+            <label style="font-size: 0.82rem;">القائمة الثانية <span style="color: var(--deceased);">*</span></label>
+            <select name="list_b" required style="width:100%;">
+                <option value="">-- اختر --</option>
+                {% for l in lists %}
+                <option value="{{ l.id }}">{{ l.name }} ({{ l.item_count }} سجل)</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 200px;">
+            <label style="font-size: 0.82rem;">اسم القائمة الجديدة <span style="color: var(--deceased);">*</span></label>
+            <input type="text" name="merged_name" required placeholder="مثال: دمج قائمة آذار + نيسان" style="font-size: 0.9rem;">
+        </div>
+        <button type="submit" class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none;">دمج</button>
+    </form>
+</div>
+{% endif %}
+
 <!-- Lists -->
 {% if lists %}
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">

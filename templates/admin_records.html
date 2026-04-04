@@ -1564,6 +1564,8 @@ function exportPdf() {
     }
     // Columns
     for (var i = 0; i < cols.length; i++) addField('cols', cols[i]);
+    // CSRF token
+    addField('_csrf_token', '{{ csrf_token() }}');
     // Record limit
     var limitVal = document.getElementById('pdfLimitInput').value.trim();
     if (limitVal && parseInt(limitVal) > 0) addField('pdf_limit', limitVal);
@@ -1614,6 +1616,7 @@ function exportExcel() {
         for (var pk in presetOverrides) addField(pk, presetOverrides[pk]);
     }
     for (var i = 0; i < cols.length; i++) addField('cols', cols[i]);
+    addField('_csrf_token', '{{ csrf_token() }}');
     var limitVal = document.getElementById('pdfLimitInput').value.trim();
     if (limitVal && parseInt(limitVal) > 0) addField('pdf_limit', limitVal);
     if (recordsLoaded && orderedRecords.length > 0) {
@@ -1649,6 +1652,7 @@ function exportVcf() {
     if (presetOverrides) {
         for (var pk in presetOverrides) addField(pk, presetOverrides[pk]);
     }
+    addField('_csrf_token', '{{ csrf_token() }}');
     var limitVal = document.getElementById('pdfLimitInput').value.trim();
     if (limitVal && parseInt(limitVal) > 0) addField('pdf_limit', limitVal);
     if (recordsLoaded && orderedRecords.length > 0) {

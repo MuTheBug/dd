@@ -5407,6 +5407,298 @@ def admin_record_delete_document(record_id, doc_id):
 
 
 # ---------------------------------------------------------------------------
+# Kids search
+# ---------------------------------------------------------------------------
+@app.route('/admin/kids')
+@admin_required
+def admin_kids_search():
+    """Search children across all records by education level."""
+    db = get_db()
+    args = request.args
+    edu_filter = args.get('education', '').strip()
+    school_filter = args.get('school', '').strip()
+    age_from = args.get('age_from', '')
+    age_to = args.get('age_to', '')
+    gender_filter = args.get('gender', '')
+
+    current_year = datetime.now().year
+    records = db.execute(
+        "SELECT id, first_name, father_name, last_name, province, address, phone, children_data "
+        "FROM records WHERE deleted_at IS NULL AND children_data IS NOT NULL AND children_data != '' AND children_data != '[]'"
+    ).fetchall()
+
+    kids = []
+    for rec in records:
+        try:
+            children = json.loads(rec['children_data'])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for child in children:
+            if not child.get('name'):
+                continue
+            # Calculate age
+            child_age = None
+            if child.get('birth_year'):
+                try:
+                    child_age = current_year - int(child['birth_year'])
+                except (ValueError, TypeError):
+                    pass
+            elif child.get('age'):
+                try:
+                    child_age = int(child['age'])
+                except (ValueError, TypeError):
+                    pass
+
+            # Apply filters
+            if edu_filter and edu_filter not in (child.get('education') or ''):
+                continue
+            if school_filter and school_filter.lower() not in (child.get('school') or child.get('university') or '').lower():
+                continue
+            if gender_filter and child.get('gender', '') != gender_filter:
+                continue
+            if age_from:
+                try:
+                    if child_age is None or child_age < int(age_from):
+                        continue
+                except ValueError:
+                    pass
+            if age_to:
+                try:
+                    if child_age is None or child_age > int(age_to):
+                        continue
+                except ValueError:
+                    pass
+
+            kids.append({
+                'name': child.get('name', ''),
+                'gender': child.get('gender', ''),
+                'birth_year': child.get('birth_year', ''),
+                'age': child_age,
+                'education': child.get('education', ''),
+                'school': child.get('school') or child.get('university') or '',
+                'employment': child.get('employment') or child.get('job') or '',
+                'health_notes': child.get('health_notes') or child.get('healthDetails') or '',
+                'special_needs': child.get('special_needs', ''),
+                'parent_id': rec['id'],
+                'parent_name': ' '.join(filter(None, [rec['first_name'], rec['father_name'], rec['last_name']])),
+                'parent_phone': rec['phone'] or '',
+                'parent_province': rec['province'] or '',
+            })
+
+    # Collect unique education levels for filter dropdown
+    all_edu = set()
+    for rec in records:
+        try:
+            for c in json.loads(rec['children_data']):
+                if c.get('education'):
+                    all_edu.add(c['education'])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    edu_levels = sorted(all_edu)
+
+    return render_template('admin_kids_search.html', kids=kids, edu_levels=edu_levels,
+                           filters={'education': edu_filter, 'school': school_filter,
+                                    'age_from': age_from, 'age_to': age_to, 'gender': gender_filter})
+
+
+@app.route('/admin/kids/pdf')
+@admin_required
+def admin_kids_pdf():
+    """Export kids search results as PDF."""
+    # Reuse same logic
+    db = get_db()
+    args = request.args
+    edu_filter = args.get('education', '').strip()
+    school_filter = args.get('school', '').strip()
+    age_from = args.get('age_from', '')
+    age_to = args.get('age_to', '')
+    gender_filter = args.get('gender', '')
+
+    current_year = datetime.now().year
+    records = db.execute(
+        "SELECT id, first_name, father_name, last_name, province, phone, children_data "
+        "FROM records WHERE deleted_at IS NULL AND children_data IS NOT NULL AND children_data != '' AND children_data != '[]'"
+    ).fetchall()
+
+    kids = []
+    for rec in records:
+        try:
+            children = json.loads(rec['children_data'])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for child in children:
+            if not child.get('name'):
+                continue
+            child_age = None
+            if child.get('birth_year'):
+                try:
+                    child_age = current_year - int(child['birth_year'])
+                except (ValueError, TypeError):
+                    pass
+            elif child.get('age'):
+                try:
+                    child_age = int(child['age'])
+                except (ValueError, TypeError):
+                    pass
+            if edu_filter and edu_filter not in (child.get('education') or ''):
+                continue
+            if school_filter and school_filter.lower() not in (child.get('school') or child.get('university') or '').lower():
+                continue
+            if gender_filter and child.get('gender', '') != gender_filter:
+                continue
+            if age_from:
+                try:
+                    if child_age is None or child_age < int(age_from):
+                        continue
+                except ValueError:
+                    pass
+            if age_to:
+                try:
+                    if child_age is None or child_age > int(age_to):
+                        continue
+                except ValueError:
+                    pass
+            kids.append({
+                'name': child.get('name', ''),
+                'gender': child.get('gender', ''),
+                'age': child_age,
+                'education': child.get('education', ''),
+                'school': child.get('school') or child.get('university') or '',
+                'parent_name': ' '.join(filter(None, [rec['first_name'], rec['father_name'], rec['last_name']])),
+                'parent_phone': rec['phone'] or '',
+                'parent_province': rec['province'] or '',
+            })
+
+    title = 'بحث الأطفال'
+    if edu_filter:
+        title += f' - {edu_filter}'
+    now = datetime.now().strftime('%Y-%m-%d %H:%M')
+    html = render_template('pdf_kids.html', kids=kids, title=title, filters=args, now=now)
+    try:
+        from weasyprint import HTML as WeasyHTML
+        pdf_bytes = WeasyHTML(string=html, base_url=BASE_DIR).write_pdf()
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=kids_search.pdf'
+        return response
+    except Exception:
+        return html
+
+
+@app.route('/admin/kids/excel')
+@admin_required
+def admin_kids_excel():
+    """Export kids search results as Excel."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    db = get_db()
+    args = request.args
+    edu_filter = args.get('education', '').strip()
+    school_filter = args.get('school', '').strip()
+    age_from = args.get('age_from', '')
+    age_to = args.get('age_to', '')
+    gender_filter = args.get('gender', '')
+
+    current_year = datetime.now().year
+    records = db.execute(
+        "SELECT id, first_name, father_name, last_name, province, phone, children_data "
+        "FROM records WHERE deleted_at IS NULL AND children_data IS NOT NULL AND children_data != '' AND children_data != '[]'"
+    ).fetchall()
+
+    kids = []
+    for rec in records:
+        try:
+            children = json.loads(rec['children_data'])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for child in children:
+            if not child.get('name'):
+                continue
+            child_age = None
+            if child.get('birth_year'):
+                try:
+                    child_age = current_year - int(child['birth_year'])
+                except (ValueError, TypeError):
+                    pass
+            elif child.get('age'):
+                try:
+                    child_age = int(child['age'])
+                except (ValueError, TypeError):
+                    pass
+            if edu_filter and edu_filter not in (child.get('education') or ''):
+                continue
+            if school_filter and school_filter.lower() not in (child.get('school') or child.get('university') or '').lower():
+                continue
+            if gender_filter and child.get('gender', '') != gender_filter:
+                continue
+            if age_from:
+                try:
+                    if child_age is None or child_age < int(age_from):
+                        continue
+                except ValueError:
+                    pass
+            if age_to:
+                try:
+                    if child_age is None or child_age > int(age_to):
+                        continue
+                except ValueError:
+                    pass
+            kids.append({
+                'name': child.get('name', ''),
+                'gender': 'ذكر' if child.get('gender') == 'male' else 'أنثى' if child.get('gender') == 'female' else '',
+                'age': child_age or '',
+                'education': child.get('education', ''),
+                'school': child.get('school') or child.get('university') or '',
+                'parent_name': ' '.join(filter(None, [rec['first_name'], rec['father_name'], rec['last_name']])),
+                'parent_phone': rec['phone'] or '',
+                'province': rec['province'] or '',
+            })
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'أطفال'
+    ws.sheet_view.rightToLeft = True
+
+    headers = ['#', 'اسم الطفل', 'الجنس', 'العمر', 'التحصيل العلمي', 'الدراسة الحالية', 'اسم ولي الأمر', 'الهاتف', 'المحافظة']
+    hfont = Font(bold=True, color='FFFFFF', size=11)
+    hfill = PatternFill(start_color='1565C0', end_color='1565C0', fill_type='solid')
+    thin_border = Border(
+        left=Side(style='thin', color='CCCCCC'),
+        right=Side(style='thin', color='CCCCCC'),
+        bottom=Side(style='thin', color='CCCCCC'),
+    )
+    for i, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=i, value=h)
+        cell.font = hfont
+        cell.fill = hfill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin_border
+
+    for idx, kid in enumerate(kids, 1):
+        ws.cell(row=idx+1, column=1, value=idx).border = thin_border
+        ws.cell(row=idx+1, column=2, value=kid['name']).border = thin_border
+        ws.cell(row=idx+1, column=3, value=kid['gender']).border = thin_border
+        ws.cell(row=idx+1, column=4, value=kid['age']).border = thin_border
+        ws.cell(row=idx+1, column=5, value=kid['education']).border = thin_border
+        ws.cell(row=idx+1, column=6, value=kid['school']).border = thin_border
+        ws.cell(row=idx+1, column=7, value=kid['parent_name']).border = thin_border
+        ws.cell(row=idx+1, column=8, value=kid['parent_phone']).border = thin_border
+        ws.cell(row=idx+1, column=9, value=kid['province']).border = thin_border
+
+    widths = [5, 20, 8, 8, 18, 22, 25, 16, 14]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True,
+                     download_name='kids_search.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+# ---------------------------------------------------------------------------
 # Custom lists
 # ---------------------------------------------------------------------------
 @app.route('/admin/lists')
@@ -5436,6 +5728,69 @@ def admin_create_list():
     db.commit()
     flash(f'تم إنشاء القائمة: {name}', 'success')
     return redirect(url_for('admin_custom_lists'))
+
+
+@app.route('/admin/lists/merge', methods=['POST'])
+@admin_required
+def admin_merge_lists():
+    """Merge two custom lists into a new one."""
+    list_a = int(request.form.get('list_a', 0) or 0)
+    list_b = int(request.form.get('list_b', 0) or 0)
+    merged_name = request.form.get('merged_name', '').strip()
+
+    if not list_a or not list_b:
+        flash('يرجى اختيار قائمتين', 'error')
+        return redirect(url_for('admin_custom_lists'))
+    if list_a == list_b:
+        flash('لا يمكن دمج قائمة مع نفسها', 'error')
+        return redirect(url_for('admin_custom_lists'))
+    if not merged_name:
+        flash('يرجى إدخال اسم للقائمة الجديدة', 'error')
+        return redirect(url_for('admin_custom_lists'))
+
+    db = get_db()
+    la = db.execute("SELECT * FROM custom_lists WHERE id=?", (list_a,)).fetchone()
+    lb = db.execute("SELECT * FROM custom_lists WHERE id=?", (list_b,)).fetchone()
+    if not la or not lb:
+        flash('إحدى القائمتين غير موجودة', 'error')
+        return redirect(url_for('admin_custom_lists'))
+
+    # Create new merged list
+    desc = f'دمج: {la["name"]} + {lb["name"]}'
+    db.execute("INSERT INTO custom_lists (name, description) VALUES (?, ?)", (merged_name, desc))
+    new_lid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    # Copy record items from both lists (avoid duplicates)
+    items_a = db.execute("SELECT record_id FROM custom_list_items WHERE list_id=?", (list_a,)).fetchall()
+    items_b = db.execute("SELECT record_id FROM custom_list_items WHERE list_id=?", (list_b,)).fetchall()
+    seen_records = set()
+    inserted = 0
+    for item in items_a + items_b:
+        rid = item['record_id']
+        if rid not in seen_records:
+            seen_records.add(rid)
+            db.execute("INSERT INTO custom_list_items (list_id, record_id) VALUES (?, ?)", (new_lid, rid))
+            inserted += 1
+
+    # Copy manual items from both lists (avoid duplicates by full_name)
+    manual_a = db.execute("SELECT * FROM custom_list_manual_items WHERE list_id=?", (list_a,)).fetchall()
+    manual_b = db.execute("SELECT * FROM custom_list_manual_items WHERE list_id=?", (list_b,)).fetchall()
+    seen_manual = set()
+    for item in manual_a + manual_b:
+        key = (item['full_name'] or '').strip()
+        if key and key not in seen_manual:
+            seen_manual.add(key)
+            db.execute("""INSERT INTO custom_list_manual_items
+                (list_id, full_name, phone, father_name, national_id, province, address, notes)
+                VALUES (?,?,?,?,?,?,?,?)""",
+                (new_lid, item['full_name'], item['phone'] or '', item['father_name'] or '',
+                 item['national_id'] or '', item['province'] or '', item['address'] or '', item['notes'] or ''))
+
+    db.commit()
+    total = inserted + len(seen_manual)
+    log_audit('list_merge', 'custom_list', new_lid, f'Merged lists {list_a}+{list_b} -> {total} items')
+    flash(f'تم دمج القائمتين في "{merged_name}" ({total} سجل)', 'success')
+    return redirect(url_for('admin_custom_list_detail', lid=new_lid))
 
 
 @app.route('/admin/list/<int:lid>')

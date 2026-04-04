@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}بحث الأطفال - حقنا{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.4rem; color: var(--primary-dark);">
+        بحث الأطفال
+        <span style="font-size: 0.95rem; color: var(--text-light);">({{ kids|length }} طفل)</span>
+    </h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline btn-sm">لوحة التحكم</a>
+</div>
+
+<!-- Filters -->
+<div class="card" style="padding: 1rem; margin-bottom: 1rem;">
+    <form method="GET" action="{{ url_for('admin_kids_search') }}" style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: end;">
+        <div class="form-group" style="margin-bottom:0; min-width: 150px;">
+            <label style="font-size: 0.82rem;">التحصيل العلمي</label>
+            <select name="education" style="width:100%;">
+                <option value="">-- الكل --</option>
+                {% for edu in edu_levels %}
+                <option value="{{ edu }}" {{ 'selected' if filters.education == edu }}>{{ edu }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width: 150px;">
+            <label style="font-size: 0.82rem;">الدراسة الحالية</label>
+            <input type="text" name="school" value="{{ filters.school }}" placeholder="بحث..." style="width:100%;">
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width: 100px;">
+            <label style="font-size: 0.82rem;">الجنس</label>
+            <select name="gender" style="width:100%;">
+                <option value="">الكل</option>
+                <option value="male" {{ 'selected' if filters.gender == 'male' }}>ذكر</option>
+                <option value="female" {{ 'selected' if filters.gender == 'female' }}>أنثى</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width: 80px;">
+            <label style="font-size: 0.82rem;">العمر من</label>
+            <input type="number" name="age_from" value="{{ filters.age_from }}" min="0" max="99" style="width:100%;">
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width: 80px;">
+            <label style="font-size: 0.82rem;">إلى</label>
+            <input type="number" name="age_to" value="{{ filters.age_to }}" min="0" max="99" style="width:100%;">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">بحث</button>
+        <a href="{{ url_for('admin_kids_search') }}" class="btn btn-outline btn-sm">مسح</a>
+    </form>
+</div>
+
+<!-- Export buttons -->
+{% if kids %}
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+    <a href="{{ url_for('admin_kids_pdf', **filters) }}" target="_blank" class="btn btn-outline btn-sm" style="color:#e53e3e;border-color:#e53e3e;">PDF طباعة</a>
+    <a href="{{ url_for('admin_kids_excel', **filters) }}" class="btn btn-outline btn-sm" style="color:#16a34a;border-color:#16a34a;">Excel تصدير</a>
+</div>
+{% endif %}
+
+<!-- Results Table -->
+{% if kids %}
+<div class="card" style="padding: 0.5rem;">
+    <div class="table-wrapper">
+        <table style="font-size: 0.88rem; width: 100%;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>اسم الطفل</th>
+                    <th>الجنس</th>
+                    <th>العمر</th>
+                    <th>التحصيل العلمي</th>
+                    <th>الدراسة الحالية</th>
+                    <th>اسم ولي الأمر</th>
+                    <th>الهاتف</th>
+                    <th>المحافظة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for kid in kids %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td style="font-weight: 600;">{{ kid.name }}</td>
+                    <td>{{ 'ذكر' if kid.gender == 'male' else 'أنثى' if kid.gender == 'female' else '-' }}</td>
+                    <td>{{ kid.age or '-' }}</td>
+                    <td>
+                        {% if kid.education %}
+                        <span style="background:#e0f2fe;color:#0369a1;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.8rem;">{{ kid.education }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ kid.school or '-' }}</td>
+                    <td><a href="{{ url_for('admin_record_detail', record_id=kid.parent_id) }}" style="color:var(--primary);">{{ kid.parent_name }}</a></td>
+                    <td style="direction:ltr;text-align:right;">{{ kid.parent_phone or '-' }}</td>
+                    <td>{{ kid.parent_province or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% elif filters.education or filters.school or filters.age_from or filters.age_to or filters.gender %}
+<div class="card" style="padding: 2rem; text-align: center; color: var(--text-light);">
+    لم يتم العثور على أطفال مطابقين للبحث
+</div>
+{% else %}
+<div class="card" style="padding: 2rem; text-align: center; color: var(--text-light);">
+    استخدم الفلاتر أعلاه للبحث عن الأطفال حسب المستوى الدراسي أو العمر
+</div>
+{% endif %}
+{% endblock %}

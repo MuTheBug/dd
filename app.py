@@ -133,7 +133,8 @@ def enforce_role_permissions():
 
     if role == 'data_entry':
         # data_entry can ONLY access the entry form and submit
-        allowed = common_allowed + ('entry_form', 'entry_submit', 'admin_dashboard')
+        allowed = common_allowed + ('entry_form', 'entry_submit', 'admin_dashboard',
+                                     'api_draft_save', 'api_draft_load', 'api_draft_clear')
         if endpoint not in allowed:
             flash('صلاحيتك محدودة بصفحة إدخال البيانات فقط', 'error')
             return redirect(url_for('entry_form'))
@@ -1090,6 +1091,15 @@ def migrate_db():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_drafts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            draft_data TEXT DEFAULT '{}',
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
+
     # -- Add user_id column to audit_log for Berkeley Protocol chain of custody --
     cursor.execute("PRAGMA table_info(audit_log)")
     audit_existing = {row[1] for row in cursor.fetchall()}
@@ -1490,6 +1500,53 @@ def entry_form():
         "SELECT DISTINCT full_name FROM (SELECT full_name FROM volunteers WHERE status='active' UNION SELECT full_name FROM members WHERE status='active') ORDER BY full_name"
     ).fetchall()
     return render_template('entry.html', volunteer_names=[v['full_name'] for v in volunteer_names])
+
+
+@app.route('/api/draft/save', methods=['POST'])
+def api_draft_save():
+    """Save form draft to server (survives IP changes)."""
+    if not session.get('is_admin'):
+        return jsonify({'success': False}), 401
+    username = session.get('username', '')
+    if not username:
+        return jsonify({'success': False}), 401
+    draft_data = request.get_json(silent=True) or {}
+    db = get_db()
+    db.execute("""INSERT INTO user_drafts (username, draft_data, updated_at)
+        VALUES (?, ?, datetime('now','localtime'))
+        ON CONFLICT(username) DO UPDATE SET draft_data=excluded.draft_data, updated_at=excluded.updated_at""",
+        (username, json.dumps(draft_data, ensure_ascii=False)))
+    db.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/draft/load')
+def api_draft_load():
+    """Load saved draft from server."""
+    if not session.get('is_admin'):
+        return jsonify({'success': False}), 401
+    username = session.get('username', '')
+    if not username:
+        return jsonify({'success': False}), 401
+    db = get_db()
+    row = db.execute("SELECT draft_data, updated_at FROM user_drafts WHERE username=?", (username,)).fetchone()
+    if row and row['draft_data']:
+        return jsonify({'success': True, 'draft': json.loads(row['draft_data']), 'updated_at': row['updated_at']})
+    return jsonify({'success': False, 'draft': None})
+
+
+@app.route('/api/draft/clear', methods=['POST'])
+def api_draft_clear():
+    """Clear saved draft from server."""
+    if not session.get('is_admin'):
+        return jsonify({'success': False}), 401
+    username = session.get('username', '')
+    if not username:
+        return jsonify({'success': False}), 401
+    db = get_db()
+    db.execute("DELETE FROM user_drafts WHERE username=?", (username,))
+    db.commit()
+    return jsonify({'success': True})
 
 
 REQUIRED_ENTRY_FIELDS = {

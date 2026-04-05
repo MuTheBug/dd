@@ -1356,9 +1356,38 @@ function submitForm() {
                     currentStep = 1;
                     updateStepUI();
                     clearDraft();
+                } else if (resp.duplicate) {
+                    resultMsg.className = 'result-msg error';
+                    resultMsg.textContent = resp.message || 'يوجد سجل مشابه.';
+                    // Show force-submit button
+                    var forceBtn = document.createElement('button');
+                    forceBtn.type = 'button';
+                    forceBtn.textContent = 'حفظ رغم التكرار';
+                    forceBtn.style.cssText = 'margin-top:10px;padding:8px 20px;background:#e67e22;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:15px;';
+                    forceBtn.onclick = function() {
+                        var fd = new FormData(document.getElementById('entryForm'));
+                        fd.set('force', 'true');
+                        isSubmitting = false;
+                        var overlay2 = document.getElementById('submitOverlay');
+                        overlay2.classList.add('active');
+                        isSubmitting = true;
+                        doSend(fd);
+                    };
+                    resultMsg.appendChild(document.createElement('br'));
+                    resultMsg.appendChild(forceBtn);
                 } else {
                     resultMsg.className = 'result-msg error';
-                    resultMsg.textContent = resp.error || '\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.';
+                    // Server sends errors as array in resp.errors
+                    var errText = '';
+                    if (resp.errors && resp.errors.length) {
+                        errText = resp.errors.join('\n');
+                    } else {
+                        errText = resp.error || resp.message || '\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.';
+                    }
+                    resultMsg.textContent = errText;
+                    if (resp.warnings && resp.warnings.length) {
+                        resultMsg.textContent += '\n\u062a\u0646\u0628\u064a\u0647\u0627\u062a: ' + resp.warnings.join('، ');
+                    }
                 }
             } catch(e) {
                 // If not JSON, it was a redirect (regular form submit success)
@@ -1422,7 +1451,7 @@ function submitForm() {
     });
 
     function doSend(fd) {
-        xhr.open('POST', document.getElementById('entryForm').action, true);
+        xhr.open('POST', '/entry/submit', true);
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         xhr.timeout = 300000; // 5 minute timeout for large uploads
         xhr.send(fd);
@@ -1435,23 +1464,53 @@ var draftKey = 'haqquna_entry_draft';
 var draftFilesKey = 'haqquna_entry_draft_files';
 var MAX_FILE_CACHE_MB = 10; // Max size per file to cache in localStorage
 
+function getDraftData() {
+    var form = document.getElementById('entryForm');
+    var data = {};
+    var inputs = form.querySelectorAll('input:not([type=file]), select, textarea');
+    for (var i = 0; i < inputs.length; i++) {
+        var el = inputs[i];
+        if (el.name) {
+            if (el.type === 'checkbox') data[el.name] = el.checked;
+            else data[el.name] = el.value;
+        }
+    }
+    data._step = currentStep;
+    return data;
+}
+
 function saveDraft() {
     try {
-        var form = document.getElementById('entryForm');
-        var data = {};
-        var inputs = form.querySelectorAll('input:not([type=file]), select, textarea');
-        for (var i = 0; i < inputs.length; i++) {
-            var el = inputs[i];
-            if (el.name) {
-                if (el.type === 'checkbox') data[el.name] = el.checked;
-                else data[el.name] = el.value;
-            }
-        }
-        data._step = currentStep;
+        var data = getDraftData();
         localStorage.setItem(draftKey, JSON.stringify(data));
         var indicator = document.getElementById('draftIndicator');
         indicator.classList.add('show');
         setTimeout(function() { indicator.classList.remove('show'); }, 2000);
+    } catch(e) {}
+}
+
+// Save draft to server (survives IP/network changes)
+var _serverDraftTimer = null;
+function saveDraftToServer() {
+    try {
+        var data = getDraftData();
+        // Check if form has meaningful data
+        if (!data.first_name && !data.last_name) return;
+        var xhr2 = new XMLHttpRequest();
+        xhr2.open('POST', '/api/draft/save', true);
+        xhr2.setRequestHeader('Content-Type', 'application/json');
+        xhr2.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr2.send(JSON.stringify(data));
+    } catch(e) {}
+}
+
+function clearServerDraft() {
+    try {
+        var xhr2 = new XMLHttpRequest();
+        xhr2.open('POST', '/api/draft/clear', true);
+        xhr2.setRequestHeader('Content-Type', 'application/json');
+        xhr2.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr2.send('{}');
     } catch(e) {}
 }
 
@@ -1530,74 +1589,107 @@ function restoreFiles() {
     } catch(e) { return false; }
 }
 
+function applyDraftData(data) {
+    var form = document.getElementById('entryForm');
+    var restored = false;
+
+    // Phase 1: Restore simple fields first (but skip dependent selects)
+    var deferredSelects = ['case_type', 'digital_evidence_type'];
+    for (var key in data) {
+        if (key === '_step' || deferredSelects.indexOf(key) !== -1) continue;
+        var el = form.querySelector('[name="' + key + '"]');
+        if (el) {
+            if (el.type === 'checkbox') el.checked = data[key];
+            else { el.value = data[key]; restored = true; }
+        }
+    }
+
+    // Phase 2: Fire change handlers to rebuild dependent options
+    if (data.status) handleStatusChange();
+    if (data.marital) handleMarital();
+    if (typeof handleDigitalEvidence === 'function' && data.digital_evidence_type) {
+        var deTypeEl = document.getElementById('digitalEvidenceType');
+        if (deTypeEl) deTypeEl.value = data.digital_evidence_type;
+        handleDigitalEvidence();
+    }
+
+    // Phase 3: Now restore dependent select values (options are now populated)
+    for (var j = 0; j < deferredSelects.length; j++) {
+        var dKey = deferredSelects[j];
+        if (data[dKey]) {
+            var dEl = form.querySelector('[name="' + dKey + '"]');
+            if (dEl) dEl.value = data[dKey];
+        }
+    }
+
+    // Phase 4: Restore step
+    if (data._step) { currentStep = data._step; updateStepUI(); }
+
+    return restored;
+}
+
 function loadDraft() {
     try {
+        // Try localStorage first
         var saved = localStorage.getItem(draftKey);
-        if (!saved) return;
-        var data = JSON.parse(saved);
-        var form = document.getElementById('entryForm');
-        var restored = false;
-
-        // Phase 1: Restore simple fields first (but skip dependent selects)
-        var deferredSelects = ['case_type', 'digital_evidence_type'];
-        for (var key in data) {
-            if (key === '_step' || deferredSelects.indexOf(key) !== -1) continue;
-            var el = form.querySelector('[name="' + key + '"]');
-            if (el) {
-                if (el.type === 'checkbox') el.checked = data[key];
-                else { el.value = data[key]; restored = true; }
+        if (saved) {
+            var data = JSON.parse(saved);
+            var restored = applyDraftData(data);
+            var filesRestored = restoreFiles();
+            if (restored) {
+                var resultMsg = document.getElementById('resultMsg');
+                if (resultMsg) {
+                    resultMsg.className = 'result-msg';
+                    resultMsg.style.display = 'block';
+                    resultMsg.style.background = '#fff3cd';
+                    resultMsg.style.color = '#856404';
+                    resultMsg.style.border = '1px solid #ffc107';
+                    resultMsg.textContent = filesRestored
+                        ? 'تم استعادة المسودة والملفات المرفقة.'
+                        : 'تم استعادة المسودة السابقة. يرجى إعادة إرفاق الصور والملفات إن وجدت.';
+                }
             }
+            return;
         }
 
-        // Phase 2: Fire change handlers to rebuild dependent options
-        if (data.status) handleStatusChange();
-        if (data.marital) handleMarital();
-        if (typeof handleDigitalEvidence === 'function' && data.digital_evidence_type) {
-            // Set the type first, then fire handler
-            var deTypeEl = document.getElementById('digitalEvidenceType');
-            if (deTypeEl) deTypeEl.value = data.digital_evidence_type;
-            handleDigitalEvidence();
-        }
-
-        // Phase 3: Now restore dependent select values (options are now populated)
-        for (var j = 0; j < deferredSelects.length; j++) {
-            var dKey = deferredSelects[j];
-            if (data[dKey]) {
-                var dEl = form.querySelector('[name="' + dKey + '"]');
-                if (dEl) dEl.value = data[dKey];
+        // No local draft — check server (handles IP change scenario)
+        var xhr3 = new XMLHttpRequest();
+        xhr3.open('GET', '/api/draft/load', true);
+        xhr3.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr3.onload = function() {
+            if (xhr3.status === 200) {
+                try {
+                    var resp = JSON.parse(xhr3.responseText);
+                    if (resp.success && resp.draft) {
+                        var restored = applyDraftData(resp.draft);
+                        if (restored) {
+                            var resultMsg = document.getElementById('resultMsg');
+                            if (resultMsg) {
+                                resultMsg.className = 'result-msg';
+                                resultMsg.style.display = 'block';
+                                resultMsg.style.background = '#d4edda';
+                                resultMsg.style.color = '#155724';
+                                resultMsg.style.border = '1px solid #28a745';
+                                resultMsg.textContent = 'تم استعادة المسودة من الخادم (آخر حفظ: ' + (resp.updated_at || '') + '). يرجى إعادة إرفاق الملفات.';
+                            }
+                        }
+                    }
+                } catch(e) {}
             }
-        }
-
-        // Phase 4: Restore step
-        if (data._step) { currentStep = data._step; updateStepUI(); }
-
-        // Phase 5: Restore cached files
-        var filesRestored = restoreFiles();
-
-        // Show reminder message
-        if (restored) {
-            var resultMsg = document.getElementById('resultMsg');
-            if (resultMsg) {
-                resultMsg.className = 'result-msg';
-                resultMsg.style.display = 'block';
-                resultMsg.style.background = '#fff3cd';
-                resultMsg.style.color = '#856404';
-                resultMsg.style.border = '1px solid #ffc107';
-                resultMsg.textContent = filesRestored
-                    ? '\u062a\u0645 \u0627\u0633\u062a\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u0633\u0648\u062f\u0629 \u0648\u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0631\u0641\u0642\u0629.'
-                    : '\u062a\u0645 \u0627\u0633\u062a\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u0633\u0648\u062f\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629. \u064a\u0631\u062c\u0649 \u0625\u0639\u0627\u062f\u0629 \u0625\u0631\u0641\u0627\u0642 \u0627\u0644\u0635\u0648\u0631 \u0648\u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0625\u0646 \u0648\u062c\u062f\u062a.';
-            }
-        }
+        };
+        xhr3.send();
     } catch(e) {}
 }
 
 function clearDraft() {
     try { localStorage.removeItem(draftKey); } catch(e) {}
     try { localStorage.removeItem(draftFilesKey); } catch(e) {}
+    clearServerDraft();
 }
 
-// Auto-save every 30 seconds
+// Auto-save every 30 seconds to localStorage + every 60 seconds to server
 setInterval(saveDraft, 30000);
+setInterval(saveDraftToServer, 60000);
 
 // === Methodology Tags ===
 document.getElementById('methodologyTags').addEventListener('click', function(e) {

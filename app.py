@@ -97,6 +97,7 @@ def csrf_protect():
         elif request.is_json:
             pass
         elif not validate_csrf_token():
+            print(f"   🔒 CSRF REJECTED: {request.method} {request.path} (endpoint: {request.endpoint})")
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 from flask import abort
                 abort(403)
@@ -1618,15 +1619,31 @@ def entry_submit():
     form = request.form
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     force = form.get('force', '') == 'true'
+    submitter = session.get('username', 'unknown')
+
+    print(f"\n{'='*60}")
+    print(f"📝 NEW ENTRY SUBMISSION from user: {submitter}")
+    print(f"   Name: {form.get('first_name', '')} {form.get('father_name', '')} {form.get('last_name', '')}")
+    print(f"   Status: {form.get('status', '')} | Province: {form.get('province', '')}")
+    print(f"   AJAX: {is_ajax} | Force: {force}")
+    print(f"{'='*60}")
 
     # Validate
     errors, warnings = _validate_entry(form)
     if errors and not force:
+        print(f"   ❌ VALIDATION FAILED: {errors}")
+        if warnings:
+            print(f"   ⚠️  Warnings: {warnings}")
         if is_ajax:
             return jsonify({'success': False, 'errors': errors, 'warnings': warnings})
         for e in errors:
             flash(e, 'error')
         return redirect(url_for('entry_form'))
+
+    if warnings:
+        print(f"   ⚠️  Warnings (non-blocking): {warnings}")
+
+    print(f"   ✅ Validation passed")
 
     # Duplicate detection
     if not force:
@@ -1643,6 +1660,7 @@ def entry_submit():
         if dup:
             dup_name = ' '.join(filter(None, [dup['first_name'], dup['father_name'], dup['last_name']]))
             msg = f'يوجد سجل مشابه: {dup_name} (#{dup["id"]}). أضف force=true للحفظ رغم ذلك.'
+            print(f"   ⚠️  DUPLICATE DETECTED: {dup_name} (#{dup['id']})")
             if is_ajax:
                 return jsonify({'success': False, 'duplicate': True, 'existing_id': dup['id'], 'message': msg, 'warnings': warnings})
             flash(msg, 'error')
@@ -1703,7 +1721,9 @@ def entry_submit():
     # Determine record_slug
     slug = f"{form.get('first_name', '')}-{form.get('last_name', '')}-{int(time.time())}".replace(' ', '-')
 
-    db.execute("""INSERT INTO records (
+    print(f"   📥 Inserting record into database...")
+    try:
+        db.execute("""INSERT INTO records (
         first_name, father_name, last_name, gender, mother_name,
         birth_day, birth_month, birth_year, province, national_id, family_book_number,
         phone, blood_type, photo_path, document_path,
@@ -1816,20 +1836,37 @@ def entry_submit():
         cv_path, form.get('survivor_cv_text', ''), cv_photo_path,
         form.get('address_area', ''), screenshot_hash
     ))
+        print(f"   ✅ INSERT executed successfully")  # noqa: E131
+    except Exception as e:
+        print(f"   ❌ INSERT FAILED: {type(e).__name__}: {e}")
+        if is_ajax:
+            return jsonify({'success': False, 'errors': [f'خطأ في قاعدة البيانات: {e}']})
+        flash(f'خطأ في قاعدة البيانات: {e}', 'error')
+        return redirect(url_for('entry_form'))
 
     # Use retry logic for concurrent access
-    for attempt in range(3):
-        try:
-            db.commit()
-            break
-        except sqlite3.OperationalError as e:
-            if 'locked' in str(e) and attempt < 2:
-                time.sleep(0.5 * (attempt + 1))
-                continue
-            raise
+    try:
+        for attempt in range(3):
+            try:
+                db.commit()
+                print(f"   ✅ COMMIT successful (attempt {attempt + 1})")
+                break
+            except sqlite3.OperationalError as e:
+                if 'locked' in str(e) and attempt < 2:
+                    print(f"   ⏳ DB locked, retrying... (attempt {attempt + 1})")
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                raise
+    except Exception as e:
+        print(f"   ❌ COMMIT FAILED: {type(e).__name__}: {e}")
+        if is_ajax:
+            return jsonify({'success': False, 'errors': [f'خطأ في حفظ البيانات: {e}']})
+        flash(f'خطأ في حفظ البيانات: {e}', 'error')
+        return redirect(url_for('entry_form'))
 
     # Save additional documents to record_documents table
     new_record_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    print(f"   📋 New record ID: #{new_record_id}")
     doc_count = int(form.get('record_doc_count', 0) or 0)
     for i in range(doc_count):
         file_key = f'record_doc_file_{i}'
@@ -1870,8 +1907,14 @@ def entry_submit():
     resp_msg = 'تم حفظ السجل بنجاح. شكراً لمساهمتك في التوثيق.'
     if warnings:
         resp_msg += ' (تنبيهات: ' + '، '.join(warnings) + ')'
+
+    print(f"   🎉 RECORD SAVED SUCCESSFULLY: #{new_record_id}")
+    print(f"   Name: {form.get('first_name', '')} {form.get('father_name', '')} {form.get('last_name', '')}")
+    print(f"   Documents: {doc_count} | Companions: {comp_count}")
+    print(f"{'='*60}\n")
+
     if is_ajax:
-        return jsonify({'success': True, 'message': resp_msg, 'warnings': warnings})
+        return jsonify({'success': True, 'message': resp_msg, 'warnings': warnings, 'record_id': new_record_id})
 
     flash(resp_msg, 'success')
     return redirect(url_for('entry_form'))

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}الإشعارات - حقنا{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>إدارة الإشعارات</h2>
+
+    <!-- Send Notification -->
+    <div class="card" style="margin-bottom:1.5rem; padding:1rem;">
+        <h3 style="margin-bottom:0.8rem;">إرسال إشعار جديد</h3>
+        <form method="post" action="{{ url_for('admin_notification_send') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <div style="margin-bottom:0.7rem;">
+                <label style="font-size:0.85rem;font-weight:600;">نص الرسالة</label>
+                <textarea name="message" rows="3" required
+                    style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;font-size:0.95rem;resize:vertical;"
+                    placeholder="اكتب رسالة الإشعار هنا..."></textarea>
+            </div>
+            <div style="margin-bottom:0.7rem;">
+                <label style="font-size:0.85rem;font-weight:600;">إرسال إلى</label>
+                <select name="target" style="padding:0.4rem;border:1px solid var(--border);border-radius:6px;width:100%;" id="notifTarget">
+                    <option value="*">جميع المستخدمين المتصلين</option>
+                    {% for u in users %}
+                    <option value="{{ u.username }}">{{ u.display_name or u.username }} ({{ u.role }})</option>
+                    {% endfor %}
+                </select>
+                <div style="font-size:0.8rem;color:var(--text-light);margin-top:0.2rem;">يمكن اختيار مستخدم محدد أو إرسال للكل</div>
+            </div>
+            <button type="submit" class="btn btn-primary">إرسال الإشعار</button>
+        </form>
+    </div>
+
+    <!-- Notifications History -->
+    <div class="card" style="padding:1rem;">
+        <h3 style="margin-bottom:0.8rem;">سجل الإشعارات</h3>
+        {% if notifications %}
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>الرسالة</th>
+                        <th>المرسل</th>
+                        <th>الهدف</th>
+                        <th>التاريخ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for n in notifications %}
+                    <tr>
+                        <td style="max-width:300px;word-wrap:break-word;">{{ n.message }}</td>
+                        <td>{{ n.sender }}</td>
+                        <td>{{ 'الكل' if n.target_users == '*' else n.target_users }}</td>
+                        <td style="font-size:0.85rem;white-space:nowrap;">{{ n.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>لا توجد إشعارات مرسلة بعد.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

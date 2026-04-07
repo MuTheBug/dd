@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}التعديلات المعلقة - حقنا{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>مراجعة التعديلات المقترحة</h2>
+
+    {% if pending %}
+    {% for edit in pending %}
+    {% set data = edit.edit_data | tojson | safe %}
+    <div class="card" style="margin-bottom:1rem;padding:1rem;{% if edit.status == 'approved' %}border-right:4px solid #059669;{% elif edit.status == 'rejected' %}border-right:4px solid #dc2626;{% else %}border-right:4px solid #f59e0b;{% endif %}">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+            <div>
+                <strong>سجل #{{ edit.record_id }}:</strong>
+                {{ edit.first_name }} {{ edit.father_name }} {{ edit.last_name }}
+                <span style="font-size:0.8rem;color:var(--text-light);margin-right:0.5rem;">بواسطة: {{ edit.submitted_by }} | {{ edit.created_at }}</span>
+            </div>
+            <div>
+                {% if edit.status == 'pending' %}
+                <span style="background:#fef3c7;color:#92400e;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.8rem;">بانتظار المراجعة</span>
+                {% elif edit.status == 'approved' %}
+                <span style="background:#d1fae5;color:#065f46;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.8rem;">مقبول - {{ edit.reviewed_by }}</span>
+                {% elif edit.status == 'rejected' %}
+                <span style="background:#fee2e2;color:#991b1b;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.8rem;">مرفوض - {{ edit.reviewed_by }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Show field changes -->
+        {% set changes = edit.edit_data | from_json if edit.edit_data else {} %}
+        <table style="width:100%;font-size:0.88rem;border-collapse:collapse;margin-bottom:0.5rem;">
+            <thead>
+                <tr style="background:#f8f9fa;"><th style="padding:0.3rem 0.5rem;text-align:right;">الحقل</th><th style="padding:0.3rem 0.5rem;text-align:right;">القيمة الحالية</th><th style="padding:0.3rem 0.5rem;text-align:right;">القيمة الجديدة</th></tr>
+            </thead>
+            <tbody>
+                {% for field, change in changes.items() %}
+                <tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:0.3rem 0.5rem;font-weight:600;">{{ field }}</td>
+                    <td style="padding:0.3rem 0.5rem;color:#dc2626;text-decoration:line-through;">{{ change.old or '-' }}</td>
+                    <td style="padding:0.3rem 0.5rem;color:#059669;font-weight:600;">{{ change.new }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if edit.status == 'pending' %}
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <form method="POST" action="{{ url_for('admin_approve_edit', edit_id=edit.id) }}" style="display:inline;">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('تأكيد الموافقة وتطبيق التعديلات؟')">موافقة وتطبيق</button>
+            </form>
+            <form method="POST" action="{{ url_for('admin_reject_edit', edit_id=edit.id) }}" style="display:inline;">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="reason" value="">
+                <button type="submit" class="btn btn-danger btn-sm" onclick="var r=prompt('سبب الرفض (اختياري):');if(r!==null)this.form.querySelector('[name=reason]').value=r;else return false;">رفض</button>
+            </form>
+            <a href="{{ url_for('admin_record_detail', record_id=edit.record_id) }}" class="btn btn-outline btn-sm" target="_blank">عرض السجل</a>
+        </div>
+        {% elif edit.notes %}
+        <div style="font-size:0.85rem;color:var(--text-light);">سبب الرفض: {{ edit.notes }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state"><p>لا توجد تعديلات معلقة حالياً.</p></div>
+    {% endif %}
+</div>
+
+{% block extra_js %}
+<script>
+// Register fromjson filter workaround
+</script>
+{% endblock %}
+{% endblock %}

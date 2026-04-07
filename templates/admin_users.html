@@ -71,6 +71,12 @@
                             <input type="hidden" name="new_password" value="">
                             <button type="submit" class="btn btn-sm btn-outline">تغيير كلمة المرور</button>
                         </form>
+                        {% if u.username != session.get('username') %}
+                        <form method="post" action="{{ url_for('admin_user_delete', user_id=u.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف المستخدم {{ u.username }}؟ هذا الإجراء لا يمكن التراجع عنه.');">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;">حذف</button>
+                        </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

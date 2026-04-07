@@ -58,6 +58,7 @@
                 {% if role == 'data_entry' %}
                 {# data_entry: entry form only #}
                 <a href="{{ url_for('entry_form') }}">إدخال بيانات</a>
+                <span class="notif-bell" id="notifBell" title="الإشعارات" onclick="toggleNotifPanel()" style="cursor:pointer;position:relative;font-size:1.2rem;">&#x1F514;<span id="notifBadge" style="display:none;position:absolute;top:-5px;right:-8px;background:#dc2626;color:#fff;border-radius:50%;font-size:0.6rem;width:16px;height:16px;text-align:center;line-height:16px;"></span></span>
                 <span style="background:#f59e0b;color:#fff;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;">{{ display_name or 'مُدخِل بيانات' }}</span>
                 <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
 
@@ -65,6 +66,7 @@
                 {# viewer: dashboard + records (read-only) #}
                 <a href="{{ url_for('admin_dashboard') }}">لوحة التحكم</a>
                 <a href="{{ url_for('admin_records') }}">السجلات</a>
+                <span class="notif-bell" id="notifBell" title="الإشعارات" onclick="toggleNotifPanel()" style="cursor:pointer;position:relative;font-size:1.2rem;">&#x1F514;<span id="notifBadge" style="display:none;position:absolute;top:-5px;right:-8px;background:#dc2626;color:#fff;border-radius:50%;font-size:0.6rem;width:16px;height:16px;text-align:center;line-height:16px;"></span></span>
                 <span style="background:#6366f1;color:#fff;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;">{{ display_name or 'مشاهد' }}</span>
                 <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
 
@@ -87,7 +89,10 @@
                 <a href="{{ url_for('admin_trash') }}">سلة المحذوفات</a>
                 <a href="{{ url_for('admin_audit_log') }}">سجل العمليات</a>
                 <a href="{{ url_for('admin_users') }}">المستخدمون</a>
+                <a href="{{ url_for('admin_notifications') }}">الإشعارات</a>
+                <a href="{{ url_for('admin_pending_edits') }}">تعديلات معلقة</a>
                 <a href="{{ url_for('admin_change_password') }}">كلمة المرور</a>
+                <span class="notif-bell" id="notifBell" title="الإشعارات" onclick="toggleNotifPanel()" style="cursor:pointer;position:relative;font-size:1.2rem;">&#x1F514;<span id="notifBadge" style="display:none;position:absolute;top:-5px;right:-8px;background:#dc2626;color:#fff;border-radius:50%;font-size:0.6rem;width:16px;height:16px;text-align:center;line-height:16px;"></span></span>
                 <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
                 {% endif %}
 
@@ -201,6 +206,99 @@
         }
     });
     </script>
+    {% if session.get('is_admin') %}
+    <!-- Notification popup panel -->
+    <div id="notifPanel" style="display:none;position:fixed;top:50px;left:50%;transform:translateX(-50%);width:90%;max-width:400px;background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.2);z-index:9999;max-height:400px;overflow-y:auto;direction:rtl;">
+        <div style="padding:0.8rem 1rem;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
+            <strong>الإشعارات</strong>
+            <button onclick="markAllRead()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:0.82rem;">تعليم الكل كمقروء</button>
+        </div>
+        <div id="notifList" style="padding:0.5rem;"></div>
+    </div>
+    <script>
+    var notifPanel = document.getElementById('notifPanel');
+    var notifBadge = document.getElementById('notifBadge');
+    var _notifIds = [];
+
+    function toggleNotifPanel() {
+        notifPanel.style.display = notifPanel.style.display === 'none' ? 'block' : 'none';
+        if (notifPanel.style.display === 'block') fetchNotifications();
+    }
+    document.addEventListener('click', function(e) {
+        if (notifPanel.style.display === 'block' && !notifPanel.contains(e.target) && !e.target.closest('#notifBell')) {
+            notifPanel.style.display = 'none';
+        }
+    });
+
+    function fetchNotifications() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/notifications/unread', true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                var resp = JSON.parse(xhr.responseText);
+                _notifIds = resp.notifications.map(function(n) { return n.id; });
+                if (resp.count > 0) {
+                    notifBadge.textContent = resp.count;
+                    notifBadge.style.display = 'block';
+                } else {
+                    notifBadge.style.display = 'none';
+                }
+                var html = '';
+                if (resp.notifications.length === 0) {
+                    html = '<div style="padding:1rem;text-align:center;color:#999;">لا توجد إشعارات جديدة</div>';
+                }
+                resp.notifications.forEach(function(n) {
+                    html += '<div style="padding:0.6rem 0.8rem;border-bottom:1px solid #f0f0f0;">'
+                          + '<div style="font-size:0.92rem;">' + n.message + '</div>'
+                          + '<div style="font-size:0.75rem;color:#999;margin-top:0.2rem;">من: ' + n.sender + ' | ' + n.time + '</div>'
+                          + '</div>';
+                });
+                document.getElementById('notifList').innerHTML = html;
+            }
+        };
+        xhr.send();
+    }
+
+    function markAllRead() {
+        if (!_notifIds.length) return;
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/notifications/mark-read', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.onload = function() {
+            notifBadge.style.display = 'none';
+            document.getElementById('notifList').innerHTML = '<div style="padding:1rem;text-align:center;color:#999;">لا توجد إشعارات جديدة</div>';
+        };
+        xhr.send(JSON.stringify({ids: _notifIds}));
+    }
+
+    // SSE real-time notifications
+    if (typeof EventSource !== 'undefined') {
+        var evtSource = new EventSource('/api/notifications/stream');
+        evtSource.onmessage = function(event) {
+            try {
+                var data = JSON.parse(event.data);
+                // Show toast notification
+                var toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1e3a5f;color:#fff;padding:0.8rem 1.5rem;border-radius:10px;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3);font-size:0.95rem;max-width:90%;text-align:center;animation:fadeIn 0.3s;';
+                toast.innerHTML = '<div>' + data.message + '</div><div style="font-size:0.75rem;opacity:0.7;margin-top:0.3rem;">من: ' + data.sender + '</div>';
+                document.body.appendChild(toast);
+                setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; setTimeout(function() { toast.remove(); }, 500); }, 5000);
+                // Update badge
+                fetchNotifications();
+            } catch(e) {}
+        };
+        evtSource.onerror = function() {
+            // Reconnect handled automatically by EventSource
+        };
+    }
+
+    // Initial check
+    fetchNotifications();
+    setInterval(fetchNotifications, 60000);
+    </script>
+    {% endif %}
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -132,24 +132,29 @@ def enforce_role_permissions():
     # Common allowed endpoints for all logged-in roles
     common_allowed = ('admin_login', 'admin_logout', 'static', 'uploaded_file')
 
+    # Common endpoints for all roles: notifications + edit suggestions
+    shared_endpoints = ('notification_stream', 'api_notifications_unread',
+                        'api_notifications_mark_read', 'suggest_record_edit')
+
     if role == 'data_entry':
-        # data_entry can ONLY access the entry form and submit
+        # data_entry can access entry form, submit, suggest edits, notifications
         allowed = common_allowed + ('entry_form', 'entry_submit', 'admin_dashboard',
-                                     'api_draft_save', 'api_draft_load', 'api_draft_clear')
+                                     'api_draft_save', 'api_draft_load', 'api_draft_clear') + shared_endpoints
         if endpoint not in allowed:
             flash('صلاحيتك محدودة بصفحة إدخال البيانات فقط', 'error')
             return redirect(url_for('entry_form'))
 
     elif role == 'viewer':
-        # Viewer: read-only (GET only) on dashboard, records, record detail, stats, PDF
+        # Viewer: read-only + suggest edits + notifications
+        viewer_write_allowed = common_allowed + shared_endpoints
         if request.method != 'GET':
-            if endpoint not in common_allowed:
+            if endpoint not in viewer_write_allowed:
                 flash('ليس لديك صلاحية لتنفيذ هذا الإجراء (مشاهد فقط)', 'error')
                 return redirect(request.referrer or url_for('admin_dashboard'))
         viewer_allowed = common_allowed + (
             'admin_dashboard', 'admin_dashboard_print', 'admin_records', 'admin_record_detail',
             'admin_record_pdf', 'api_stats', 'api_records_export',
-        )
+        ) + shared_endpoints
         if endpoint not in viewer_allowed:
             flash('صلاحيتك محدودة بمشاهدة السجلات فقط', 'error')
             return redirect(url_for('admin_dashboard'))
@@ -1098,6 +1103,32 @@ def migrate_db():
             username TEXT NOT NULL UNIQUE,
             draft_data TEXT DEFAULT '{}',
             updated_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT NOT NULL,
+            sender TEXT DEFAULT '',
+            target_users TEXT DEFAULT '*',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            is_read_by TEXT DEFAULT '[]'
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pending_edits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id INTEGER NOT NULL,
+            submitted_by TEXT NOT NULL,
+            edit_data TEXT NOT NULL DEFAULT '{}',
+            status TEXT NOT NULL DEFAULT 'pending',
+            reviewed_by TEXT DEFAULT '',
+            reviewed_at TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
         )
     """)
 
@@ -2082,6 +2113,289 @@ def admin_user_reset_password(user_id):
     log_audit('user_reset_password', 'user', user_id)
     flash('تم تغيير كلمة المرور', 'success')
     return redirect(url_for('admin_users'))
+
+
+@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@admin_required
+def admin_user_delete(user_id):
+    """Delete a user account (admin only)."""
+    if session.get('user_role', 'admin') != 'admin':
+        return jsonify({'error': 'غير مصرح'}), 403
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if not user:
+        flash('المستخدم غير موجود', 'error')
+        return redirect(url_for('admin_users'))
+    if user['username'] == session.get('username'):
+        flash('لا يمكنك حذف حسابك الخاص', 'error')
+        return redirect(url_for('admin_users'))
+    username = user['username']
+    db.execute("DELETE FROM users WHERE id=?", (user_id,))
+    db.execute("DELETE FROM user_drafts WHERE username=?", (username,))
+    db.commit()
+    log_audit('user_delete', 'user', user_id, f'Deleted user: {username}')
+    print(f"   🗑️ USER DELETED: {username} (ID: {user_id})")
+    flash(f'تم حذف المستخدم {username}', 'success')
+    return redirect(url_for('admin_users'))
+
+
+# ---------------------------------------------------------------------------
+# Notifications system (SSE-based real-time push)
+# ---------------------------------------------------------------------------
+_notification_subscribers = []  # list of queue.Queue objects for SSE
+
+@app.route('/admin/notifications')
+@admin_required
+def admin_notifications():
+    """Notifications management page (admin only)."""
+    if session.get('user_role', 'admin') != 'admin':
+        flash('فقط المدير يمكنه إدارة الإشعارات', 'error')
+        return redirect(url_for('admin_dashboard'))
+    db = get_db()
+    notifications = db.execute("SELECT * FROM notifications ORDER BY created_at DESC LIMIT 100").fetchall()
+    users = db.execute("SELECT username, display_name, role FROM users WHERE is_active=1 ORDER BY display_name").fetchall()
+    return render_template('admin_notifications.html', notifications=notifications, users=users)
+
+
+@app.route('/admin/notifications/send', methods=['POST'])
+@admin_required
+def admin_notification_send():
+    """Send a notification to all or specific users."""
+    if session.get('user_role', 'admin') != 'admin':
+        return jsonify({'error': 'غير مصرح'}), 403
+    message = request.form.get('message', '').strip()
+    target = request.form.get('target', '*')  # '*' = all, or comma-separated usernames
+    if not message:
+        flash('الرسالة مطلوبة', 'error')
+        return redirect(url_for('admin_notifications'))
+    db = get_db()
+    sender = session.get('display_name', session.get('username', 'admin'))
+    db.execute("INSERT INTO notifications (message, sender, target_users) VALUES (?,?,?)",
+               (message, sender, target))
+    db.commit()
+    # Push to all SSE subscribers
+    import queue
+    notif_data = json.dumps({
+        'message': message,
+        'sender': sender,
+        'target': target,
+        'time': datetime.now().strftime('%Y-%m-%d %H:%M')
+    }, ensure_ascii=False)
+    dead = []
+    for q in _notification_subscribers:
+        try:
+            q.put_nowait(notif_data)
+        except queue.Full:
+            dead.append(q)
+    for q in dead:
+        _notification_subscribers.remove(q)
+    print(f"   🔔 NOTIFICATION SENT to {'all' if target == '*' else target}: {message[:50]}...")
+    flash('تم إرسال الإشعار', 'success')
+    return redirect(url_for('admin_notifications'))
+
+
+@app.route('/api/notifications/stream')
+@admin_required
+def notification_stream():
+    """SSE endpoint for real-time notifications."""
+    import queue
+    q = queue.Queue(maxsize=50)
+    _notification_subscribers.append(q)
+    username = session.get('username', '')
+
+    def generate():
+        try:
+            while True:
+                try:
+                    data = q.get(timeout=30)
+                    # Filter by target
+                    parsed = json.loads(data)
+                    target = parsed.get('target', '*')
+                    if target == '*' or username in target.split(','):
+                        yield f"data: {data}\n\n"
+                except queue.Empty:
+                    yield ": keepalive\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            if q in _notification_subscribers:
+                _notification_subscribers.remove(q)
+
+    return app.response_class(generate(), mimetype='text/event-stream',
+                              headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+@app.route('/api/notifications/unread')
+@admin_required
+def api_notifications_unread():
+    """Get unread notification count and recent messages."""
+    username = session.get('username', '')
+    db = get_db()
+    notifs = db.execute(
+        "SELECT * FROM notifications ORDER BY created_at DESC LIMIT 20").fetchall()
+    unread = []
+    for n in notifs:
+        target = n['target_users']
+        if target != '*' and username not in target.split(','):
+            continue
+        read_by = json.loads(n['is_read_by'] or '[]')
+        if username not in read_by:
+            unread.append({
+                'id': n['id'], 'message': n['message'],
+                'sender': n['sender'], 'time': n['created_at']
+            })
+    return jsonify({'count': len(unread), 'notifications': unread[:10]})
+
+
+@app.route('/api/notifications/mark-read', methods=['POST'])
+@admin_required
+def api_notifications_mark_read():
+    """Mark notifications as read for current user."""
+    username = session.get('username', '')
+    notif_ids = request.get_json(silent=True) or {}
+    ids = notif_ids.get('ids', [])
+    db = get_db()
+    for nid in ids:
+        row = db.execute("SELECT is_read_by FROM notifications WHERE id=?", (nid,)).fetchone()
+        if row:
+            read_by = json.loads(row['is_read_by'] or '[]')
+            if username not in read_by:
+                read_by.append(username)
+                db.execute("UPDATE notifications SET is_read_by=? WHERE id=?",
+                           (json.dumps(read_by), nid))
+    db.commit()
+    return jsonify({'success': True})
+
+
+# ---------------------------------------------------------------------------
+# Pending edits (user suggestions awaiting admin approval)
+# ---------------------------------------------------------------------------
+@app.route('/record/<int:record_id>/suggest-edit', methods=['GET', 'POST'])
+@admin_required
+def suggest_record_edit(record_id):
+    """Allow non-admin users to suggest edits to a record."""
+    db = get_db()
+    record = db.execute("SELECT * FROM records WHERE id=? AND deleted_at IS NULL", (record_id,)).fetchone()
+    if not record:
+        flash('السجل غير موجود', 'error')
+        return redirect(url_for('entry_form'))
+
+    if request.method == 'POST':
+        edit_data = {}
+        editable_fields = [
+            'first_name', 'father_name', 'last_name', 'mother_name', 'gender',
+            'birth_day', 'birth_month', 'birth_year', 'province', 'national_id',
+            'phone', 'blood_type', 'status', 'marital',
+            'arrest_day', 'arrest_month', 'arrest_year', 'arrest_place',
+            'arrest_authority', 'arrest_reason',
+            'address', 'address_area', 'housing_type',
+            'employment', 'profession', 'education',
+            'notes', 'guardian_name', 'guardian_phone',
+            'spouse_name', 'spouse_phone',
+        ]
+        for field in editable_fields:
+            new_val = request.form.get(field, '').strip()
+            old_val = str(record[field] or '').strip() if record[field] is not None else ''
+            if new_val and new_val != old_val:
+                edit_data[field] = {'old': old_val, 'new': new_val}
+
+        # Handle photo upload suggestion
+        if 'photo' in request.files and request.files['photo'].filename:
+            photo_path, photo_hash = save_upload(request.files['photo'], 'photos')
+            if photo_path:
+                edit_data['photo_path'] = {'old': record['photo_path'] or '', 'new': photo_path}
+                edit_data['photo_hash'] = {'old': record['photo_hash'] or '', 'new': photo_hash or ''}
+
+        if not edit_data:
+            flash('لم يتم تغيير أي بيانات', 'error')
+            return redirect(url_for('suggest_record_edit', record_id=record_id))
+
+        submitter = session.get('username', 'unknown')
+        db.execute(
+            "INSERT INTO pending_edits (record_id, submitted_by, edit_data) VALUES (?,?,?)",
+            (record_id, submitter, json.dumps(edit_data, ensure_ascii=False)))
+        db.commit()
+        log_audit('suggest_edit', 'record', record_id, f'Edit suggestion by {submitter}')
+        print(f"   📝 EDIT SUGGESTION: Record #{record_id} by {submitter} ({len(edit_data)} fields)")
+        flash('تم إرسال اقتراح التعديل للمراجعة من قبل المدير', 'success')
+        return redirect(url_for('suggest_record_edit', record_id=record_id))
+
+    # GET: show suggestion form
+    return render_template('suggest_edit.html', record=record)
+
+
+@app.route('/admin/pending-edits')
+@admin_required
+def admin_pending_edits():
+    """Admin page to review pending edit suggestions."""
+    if session.get('user_role', 'admin') != 'admin':
+        flash('فقط المدير يمكنه مراجعة التعديلات', 'error')
+        return redirect(url_for('admin_dashboard'))
+    db = get_db()
+    pending = db.execute("""
+        SELECT pe.*, r.first_name, r.father_name, r.last_name
+        FROM pending_edits pe
+        JOIN records r ON r.id = pe.record_id
+        ORDER BY pe.status = 'pending' DESC, pe.created_at DESC
+        LIMIT 200
+    """).fetchall()
+    return render_template('admin_pending_edits.html', pending=pending)
+
+
+@app.route('/admin/pending-edits/<int:edit_id>/approve', methods=['POST'])
+@admin_required
+def admin_approve_edit(edit_id):
+    """Approve a pending edit and apply changes to the record."""
+    if session.get('user_role', 'admin') != 'admin':
+        return jsonify({'error': 'غير مصرح'}), 403
+    db = get_db()
+    edit = db.execute("SELECT * FROM pending_edits WHERE id=?", (edit_id,)).fetchone()
+    if not edit or edit['status'] != 'pending':
+        flash('التعديل غير موجود أو تم مراجعته مسبقاً', 'error')
+        return redirect(url_for('admin_pending_edits'))
+
+    edit_data = json.loads(edit['edit_data'])
+    record_id = edit['record_id']
+
+    # Apply each field change
+    for field, change in edit_data.items():
+        new_val = change['new']
+        db.execute(f"UPDATE records SET {field}=? WHERE id=?", (new_val, record_id))
+
+    reviewer = session.get('username', 'admin')
+    db.execute("""UPDATE pending_edits SET status='approved', reviewed_by=?,
+        reviewed_at=datetime('now','localtime') WHERE id=?""", (reviewer, edit_id))
+    db.commit()
+    log_audit('approve_edit', 'record', record_id,
+              f'Approved edit #{edit_id} by {edit["submitted_by"]} ({len(edit_data)} fields)')
+    print(f"   ✅ EDIT APPROVED: #{edit_id} for record #{record_id} by {reviewer}")
+    flash('تم الموافقة على التعديل وتطبيقه', 'success')
+    return redirect(url_for('admin_pending_edits'))
+
+
+@app.route('/admin/pending-edits/<int:edit_id>/reject', methods=['POST'])
+@admin_required
+def admin_reject_edit(edit_id):
+    """Reject a pending edit."""
+    if session.get('user_role', 'admin') != 'admin':
+        return jsonify({'error': 'غير مصرح'}), 403
+    db = get_db()
+    edit = db.execute("SELECT * FROM pending_edits WHERE id=?", (edit_id,)).fetchone()
+    if not edit or edit['status'] != 'pending':
+        flash('التعديل غير موجود أو تم مراجعته مسبقاً', 'error')
+        return redirect(url_for('admin_pending_edits'))
+
+    reason = request.form.get('reason', '')
+    reviewer = session.get('username', 'admin')
+    db.execute("""UPDATE pending_edits SET status='rejected', reviewed_by=?,
+        reviewed_at=datetime('now','localtime'), notes=? WHERE id=?""",
+               (reviewer, reason, edit_id))
+    db.commit()
+    log_audit('reject_edit', 'record', edit['record_id'],
+              f'Rejected edit #{edit_id} by {edit["submitted_by"]}')
+    print(f"   ❌ EDIT REJECTED: #{edit_id} for record #{edit['record_id']} by {reviewer}")
+    flash('تم رفض التعديل', 'info')
+    return redirect(url_for('admin_pending_edits'))
 
 
 @app.route('/admin')

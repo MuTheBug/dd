@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}اقتراح تعديل - {{ record.first_name }} {{ record.last_name }} - حقنا{% endblock %}
+{% block content %}
+<div class="container" style="max-width:800px;">
+    <h2>اقتراح تعديل على السجل #{{ record.id }}</h2>
+    <p style="color:var(--text-light);margin-bottom:1rem;">{{ record.first_name }} {{ record.father_name }} {{ record.last_name }} - التعديلات ستُراجع من قبل المدير قبل تطبيقها.</p>
+
+    <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+        <div class="card" style="padding:1rem;margin-bottom:1rem;">
+            <h3 style="margin-bottom:0.8rem;">البيانات الشخصية</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;">
+                {% macro edit_field(name, label, current, type='text') %}
+                <div>
+                    <label style="font-size:0.82rem;color:var(--text-light);">{{ label }}</label>
+                    <input type="{{ type }}" name="{{ name }}" value="{{ current or '' }}"
+                        style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;"
+                        placeholder="{{ current or 'فارغ' }}">
+                </div>
+                {% endmacro %}
+
+                {{ edit_field('first_name', 'الاسم', record.first_name) }}
+                {{ edit_field('father_name', 'اسم الأب', record.father_name) }}
+                {{ edit_field('last_name', 'الكنية', record.last_name) }}
+                {{ edit_field('mother_name', 'اسم الأم', record.mother_name) }}
+                <div>
+                    <label style="font-size:0.82rem;color:var(--text-light);">الجنس</label>
+                    <select name="gender" style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;">
+                        <option value="">-</option>
+                        <option value="male" {{ 'selected' if record.gender == 'male' }}>ذكر</option>
+                        <option value="female" {{ 'selected' if record.gender == 'female' }}>أنثى</option>
+                    </select>
+                </div>
+                {{ edit_field('national_id', 'الرقم الوطني', record.national_id) }}
+                {{ edit_field('phone', 'الهاتف', record.phone) }}
+                {{ edit_field('blood_type', 'فصيلة الدم', record.blood_type) }}
+
+                <div>
+                    <label style="font-size:0.82rem;color:var(--text-light);">سنة الميلاد</label>
+                    <input type="number" name="birth_year" value="{{ record.birth_year or '' }}"
+                        style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;" min="1900" max="2025">
+                </div>
+                <div>
+                    <label style="font-size:0.82rem;color:var(--text-light);">المحافظة</label>
+                    <select name="province" style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;">
+                        <option value="">-</option>
+                        {% for p in ['دمشق','ريف دمشق','حلب','حمص','حماة','اللاذقية','طرطوس','إدلب','دير الزور','الرقة','الحسكة','درعا','السويداء','القنيطرة'] %}
+                        <option value="{{ p }}" {{ 'selected' if record.province == p }}>{{ p }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="padding:1rem;margin-bottom:1rem;">
+            <h3 style="margin-bottom:0.8rem;">الحالة والاعتقال</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;">
+                <div>
+                    <label style="font-size:0.82rem;color:var(--text-light);">الحالة</label>
+                    <select name="status" style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;">
+                        <option value="">-</option>
+                        <option value="survivor" {{ 'selected' if record.status == 'survivor' }}>ناجي / مفرج عنه</option>
+                        <option value="enforced" {{ 'selected' if record.status == 'enforced' }}>مختفي قسرياً / معتقل</option>
+                        <option value="deceased" {{ 'selected' if record.status == 'deceased' }}>متوفى</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.82rem;color:var(--text-light);">الحالة الاجتماعية</label>
+                    <select name="marital" style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;">
+                        <option value="">-</option>
+                        <option value="single" {{ 'selected' if record.marital == 'single' }}>أعزب</option>
+                        <option value="married" {{ 'selected' if record.marital == 'married' }}>متزوج</option>
+                        <option value="divorced" {{ 'selected' if record.marital == 'divorced' }}>مطلق</option>
+                        <option value="widowed" {{ 'selected' if record.marital == 'widowed' }}>أرمل</option>
+                    </select>
+                </div>
+                {{ edit_field('arrest_place', 'مكان الاعتقال', record.arrest_place) }}
+                {{ edit_field('arrest_authority', 'الجهة المعتقلة', record.arrest_authority) }}
+                {{ edit_field('arrest_reason', 'سبب الاعتقال', record.arrest_reason) }}
+                {{ edit_field('arrest_year', 'سنة الاعتقال', record.arrest_year, 'number') }}
+            </div>
+        </div>
+
+        <div class="card" style="padding:1rem;margin-bottom:1rem;">
+            <h3 style="margin-bottom:0.8rem;">العنوان والمهنة</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;">
+                {{ edit_field('address', 'العنوان', record.address) }}
+                {{ edit_field('address_area', 'المنطقة', record.address_area) }}
+                {{ edit_field('housing_type', 'نوع السكن', record.housing_type) }}
+                {{ edit_field('employment', 'حالة العمل', record.employment) }}
+                {{ edit_field('profession', 'المهنة', record.profession) }}
+                {{ edit_field('education', 'المستوى التعليمي', record.education) }}
+            </div>
+        </div>
+
+        <div class="card" style="padding:1rem;margin-bottom:1rem;">
+            <h3 style="margin-bottom:0.8rem;">العائلة</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;">
+                {{ edit_field('spouse_name', 'اسم الزوج/ة', record.spouse_name) }}
+                {{ edit_field('spouse_phone', 'هاتف الزوج/ة', record.spouse_phone) }}
+                {{ edit_field('guardian_name', 'اسم الوصي', record.guardian_name) }}
+                {{ edit_field('guardian_phone', 'هاتف الوصي', record.guardian_phone) }}
+            </div>
+        </div>
+
+        <div class="card" style="padding:1rem;margin-bottom:1rem;">
+            <h3 style="margin-bottom:0.8rem;">رفع صورة شخصية</h3>
+            {% if record.photo_path %}
+            <div style="margin-bottom:0.5rem;">
+                <span style="font-size:0.85rem;color:var(--text-light);">الصورة الحالية موجودة</span>
+            </div>
+            {% else %}
+            <div style="margin-bottom:0.5rem;">
+                <span style="font-size:0.85rem;color:#e67e22;">لا توجد صورة شخصية حالياً</span>
+            </div>
+            {% endif %}
+            <input type="file" name="photo" accept="image/*"
+                style="border:1px solid var(--border);border-radius:6px;padding:0.4rem;width:100%;">
+        </div>
+
+        <div class="card" style="padding:1rem;margin-bottom:1rem;">
+            <h3 style="margin-bottom:0.8rem;">ملاحظات</h3>
+            <textarea name="notes" rows="3" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;">{{ record.notes or '' }}</textarea>
+        </div>
+
+        <div style="display:flex;gap:0.5rem;">
+            <button type="submit" class="btn btn-primary">إرسال اقتراح التعديل للمراجعة</button>
+            <a href="{{ url_for('admin_record_detail', record_id=record.id) }}" class="btn btn-outline">إلغاء</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

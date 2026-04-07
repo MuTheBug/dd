@@ -132,16 +132,17 @@ def enforce_role_permissions():
     # Common allowed endpoints for all logged-in roles
     common_allowed = ('admin_login', 'admin_logout', 'static', 'uploaded_file')
 
-    # Common endpoints for all roles: notifications + edit suggestions
+    # Common endpoints for all roles: notifications + edit suggestions + record browsing
     shared_endpoints = ('notification_stream', 'api_notifications_unread',
-                        'api_notifications_mark_read', 'suggest_record_edit')
+                        'api_notifications_mark_read', 'suggest_record_edit',
+                        'admin_records', 'admin_record_detail')
 
     if role == 'data_entry':
-        # data_entry can access entry form, submit, suggest edits, notifications
+        # data_entry can access entry form, submit, browse records, suggest edits, notifications
         allowed = common_allowed + ('entry_form', 'entry_submit', 'admin_dashboard',
                                      'api_draft_save', 'api_draft_load', 'api_draft_clear') + shared_endpoints
         if endpoint not in allowed:
-            flash('صلاحيتك محدودة بصفحة إدخال البيانات فقط', 'error')
+            flash('صلاحيتك محدودة بصفحة إدخال البيانات والسجلات فقط', 'error')
             return redirect(url_for('entry_form'))
 
     elif role == 'viewer':

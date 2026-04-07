@@ -56,8 +56,9 @@
                 {% set role = session.get('user_role', 'admin') %}
 
                 {% if role == 'data_entry' %}
-                {# data_entry: entry form only #}
+                {# data_entry: entry form + records browsing + suggest edits #}
                 <a href="{{ url_for('entry_form') }}">إدخال بيانات</a>
+                <a href="{{ url_for('admin_records') }}">السجلات</a>
                 <span class="notif-bell" id="notifBell" title="الإشعارات" onclick="toggleNotifPanel()" style="cursor:pointer;position:relative;font-size:1.2rem;">&#x1F514;<span id="notifBadge" style="display:none;position:absolute;top:-5px;right:-8px;background:#dc2626;color:#fff;border-radius:50%;font-size:0.6rem;width:16px;height:16px;text-align:center;line-height:16px;"></span></span>
                 <span style="background:#f59e0b;color:#fff;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;">{{ display_name or 'مُدخِل بيانات' }}</span>
                 <a href="{{ url_for('admin_logout') }}" class="nav-logout">خروج</a>
@@ -219,6 +220,7 @@
     var notifPanel = document.getElementById('notifPanel');
     var notifBadge = document.getElementById('notifBadge');
     var _notifIds = [];
+    var _lastNotifCount = -1; // -1 = first load (don't show toasts)
 
     function toggleNotifPanel() {
         notifPanel.style.display = notifPanel.style.display === 'none' ? 'block' : 'none';
@@ -230,20 +232,62 @@
         }
     });
 
+    function showNotifToast(message, sender) {
+        // Play notification sound
+        try {
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = 800; gain.gain.value = 0.3;
+            osc.start(); osc.stop(ctx.currentTime + 0.15);
+            setTimeout(function() {
+                var osc2 = ctx.createOscillator();
+                var gain2 = ctx.createGain();
+                osc2.connect(gain2); gain2.connect(ctx.destination);
+                osc2.frequency.value = 1000; gain2.gain.value = 0.3;
+                osc2.start(); osc2.stop(ctx.currentTime + 0.2);
+            }, 180);
+        } catch(e) {}
+
+        // Show big full-width toast at top
+        var toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;top:0;left:0;right:0;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;padding:1rem 1.5rem;z-index:999999;box-shadow:0 4px 25px rgba(0,0,0,0.4);font-size:1.1rem;text-align:center;direction:rtl;cursor:pointer;animation:slideDown 0.4s ease;';
+        toast.innerHTML = '<div style="font-size:1.15rem;font-weight:600;margin-bottom:0.3rem;">' + message + '</div>'
+                        + '<div style="font-size:0.8rem;opacity:0.8;">من: ' + sender + '</div>'
+                        + '<div style="font-size:0.7rem;opacity:0.5;margin-top:0.3rem;">انقر للإغلاق</div>';
+        toast.onclick = function() { toast.remove(); };
+        document.body.appendChild(toast);
+        // Auto-hide after 8 seconds
+        setTimeout(function() {
+            toast.style.transition = 'transform 0.5s ease, opacity 0.5s ease';
+            toast.style.transform = 'translateY(-100%)';
+            toast.style.opacity = '0';
+            setTimeout(function() { toast.remove(); }, 500);
+        }, 8000);
+    }
+
     function fetchNotifications() {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', '/api/notifications/unread', true);
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         xhr.onload = function() {
             if (xhr.status === 200) {
+                try {
                 var resp = JSON.parse(xhr.responseText);
                 _notifIds = resp.notifications.map(function(n) { return n.id; });
                 if (resp.count > 0) {
                     notifBadge.textContent = resp.count;
                     notifBadge.style.display = 'block';
+                    // Show toast for NEW notifications (count increased)
+                    if (resp.count > _lastNotifCount && _lastNotifCount >= 0) {
+                        var newOnes = resp.notifications.slice(0, resp.count - _lastNotifCount);
+                        newOnes.forEach(function(n) { showNotifToast(n.message, n.sender); });
+                    }
                 } else {
                     notifBadge.style.display = 'none';
                 }
+                _lastNotifCount = resp.count;
                 var html = '';
                 if (resp.notifications.length === 0) {
                     html = '<div style="padding:1rem;text-align:center;color:#999;">لا توجد إشعارات جديدة</div>';
@@ -255,6 +299,7 @@
                           + '</div>';
                 });
                 document.getElementById('notifList').innerHTML = html;
+                } catch(e) {}
             }
         };
         xhr.send();
@@ -267,25 +312,25 @@
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         xhr.onload = function() {
+            _lastNotifCount = 0;
             notifBadge.style.display = 'none';
             document.getElementById('notifList').innerHTML = '<div style="padding:1rem;text-align:center;color:#999;">لا توجد إشعارات جديدة</div>';
         };
         xhr.send(JSON.stringify({ids: _notifIds}));
     }
 
-    // SSE real-time notifications
+    // Add slide-down animation
+    var styleEl = document.createElement('style');
+    styleEl.textContent = '@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }';
+    document.head.appendChild(styleEl);
+
+    // SSE real-time notifications (instant push)
     if (typeof EventSource !== 'undefined') {
         var evtSource = new EventSource('/api/notifications/stream');
         evtSource.onmessage = function(event) {
             try {
                 var data = JSON.parse(event.data);
-                // Show toast notification
-                var toast = document.createElement('div');
-                toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1e3a5f;color:#fff;padding:0.8rem 1.5rem;border-radius:10px;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3);font-size:0.95rem;max-width:90%;text-align:center;animation:fadeIn 0.3s;';
-                toast.innerHTML = '<div>' + data.message + '</div><div style="font-size:0.75rem;opacity:0.7;margin-top:0.3rem;">من: ' + data.sender + '</div>';
-                document.body.appendChild(toast);
-                setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; setTimeout(function() { toast.remove(); }, 500); }, 5000);
-                // Update badge
+                showNotifToast(data.message, data.sender);
                 fetchNotifications();
             } catch(e) {}
         };
@@ -294,9 +339,11 @@
         };
     }
 
-    // Initial check
+    // Initial check (set _lastNotifCount=-1 to suppress toasts on first load)
+    _lastNotifCount = -1;
     fetchNotifications();
-    setInterval(fetchNotifications, 60000);
+    // Poll every 10 seconds for new notifications (SSE is instant but may not work on all setups)
+    setInterval(fetchNotifications, 10000);
     </script>
     {% endif %}
     {% block scripts %}{% endblock %}

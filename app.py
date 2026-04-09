@@ -135,7 +135,7 @@ def enforce_role_permissions():
     # Common endpoints for all roles: notifications + edit suggestions + record browsing
     shared_endpoints = ('notification_stream', 'api_notifications_unread',
                         'api_notifications_mark_read', 'suggest_record_edit',
-                        'admin_records', 'admin_record_detail')
+                        'admin_records', 'admin_record_detail', 'api_records')
 
     if role == 'data_entry':
         # data_entry can access entry form, submit, browse records, suggest edits, notifications
@@ -2284,15 +2284,43 @@ def suggest_record_edit(record_id):
     if request.method == 'POST':
         edit_data = {}
         editable_fields = [
+            # Personal
             'first_name', 'father_name', 'last_name', 'mother_name', 'gender',
             'birth_day', 'birth_month', 'birth_year', 'province', 'national_id',
-            'phone', 'blood_type', 'status', 'marital',
+            'family_book_number', 'phone', 'blood_type',
+            # Status & arrest
+            'status', 'case_type',
             'arrest_day', 'arrest_month', 'arrest_year', 'arrest_place',
-            'arrest_authority', 'arrest_reason',
-            'address', 'address_area', 'housing_type',
-            'employment', 'profession', 'education',
-            'notes', 'guardian_name', 'guardian_phone',
-            'spouse_name', 'spouse_phone',
+            'arrest_authority', 'arrest_reason', 'arrest_causer',
+            'last_known_location', 'last_known_alive_date',
+            # Release & death
+            'release_day', 'release_month', 'release_year',
+            'death_day', 'death_month', 'death_year', 'death_place',
+            # Family
+            'marital', 'guardian_name', 'guardian_relation', 'guardian_phone',
+            'spouse_name', 'spouse_phone', 'ex_spouse_name',
+            # Housing & employment
+            'address', 'address_area', 'housing_type', 'rent_amount',
+            'employment', 'profession', 'employer',
+            'breadwinner', 'breadwinner_job', 'breadwinner_relation', 'breadwinner_relation_other',
+            # Education
+            'education', 'edu_type', 'edu_specialization', 'edu_university',
+            # Health
+            'chronic', 'other_diseases', 'special_needs_details',
+            # Legal & associations
+            'legal', 'legal_details', 'assoc', 'assoc_name', 'service_type',
+            # Reporter
+            'reporter_name', 'reporter_relation', 'reporter_phone', 'reporter_id',
+            # Digital evidence
+            'digital_evidence_type', 'digital_evidence_url', 'digital_evidence_url_status',
+            'digital_evidence_date', 'digital_evidence_person_name',
+            'digital_evidence_death_date', 'digital_evidence_description',
+            # Civil registry
+            'civil_registry_status', 'civil_registry_date',
+            'conflicting_info_details',
+            # Methodology
+            'notes', 'methodology_notes', 'methodology_type', 'source_url', 'source_type',
+            'survivor_cv_text',
         ]
         for field in editable_fields:
             new_val = request.form.get(field, '').strip()
@@ -2300,12 +2328,40 @@ def suggest_record_edit(record_id):
             if new_val and new_val != old_val:
                 edit_data[field] = {'old': old_val, 'new': new_val}
 
-        # Handle photo upload suggestion
-        if 'photo' in request.files and request.files['photo'].filename:
-            photo_path, photo_hash = save_upload(request.files['photo'], 'photos')
-            if photo_path:
-                edit_data['photo_path'] = {'old': record['photo_path'] or '', 'new': photo_path}
-                edit_data['photo_hash'] = {'old': record['photo_hash'] or '', 'new': photo_hash or ''}
+        # Checkbox/integer fields
+        for checkbox_field, label in [('has_special_needs', 'ذوي احتياجات خاصة'),
+                                       ('is_officially_registered', 'مسجل رسمياً'),
+                                       ('informant_consent', 'موافقة المُبلِّغ'),
+                                       ('has_conflicting_info', 'معلومات متضاربة')]:
+            new_val = '1' if request.form.get(checkbox_field) else '0'
+            old_val = str(record[checkbox_field] or 0)
+            if new_val != old_val:
+                edit_data[checkbox_field] = {'old': old_val, 'new': new_val}
+
+        # JSON fields: children_data, witnesses_data
+        for json_field in ['children_data', 'witnesses_data', 'detention_facilities_data']:
+            new_val = request.form.get(json_field, '').strip()
+            if new_val:
+                old_val = str(record[json_field] or '[]')
+                if new_val != old_val:
+                    edit_data[json_field] = {'old': old_val, 'new': new_val}
+
+        # Handle file uploads
+        file_uploads = [
+            ('photo', 'photos', 'photo_path', 'photo_hash'),
+            ('document', 'documents', 'document_path', 'document_hash'),
+            ('digital_evidence_screenshot', 'screenshots', 'digital_evidence_screenshot_path', None),
+            ('civil_registry_document', 'documents', 'civil_registry_document_path', None),
+            ('survivor_cv', 'documents', 'survivor_cv_path', None),
+            ('survivor_cv_photo', 'photos', 'survivor_cv_photo_path', None),
+        ]
+        for file_key, subfolder, path_field, hash_field in file_uploads:
+            if file_key in request.files and request.files[file_key].filename:
+                saved_path, saved_hash = save_upload(request.files[file_key], subfolder)
+                if saved_path:
+                    edit_data[path_field] = {'old': record[path_field] or '', 'new': saved_path}
+                    if hash_field:
+                        edit_data[hash_field] = {'old': record[hash_field] or '', 'new': saved_hash or ''}
 
         if not edit_data:
             flash('لم يتم تغيير أي بيانات', 'error')
@@ -2321,8 +2377,13 @@ def suggest_record_edit(record_id):
         flash('تم إرسال اقتراح التعديل للمراجعة من قبل المدير', 'success')
         return redirect(url_for('suggest_record_edit', record_id=record_id))
 
-    # GET: show suggestion form
-    return render_template('suggest_edit.html', record=record)
+    # GET: show suggestion form with children parsed
+    children = []
+    try:
+        children = json.loads(record['children_data'] or '[]')
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return render_template('suggest_edit.html', record=record, children=children)
 
 
 @app.route('/admin/pending-edits')

@@ -1,133 +1,370 @@
 {% extends "base.html" %}
 {% block title %}اقتراح تعديل - {{ record.first_name }} {{ record.last_name }} - حقنا{% endblock %}
 {% block content %}
-<div class="container" style="max-width:800px;">
+<style>
+.se-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; }
+.se-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.6rem; }
+.se-card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:1rem; margin-bottom:1rem; }
+.se-card h3 { margin-bottom:0.7rem; font-size:1rem; color:var(--primary); border-bottom:2px solid var(--primary); padding-bottom:0.3rem; }
+.se-field label { font-size:0.82rem; color:var(--text-light); display:block; margin-bottom:0.15rem; }
+.se-field input, .se-field select, .se-field textarea {
+    width:100%; padding:0.4rem; border:1px solid var(--border); border-radius:6px; font-size:0.9rem; box-sizing:border-box;
+}
+.se-field textarea { resize:vertical; }
+.se-field { margin-bottom:0.3rem; }
+.se-current { font-size:0.75rem; color:#999; margin-top:0.1rem; }
+.se-empty { color:#e67e22; }
+.child-row { background:#f8f9fa; border:1px solid var(--border); border-radius:8px; padding:0.7rem; margin-bottom:0.5rem; }
+.child-row .se-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+@media (max-width:600px) { .se-grid, .se-grid-3 { grid-template-columns:1fr; } }
+</style>
+
+<div class="container" style="max-width:900px;">
     <h2>اقتراح تعديل على السجل #{{ record.id }}</h2>
-    <p style="color:var(--text-light);margin-bottom:1rem;">{{ record.first_name }} {{ record.father_name }} {{ record.last_name }} - التعديلات ستُراجع من قبل المدير قبل تطبيقها.</p>
+    <p style="color:var(--text-light);margin-bottom:0.5rem;">
+        {{ record.first_name }} {{ record.father_name }} {{ record.last_name }}
+        — <span style="color:#e67e22;">التعديلات ستُراجع من قبل المدير قبل تطبيقها. عدّل فقط الحقول التي تريد تغييرها.</span>
+    </p>
 
     <form method="POST" enctype="multipart/form-data">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 
-        <div class="card" style="padding:1rem;margin-bottom:1rem;">
-            <h3 style="margin-bottom:0.8rem;">البيانات الشخصية</h3>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;">
-                {% macro edit_field(name, label, current, type='text') %}
-                <div>
-                    <label style="font-size:0.82rem;color:var(--text-light);">{{ label }}</label>
-                    <input type="{{ type }}" name="{{ name }}" value="{{ current or '' }}"
-                        style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;"
-                        placeholder="{{ current or 'فارغ' }}">
-                </div>
-                {% endmacro %}
+        {% macro F(name, label, current, type='text') %}
+        <div class="se-field">
+            <label>{{ label }}</label>
+            <input type="{{ type }}" name="{{ name }}" value="{{ current if current is not none and current != 0 else '' }}">
+            {% if not current and current != 0 %}<div class="se-current se-empty">فارغ حالياً</div>{% endif %}
+        </div>
+        {% endmacro %}
 
-                {{ edit_field('first_name', 'الاسم', record.first_name) }}
-                {{ edit_field('father_name', 'اسم الأب', record.father_name) }}
-                {{ edit_field('last_name', 'الكنية', record.last_name) }}
-                {{ edit_field('mother_name', 'اسم الأم', record.mother_name) }}
-                <div>
-                    <label style="font-size:0.82rem;color:var(--text-light);">الجنس</label>
-                    <select name="gender" style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;">
-                        <option value="">-</option>
-                        <option value="male" {{ 'selected' if record.gender == 'male' }}>ذكر</option>
-                        <option value="female" {{ 'selected' if record.gender == 'female' }}>أنثى</option>
-                    </select>
-                </div>
-                {{ edit_field('national_id', 'الرقم الوطني', record.national_id) }}
-                {{ edit_field('phone', 'الهاتف', record.phone) }}
-                {{ edit_field('blood_type', 'فصيلة الدم', record.blood_type) }}
+        {% macro S(name, label, current, options) %}
+        <div class="se-field">
+            <label>{{ label }}</label>
+            <select name="{{ name }}">
+                <option value="">-</option>
+                {% for val, text in options %}
+                <option value="{{ val }}" {{ 'selected' if current == val }}>{{ text }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endmacro %}
 
-                <div>
-                    <label style="font-size:0.82rem;color:var(--text-light);">سنة الميلاد</label>
-                    <input type="number" name="birth_year" value="{{ record.birth_year or '' }}"
-                        style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;" min="1900" max="2025">
+        <!-- 1. البيانات الشخصية -->
+        <div class="se-card">
+            <h3>البيانات الشخصية</h3>
+            <div class="se-grid">
+                {{ F('first_name', 'الاسم', record.first_name) }}
+                {{ F('father_name', 'اسم الأب', record.father_name) }}
+                {{ F('last_name', 'الكنية', record.last_name) }}
+                {{ F('mother_name', 'اسم الأم', record.mother_name) }}
+                {{ S('gender', 'الجنس', record.gender, [('male','ذكر'),('female','أنثى')]) }}
+                {{ S('province', 'المحافظة', record.province, [('دمشق','دمشق'),('ريف دمشق','ريف دمشق'),('حلب','حلب'),('حمص','حمص'),('حماة','حماة'),('اللاذقية','اللاذقية'),('طرطوس','طرطوس'),('إدلب','إدلب'),('دير الزور','دير الزور'),('الرقة','الرقة'),('الحسكة','الحسكة'),('درعا','درعا'),('السويداء','السويداء'),('القنيطرة','القنيطرة')]) }}
+            </div>
+            <div class="se-grid-3">
+                {{ F('birth_day', 'يوم الميلاد', record.birth_day, 'number') }}
+                {{ F('birth_month', 'شهر الميلاد', record.birth_month, 'number') }}
+                {{ F('birth_year', 'سنة الميلاد', record.birth_year, 'number') }}
+            </div>
+            <div class="se-grid">
+                {{ F('national_id', 'الرقم الوطني', record.national_id) }}
+                {{ F('family_book_number', 'رقم دفتر العائلة', record.family_book_number) }}
+                {{ F('phone', 'الهاتف', record.phone) }}
+                {{ F('blood_type', 'فصيلة الدم', record.blood_type) }}
+            </div>
+        </div>
+
+        <!-- 2. الحالة والاعتقال -->
+        <div class="se-card">
+            <h3>الحالة والاعتقال</h3>
+            <div class="se-grid">
+                {{ S('status', 'الحالة', record.status, [('survivor','ناجي / مفرج عنه'),('enforced','مختفي قسرياً / معتقل'),('deceased','متوفى')]) }}
+                {{ S('case_type', 'نوع الحالة', record.case_type, [('direct_victim','ضحية مباشرة'),('family_member','ذوي الضحية'),('witness','شاهد')]) }}
+            </div>
+            <div class="se-grid-3">
+                {{ F('arrest_day', 'يوم الاعتقال', record.arrest_day, 'number') }}
+                {{ F('arrest_month', 'شهر الاعتقال', record.arrest_month, 'number') }}
+                {{ F('arrest_year', 'سنة الاعتقال', record.arrest_year, 'number') }}
+            </div>
+            <div class="se-grid">
+                {{ F('arrest_place', 'مكان الاعتقال', record.arrest_place) }}
+                {{ F('arrest_authority', 'الجهة المعتقلة', record.arrest_authority) }}
+                {{ F('arrest_reason', 'سبب الاعتقال', record.arrest_reason) }}
+                {{ F('arrest_causer', 'المتسبب بالاعتقال', record.arrest_causer) }}
+                {{ F('last_known_location', 'آخر مكان معروف', record.last_known_location) }}
+                {{ F('last_known_alive_date', 'آخر تاريخ حي', record.last_known_alive_date) }}
+            </div>
+        </div>
+
+        <!-- 3. الإفراج والوفاة -->
+        <div class="se-card">
+            <h3>بيانات الإفراج / الوفاة</h3>
+            <div class="se-grid-3">
+                {{ F('release_day', 'يوم الإفراج', record.release_day, 'number') }}
+                {{ F('release_month', 'شهر الإفراج', record.release_month, 'number') }}
+                {{ F('release_year', 'سنة الإفراج', record.release_year, 'number') }}
+            </div>
+            <div class="se-grid-3">
+                {{ F('death_day', 'يوم الوفاة', record.death_day, 'number') }}
+                {{ F('death_month', 'شهر الوفاة', record.death_month, 'number') }}
+                {{ F('death_year', 'سنة الوفاة', record.death_year, 'number') }}
+            </div>
+            <div class="se-grid">
+                {{ F('death_place', 'مكان الوفاة', record.death_place) }}
+            </div>
+        </div>
+
+        <!-- 4. العائلة -->
+        <div class="se-card">
+            <h3>البيانات العائلية</h3>
+            <div class="se-grid">
+                {{ S('marital', 'الحالة الاجتماعية', record.marital, [('single','أعزب'),('married','متزوج'),('divorced','مطلق'),('widowed','أرمل')]) }}
+                {{ F('spouse_name', 'اسم الزوج/ة', record.spouse_name) }}
+                {{ F('spouse_phone', 'هاتف الزوج/ة', record.spouse_phone) }}
+                {{ F('ex_spouse_name', 'اسم الزوج/ة السابق/ة', record.ex_spouse_name) }}
+                {{ F('guardian_name', 'اسم الوصي/الكفيل', record.guardian_name) }}
+                {{ F('guardian_relation', 'صلة الوصي', record.guardian_relation) }}
+                {{ F('guardian_phone', 'هاتف الوصي', record.guardian_phone) }}
+            </div>
+        </div>
+
+        <!-- 5. الأولاد -->
+        <div class="se-card">
+            <h3>الأولاد ({{ children|length }} حالياً)</h3>
+            <div id="childrenContainer">
+                {% for child in children %}
+                <div class="child-row">
+                    <div style="font-weight:600;margin-bottom:0.3rem;">طفل {{ loop.index }}</div>
+                    <div class="se-grid">
+                        <div class="se-field"><label>الاسم</label><input class="ch-name" value="{{ child.name or '' }}"></div>
+                        <div class="se-field"><label>الجنس</label><select class="ch-gender"><option value="">-</option><option value="male" {{ 'selected' if child.gender=='male' }}>ذكر</option><option value="female" {{ 'selected' if child.gender=='female' }}>أنثى</option></select></div>
+                        <div class="se-field"><label>سنة الميلاد</label><input type="number" class="ch-birth" value="{{ child.birth_year or '' }}"></div>
+                        <div class="se-field"><label>المستوى التعليمي</label><input class="ch-edu" value="{{ child.education or '' }}"></div>
+                        <div class="se-field"><label>المدرسة/الجامعة</label><input class="ch-school" value="{{ child.school or child.university or '' }}"></div>
+                        <div class="se-field"><label>العمل</label><input class="ch-job" value="{{ child.job or '' }}"></div>
+                        <div class="se-field"><label>ملاحظات صحية</label><input class="ch-health" value="{{ child.health_notes or '' }}"></div>
+                        <div class="se-field"><label>احتياجات خاصة</label><input class="ch-special" value="{{ child.special_needs or '' }}"></div>
+                    </div>
+                    <button type="button" onclick="this.closest('.child-row').remove();updateChildrenJSON();" style="margin-top:0.3rem;color:#dc2626;background:none;border:none;cursor:pointer;font-size:0.8rem;">حذف هذا الطفل</button>
                 </div>
-                <div>
-                    <label style="font-size:0.82rem;color:var(--text-light);">المحافظة</label>
-                    <select name="province" style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;">
-                        <option value="">-</option>
-                        {% for p in ['دمشق','ريف دمشق','حلب','حمص','حماة','اللاذقية','طرطوس','إدلب','دير الزور','الرقة','الحسكة','درعا','السويداء','القنيطرة'] %}
-                        <option value="{{ p }}" {{ 'selected' if record.province == p }}>{{ p }}</option>
-                        {% endfor %}
-                    </select>
+                {% endfor %}
+            </div>
+            <button type="button" onclick="addChild()" class="btn btn-outline btn-sm" style="margin-top:0.5rem;">+ إضافة طفل</button>
+            <input type="hidden" name="children_data" id="childrenDataJSON" value="">
+        </div>
+
+        <!-- 6. السكن والعمل -->
+        <div class="se-card">
+            <h3>البيانات السكنية والاقتصادية</h3>
+            <div class="se-grid">
+                {{ F('address_area', 'المنطقة / الحي', record.address_area) }}
+                {{ F('address', 'العنوان التفصيلي', record.address) }}
+                {{ F('housing_type', 'نوع السكن', record.housing_type) }}
+                {{ F('rent_amount', 'مبلغ الإيجار', record.rent_amount) }}
+                {{ F('employment', 'حالة العمل', record.employment) }}
+                {{ F('profession', 'المهنة', record.profession) }}
+                {{ F('employer', 'جهة العمل', record.employer) }}
+                {{ F('breadwinner', 'المعيل', record.breadwinner) }}
+                {{ F('breadwinner_job', 'عمل المعيل', record.breadwinner_job) }}
+                {{ F('breadwinner_relation', 'صلة المعيل', record.breadwinner_relation) }}
+            </div>
+        </div>
+
+        <!-- 7. التعليم -->
+        <div class="se-card">
+            <h3>التحصيل العلمي</h3>
+            <div class="se-grid">
+                {{ F('education', 'المستوى التعليمي', record.education) }}
+                {{ F('edu_type', 'نوع التعليم', record.edu_type) }}
+                {{ F('edu_specialization', 'التخصص', record.edu_specialization) }}
+                {{ F('edu_university', 'الجامعة/المعهد', record.edu_university) }}
+            </div>
+        </div>
+
+        <!-- 8. الصحة -->
+        <div class="se-card">
+            <h3>الحالة الصحية</h3>
+            <div class="se-grid">
+                {{ F('chronic', 'أمراض مزمنة', record.chronic) }}
+                {{ F('other_diseases', 'أمراض أخرى', record.other_diseases) }}
+                <div class="se-field">
+                    <label><input type="checkbox" name="has_special_needs" value="1" {{ 'checked' if record.has_special_needs }}> ذوي احتياجات خاصة</label>
+                </div>
+                {{ F('special_needs_details', 'تفاصيل الاحتياجات', record.special_needs_details) }}
+            </div>
+        </div>
+
+        <!-- 9. القانونية والجمعيات -->
+        <div class="se-card">
+            <h3>المشاكل القانونية والجمعيات</h3>
+            <div class="se-grid">
+                {{ S('legal', 'مشاكل قانونية', record.legal, [('yes','نعم'),('no','لا')]) }}
+                {{ S('assoc', 'مسجل لدى جمعية', record.assoc, [('yes','نعم'),('no','لا')]) }}
+                {{ F('assoc_name', 'اسم الجمعية', record.assoc_name) }}
+                {{ F('service_type', 'نوع الخدمة المطلوبة', record.service_type) }}
+                <div class="se-field">
+                    <label><input type="checkbox" name="is_officially_registered" value="1" {{ 'checked' if record.is_officially_registered }}> مسجل رسمياً</label>
+                </div>
+            </div>
+            <div class="se-field">
+                <label>تفاصيل قانونية</label>
+                <textarea name="legal_details" rows="2">{{ record.legal_details or '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- 10. بيانات المُبلِّغ -->
+        <div class="se-card">
+            <h3>بيانات المُبلِّغ</h3>
+            <div class="se-grid">
+                {{ F('reporter_name', 'اسم المُبلِّغ', record.reporter_name) }}
+                {{ F('reporter_relation', 'صلة المُبلِّغ', record.reporter_relation) }}
+                {{ F('reporter_phone', 'هاتف المُبلِّغ', record.reporter_phone) }}
+                {{ F('reporter_id', 'رقم هوية المُبلِّغ', record.reporter_id) }}
+                <div class="se-field">
+                    <label><input type="checkbox" name="informant_consent" value="1" {{ 'checked' if record.informant_consent }}> موافقة المُبلِّغ</label>
                 </div>
             </div>
         </div>
 
-        <div class="card" style="padding:1rem;margin-bottom:1rem;">
-            <h3 style="margin-bottom:0.8rem;">الحالة والاعتقال</h3>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;">
-                <div>
-                    <label style="font-size:0.82rem;color:var(--text-light);">الحالة</label>
-                    <select name="status" style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;">
-                        <option value="">-</option>
-                        <option value="survivor" {{ 'selected' if record.status == 'survivor' }}>ناجي / مفرج عنه</option>
-                        <option value="enforced" {{ 'selected' if record.status == 'enforced' }}>مختفي قسرياً / معتقل</option>
-                        <option value="deceased" {{ 'selected' if record.status == 'deceased' }}>متوفى</option>
-                    </select>
+        <!-- 11. الأدلة الرقمية -->
+        <div class="se-card">
+            <h3>الأدلة الرقمية</h3>
+            <div class="se-grid">
+                {{ F('digital_evidence_type', 'نوع الدليل', record.digital_evidence_type) }}
+                {{ F('digital_evidence_url', 'رابط الدليل', record.digital_evidence_url) }}
+                {{ F('digital_evidence_url_status', 'حالة الرابط', record.digital_evidence_url_status) }}
+                {{ F('digital_evidence_date', 'تاريخ الدليل', record.digital_evidence_date) }}
+                {{ F('digital_evidence_person_name', 'اسم الشخص في الدليل', record.digital_evidence_person_name) }}
+                {{ F('digital_evidence_death_date', 'تاريخ الوفاة في الدليل', record.digital_evidence_death_date) }}
+            </div>
+            <div class="se-field">
+                <label>وصف الدليل</label>
+                <textarea name="digital_evidence_description" rows="2">{{ record.digital_evidence_description or '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- 12. السجل المدني -->
+        <div class="se-card">
+            <h3>السجل المدني</h3>
+            <div class="se-grid">
+                {{ F('civil_registry_status', 'حالة السجل المدني', record.civil_registry_status) }}
+                {{ F('civil_registry_date', 'تاريخ التحديث', record.civil_registry_date) }}
+                <div class="se-field">
+                    <label><input type="checkbox" name="has_conflicting_info" value="1" {{ 'checked' if record.has_conflicting_info }}> معلومات متضاربة</label>
                 </div>
-                <div>
-                    <label style="font-size:0.82rem;color:var(--text-light);">الحالة الاجتماعية</label>
-                    <select name="marital" style="width:100%;padding:0.4rem;border:1px solid var(--border);border-radius:6px;">
-                        <option value="">-</option>
-                        <option value="single" {{ 'selected' if record.marital == 'single' }}>أعزب</option>
-                        <option value="married" {{ 'selected' if record.marital == 'married' }}>متزوج</option>
-                        <option value="divorced" {{ 'selected' if record.marital == 'divorced' }}>مطلق</option>
-                        <option value="widowed" {{ 'selected' if record.marital == 'widowed' }}>أرمل</option>
-                    </select>
+            </div>
+            <div class="se-field">
+                <label>تفاصيل التضارب</label>
+                <textarea name="conflicting_info_details" rows="2">{{ record.conflicting_info_details or '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- 13. الملفات والوثائق -->
+        <div class="se-card">
+            <h3>رفع ملفات ووثائق</h3>
+            <div class="se-grid">
+                <div class="se-field">
+                    <label>الصورة الشخصية {% if record.photo_path %}<span style="color:#059669;">(موجودة)</span>{% else %}<span class="se-empty">(فارغ)</span>{% endif %}</label>
+                    <input type="file" name="photo" accept="image/*">
                 </div>
-                {{ edit_field('arrest_place', 'مكان الاعتقال', record.arrest_place) }}
-                {{ edit_field('arrest_authority', 'الجهة المعتقلة', record.arrest_authority) }}
-                {{ edit_field('arrest_reason', 'سبب الاعتقال', record.arrest_reason) }}
-                {{ edit_field('arrest_year', 'سنة الاعتقال', record.arrest_year, 'number') }}
+                <div class="se-field">
+                    <label>وثيقة الهوية {% if record.document_path %}<span style="color:#059669;">(موجودة)</span>{% else %}<span class="se-empty">(فارغ)</span>{% endif %}</label>
+                    <input type="file" name="document" accept="image/*,.pdf">
+                </div>
+                <div class="se-field">
+                    <label>لقطة شاشة دليل رقمي {% if record.digital_evidence_screenshot_path %}<span style="color:#059669;">(موجودة)</span>{% else %}<span class="se-empty">(فارغ)</span>{% endif %}</label>
+                    <input type="file" name="digital_evidence_screenshot" accept="image/*,.pdf">
+                </div>
+                <div class="se-field">
+                    <label>وثيقة السجل المدني {% if record.civil_registry_document_path %}<span style="color:#059669;">(موجودة)</span>{% else %}<span class="se-empty">(فارغ)</span>{% endif %}</label>
+                    <input type="file" name="civil_registry_document" accept="image/*,.pdf">
+                </div>
+                <div class="se-field">
+                    <label>ملخص تجربة الناجي {% if record.survivor_cv_path %}<span style="color:#059669;">(موجود)</span>{% else %}<span class="se-empty">(فارغ)</span>{% endif %}</label>
+                    <input type="file" name="survivor_cv" accept="image/*,.pdf,.doc,.docx">
+                </div>
+                <div class="se-field">
+                    <label>صورة بعد الإفراج {% if record.survivor_cv_photo_path %}<span style="color:#059669;">(موجودة)</span>{% else %}<span class="se-empty">(فارغ)</span>{% endif %}</label>
+                    <input type="file" name="survivor_cv_photo" accept="image/*">
+                </div>
             </div>
         </div>
 
-        <div class="card" style="padding:1rem;margin-bottom:1rem;">
-            <h3 style="margin-bottom:0.8rem;">العنوان والمهنة</h3>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;">
-                {{ edit_field('address', 'العنوان', record.address) }}
-                {{ edit_field('address_area', 'المنطقة', record.address_area) }}
-                {{ edit_field('housing_type', 'نوع السكن', record.housing_type) }}
-                {{ edit_field('employment', 'حالة العمل', record.employment) }}
-                {{ edit_field('profession', 'المهنة', record.profession) }}
-                {{ edit_field('education', 'المستوى التعليمي', record.education) }}
+        <!-- 14. ملاحظات ومنهجية -->
+        <div class="se-card">
+            <h3>ملاحظات ومنهجية</h3>
+            <div class="se-field">
+                <label>ملاحظات عامة</label>
+                <textarea name="notes" rows="3">{{ record.notes or '' }}</textarea>
+            </div>
+            <div class="se-field">
+                <label>ملاحظات المنهجية</label>
+                <textarea name="methodology_notes" rows="2">{{ record.methodology_notes or '' }}</textarea>
+            </div>
+            <div class="se-grid">
+                {{ F('methodology_type', 'نوع المنهجية', record.methodology_type) }}
+                {{ F('source_url', 'رابط المصدر', record.source_url) }}
+                {{ F('source_type', 'نوع المصدر', record.source_type) }}
+            </div>
+            <div class="se-field">
+                <label>نص تجربة الناجي</label>
+                <textarea name="survivor_cv_text" rows="3">{{ record.survivor_cv_text or '' }}</textarea>
             </div>
         </div>
 
-        <div class="card" style="padding:1rem;margin-bottom:1rem;">
-            <h3 style="margin-bottom:0.8rem;">العائلة</h3>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;">
-                {{ edit_field('spouse_name', 'اسم الزوج/ة', record.spouse_name) }}
-                {{ edit_field('spouse_phone', 'هاتف الزوج/ة', record.spouse_phone) }}
-                {{ edit_field('guardian_name', 'اسم الوصي', record.guardian_name) }}
-                {{ edit_field('guardian_phone', 'هاتف الوصي', record.guardian_phone) }}
-            </div>
-        </div>
-
-        <div class="card" style="padding:1rem;margin-bottom:1rem;">
-            <h3 style="margin-bottom:0.8rem;">رفع صورة شخصية</h3>
-            {% if record.photo_path %}
-            <div style="margin-bottom:0.5rem;">
-                <span style="font-size:0.85rem;color:var(--text-light);">الصورة الحالية موجودة</span>
-            </div>
-            {% else %}
-            <div style="margin-bottom:0.5rem;">
-                <span style="font-size:0.85rem;color:#e67e22;">لا توجد صورة شخصية حالياً</span>
-            </div>
-            {% endif %}
-            <input type="file" name="photo" accept="image/*"
-                style="border:1px solid var(--border);border-radius:6px;padding:0.4rem;width:100%;">
-        </div>
-
-        <div class="card" style="padding:1rem;margin-bottom:1rem;">
-            <h3 style="margin-bottom:0.8rem;">ملاحظات</h3>
-            <textarea name="notes" rows="3" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;">{{ record.notes or '' }}</textarea>
-        </div>
-
-        <div style="display:flex;gap:0.5rem;">
-            <button type="submit" class="btn btn-primary">إرسال اقتراح التعديل للمراجعة</button>
+        <div style="display:flex;gap:0.5rem;margin-bottom:2rem;">
+            <button type="submit" class="btn btn-primary" onclick="updateChildrenJSON();">إرسال اقتراح التعديل للمراجعة</button>
             <a href="{{ url_for('admin_record_detail', record_id=record.id) }}" class="btn btn-outline">إلغاء</a>
         </div>
     </form>
 </div>
+
+<script>
+function addChild() {
+    var container = document.getElementById('childrenContainer');
+    var idx = container.querySelectorAll('.child-row').length + 1;
+    var html = '<div class="child-row">'
+        + '<div style="font-weight:600;margin-bottom:0.3rem;">طفل ' + idx + '</div>'
+        + '<div class="se-grid">'
+        + '<div class="se-field"><label>الاسم</label><input class="ch-name" value=""></div>'
+        + '<div class="se-field"><label>الجنس</label><select class="ch-gender"><option value="">-</option><option value="male">ذكر</option><option value="female">أنثى</option></select></div>'
+        + '<div class="se-field"><label>سنة الميلاد</label><input type="number" class="ch-birth" value=""></div>'
+        + '<div class="se-field"><label>المستوى التعليمي</label><input class="ch-edu" value=""></div>'
+        + '<div class="se-field"><label>المدرسة/الجامعة</label><input class="ch-school" value=""></div>'
+        + '<div class="se-field"><label>العمل</label><input class="ch-job" value=""></div>'
+        + '<div class="se-field"><label>ملاحظات صحية</label><input class="ch-health" value=""></div>'
+        + '<div class="se-field"><label>احتياجات خاصة</label><input class="ch-special" value=""></div>'
+        + '</div>'
+        + '<button type="button" onclick="this.closest(\'.child-row\').remove();updateChildrenJSON();" style="margin-top:0.3rem;color:#dc2626;background:none;border:none;cursor:pointer;font-size:0.8rem;">حذف هذا الطفل</button>'
+        + '</div>';
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+function updateChildrenJSON() {
+    var rows = document.querySelectorAll('#childrenContainer .child-row');
+    var children = [];
+    rows.forEach(function(row) {
+        var name = (row.querySelector('.ch-name') || {}).value || '';
+        if (!name) return;
+        var currentYear = new Date().getFullYear();
+        var birthYear = parseInt((row.querySelector('.ch-birth') || {}).value) || 0;
+        children.push({
+            name: name,
+            gender: (row.querySelector('.ch-gender') || {}).value || '',
+            birth_year: birthYear,
+            age: birthYear ? (currentYear - birthYear) : 0,
+            education: (row.querySelector('.ch-edu') || {}).value || '',
+            school: (row.querySelector('.ch-school') || {}).value || '',
+            university: '',
+            employment: '',
+            job: (row.querySelector('.ch-job') || {}).value || '',
+            health_notes: (row.querySelector('.ch-health') || {}).value || '',
+            special_needs: (row.querySelector('.ch-special') || {}).value || ''
+        });
+    });
+    document.getElementById('childrenDataJSON').value = JSON.stringify(children);
+}
+
+// Set initial children JSON on load
+document.addEventListener('DOMContentLoaded', function() { updateChildrenJSON(); });
+</script>
 {% endblock %}

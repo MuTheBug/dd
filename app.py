@@ -93,7 +93,7 @@ def csrf_protect():
     if request.method in ('POST', 'PUT', 'DELETE'):
         # Exempt the public entry form AJAX submissions and API endpoints
         if request.endpoint and request.endpoint.startswith('api_'):
-            pass  # API endpoints use JSON / X-Requested-With
+            pass  # API endpoints use JSON / X-Requested-With (sync uses X-Sync-User/X-Sync-Pass)
         elif request.is_json:
             pass
         elif not validate_csrf_token():
@@ -140,7 +140,8 @@ def enforce_role_permissions():
     if role == 'data_entry':
         # data_entry can access entry form, submit, browse records, suggest edits, notifications
         allowed = common_allowed + ('entry_form', 'entry_submit', 'admin_dashboard',
-                                     'api_draft_save', 'api_draft_load', 'api_draft_clear') + shared_endpoints
+                                     'api_draft_save', 'api_draft_load', 'api_draft_clear',
+                                     'offline_form_page', 'offline_form_download') + shared_endpoints
         if endpoint not in allowed:
             flash('صلاحيتك محدودة بصفحة إدخال البيانات والسجلات فقط', 'error')
             return redirect(url_for('entry_form'))
@@ -749,6 +750,8 @@ def migrate_db():
         'spouse_previous_children_data': "TEXT DEFAULT '[]'",
         # Berkeley Protocol: structured methodology type
         'methodology_type': "TEXT DEFAULT ''",
+        # Offline form sync: client-generated UUID for idempotent dedup
+        'client_uuid': "TEXT DEFAULT ''",
     }
 
     for col, typedef in new_columns.items():
@@ -1261,6 +1264,7 @@ def migrate_db():
         "CREATE INDEX IF NOT EXISTS idx_record_detentions_record_id ON record_detentions(record_id)",
         "CREATE INDEX IF NOT EXISTS idx_record_detentions_facility ON record_detentions(facility_name)",
         "CREATE INDEX IF NOT EXISTS idx_record_documents_record_id ON record_documents(record_id)",
+        "CREATE INDEX IF NOT EXISTS idx_records_client_uuid ON records(client_uuid)",
     ]
     for stmt in index_statements:
         try:
@@ -8362,6 +8366,303 @@ def admin_import_template():
     return send_file(buf, as_attachment=True,
                      download_name=f'template_{import_type}.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+# ---------------------------------------------------------------------------
+# Offline form sync API
+# ---------------------------------------------------------------------------
+def _verify_sync_user(username, password):
+    """Verify a user's credentials for offline sync. Returns user dict or None."""
+    if not username or not password:
+        return None
+    db = get_db()
+    user = db.execute(
+        "SELECT id, username, display_name, role, is_active, password_hash FROM users WHERE username=? AND is_active=1",
+        (username,)
+    ).fetchone()
+    if user and check_password_hash(user['password_hash'], password):
+        return dict(user)
+    # Fall back to legacy admin password file
+    if username == 'admin':
+        try:
+            pw_hash = _get_admin_password_hash()
+            if check_password_hash(pw_hash, password):
+                return {'id': 0, 'username': 'admin', 'display_name': 'admin', 'role': 'admin', 'is_active': 1}
+        except Exception:
+            pass
+    return None
+
+
+def _add_cors_headers(resp):
+    """Allow cross-origin sync requests (offline form may be served from file:// or LAN IP)."""
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS, GET'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, X-Sync-User, X-Sync-Pass'
+    resp.headers['Access-Control-Max-Age'] = '600'
+    return resp
+
+
+@app.route('/api/sync/ping', methods=['GET', 'OPTIONS'])
+def api_sync_ping():
+    """Health check for offline form to verify server is reachable."""
+    if request.method == 'OPTIONS':
+        return _add_cors_headers(make_response('', 204))
+    return _add_cors_headers(jsonify({'ok': True, 'app': 'haqquna', 'version': '1.0'}))
+
+
+@app.route('/api/sync/login', methods=['POST', 'OPTIONS'])
+def api_sync_login():
+    """Verify credentials before sync. Returns role + display_name."""
+    if request.method == 'OPTIONS':
+        return _add_cors_headers(make_response('', 204))
+    username = request.headers.get('X-Sync-User') or (request.form.get('username') if not request.is_json else (request.get_json(silent=True) or {}).get('username', ''))
+    password = request.headers.get('X-Sync-Pass') or (request.form.get('password') if not request.is_json else (request.get_json(silent=True) or {}).get('password', ''))
+    user = _verify_sync_user(username, password)
+    if not user:
+        return _add_cors_headers(jsonify({'success': False, 'error': 'invalid_credentials'})), 401
+    if user.get('role') not in ('admin', 'data_entry'):
+        return _add_cors_headers(jsonify({'success': False, 'error': 'insufficient_role'})), 403
+    return _add_cors_headers(jsonify({
+        'success': True,
+        'username': user['username'],
+        'display_name': user.get('display_name') or user['username'],
+        'role': user.get('role', 'admin'),
+    }))
+
+
+@app.route('/api/sync/entries', methods=['POST', 'OPTIONS'])
+def api_sync_entries():
+    """Receive a single entry from the offline form and insert it into the main database.
+
+    Auth: X-Sync-User + X-Sync-Pass headers (or username/password in form).
+    Body: multipart/form-data with same field names as /entry POST.
+    Idempotency: client_uuid in form; if a record with that uuid already exists, return its id.
+    """
+    if request.method == 'OPTIONS':
+        return _add_cors_headers(make_response('', 204))
+
+    username = request.headers.get('X-Sync-User') or request.form.get('username', '')
+    password = request.headers.get('X-Sync-Pass') or request.form.get('password', '')
+    user = _verify_sync_user(username, password)
+    if not user:
+        print(f"   🔒 SYNC AUTH FAILED for user '{username}'")
+        return _add_cors_headers(jsonify({'success': False, 'error': 'invalid_credentials'})), 401
+    if user.get('role') not in ('admin', 'data_entry'):
+        return _add_cors_headers(jsonify({'success': False, 'error': 'insufficient_role'})), 403
+
+    db = get_db()
+    form = request.form
+    client_uuid = form.get('client_uuid', '').strip()
+    submitter = user['username']
+
+    print(f"\n{'='*60}")
+    print(f"📡 SYNC ENTRY from offline form (user: {submitter})")
+    print(f"   client_uuid: {client_uuid}")
+    print(f"   Name: {form.get('first_name','')} {form.get('father_name','')} {form.get('last_name','')}")
+    print(f"{'='*60}")
+
+    if not client_uuid:
+        return _add_cors_headers(jsonify({'success': False, 'error': 'missing_client_uuid'})), 400
+
+    # Idempotency check — return existing record if already synced
+    existing = db.execute(
+        "SELECT id FROM records WHERE client_uuid=? AND deleted_at IS NULL",
+        (client_uuid,)
+    ).fetchone()
+    if existing:
+        print(f"   ↩️  Already synced as record #{existing['id']}")
+        return _add_cors_headers(jsonify({
+            'success': True, 'server_id': existing['id'], 'duplicate_uuid': True,
+            'message': f"already synced as #{existing['id']}"
+        }))
+
+    errors, warnings = _validate_entry(form)
+    if errors:
+        print(f"   ❌ VALIDATION FAILED: {errors}")
+        return _add_cors_headers(jsonify({'success': False, 'errors': errors, 'warnings': warnings})), 400
+
+    # Handle uploads (same fields as /entry)
+    photo_path, photo_hash = '', ''
+    doc_path, doc_hash = '', ''
+    screenshot_path, screenshot_hash = '', ''
+    civil_doc_path = ''
+    cv_path = ''
+    cv_photo_path = ''
+    if 'photo' in request.files:
+        photo_path, photo_hash = save_upload(request.files['photo'], 'photos')
+        photo_path = photo_path or ''
+        photo_hash = photo_hash or ''
+    if 'document' in request.files:
+        doc_path, doc_hash = save_upload(request.files['document'], 'documents')
+        doc_path = doc_path or ''
+        doc_hash = doc_hash or ''
+    if 'digital_evidence_screenshot' in request.files:
+        screenshot_path, screenshot_hash = save_upload(request.files['digital_evidence_screenshot'], 'screenshots')
+        screenshot_path = screenshot_path or ''
+        screenshot_hash = screenshot_hash or ''
+    if 'civil_registry_document' in request.files:
+        civil_doc_path, _ = save_upload(request.files['civil_registry_document'], 'documents')
+        civil_doc_path = civil_doc_path or ''
+    if 'survivor_cv' in request.files:
+        cv_path, _ = save_upload(request.files['survivor_cv'], 'documents')
+        cv_path = cv_path or ''
+    if 'survivor_cv_photo' in request.files:
+        cv_photo_path, _ = save_upload(request.files['survivor_cv_photo'], 'photos')
+        cv_photo_path = cv_photo_path or ''
+
+    witnesses = form.get('witnesses_data', '[]')
+    detention_facilities = form.get('detention_facilities_data', '[]')
+    children_data = form.get('children_data', '[]')
+    children_data_w = form.get('children_data_w', '[]')
+
+    chronic_list = form.getlist('chronic_list')
+    chronic_value = '، '.join(chronic_list) if chronic_list else form.get('chronic', '')
+    has_hypertension = 1 if 'ضغط الدم' in chronic_list else int(form.get('has_hypertension', 0) or 0)
+    has_diabetes = 1 if 'السكري' in chronic_list else int(form.get('has_diabetes', 0) or 0)
+
+    slug = f"{form.get('first_name','')}-{form.get('last_name','')}-{int(time.time())}".replace(' ', '-')
+
+    try:
+        db.execute("""INSERT INTO records (
+            first_name, father_name, last_name, gender, mother_name,
+            birth_day, birth_month, birth_year, province, national_id, family_book_number,
+            phone, blood_type, photo_path, document_path,
+            arrest_day, arrest_month, arrest_year, arrest_place,
+            arrest_authority, arrest_reason, arrest_causer,
+            status, release_day, release_month, release_year,
+            death_day, death_month, death_year, death_place,
+            marital, guardian_name, guardian_relation, guardian_phone,
+            spouse_name, spouse_phone, has_kids, kids_count, children_data,
+            ex_spouse_name, has_kids_w, kids_count_w, children_data_w,
+            address, housing_type, rent_amount,
+            employment, profession, employer, breadwinner,
+            breadwinner_job, breadwinner_relation, breadwinner_relation_other,
+            chronic, diseases, has_hypertension, has_diabetes, other_diseases,
+            has_special_needs, special_needs_details,
+            education, edu_type, edu_specialization, edu_university,
+            kids_under_18_count, is_officially_registered,
+            legal, legal_details, assoc, assoc_name, service_type,
+            notes,
+            case_type, reporter_name, reporter_relation, reporter_phone, reporter_id,
+            informant_consent, witnesses_data,
+            digital_evidence_type, digital_evidence_url, digital_evidence_url_status,
+            digital_evidence_screenshot_path, digital_evidence_date,
+            digital_evidence_description, digital_evidence_person_name,
+            digital_evidence_death_date,
+            civil_registry_status, civil_registry_date, civil_registry_document_path,
+            has_conflicting_info, conflicting_info_details,
+            evidence_level, evidence_sources_count,
+            last_known_alive_date, last_known_location,
+            detention_facilities_data,
+            source_type, source_url, collection_date, collector_name,
+            verification_status, methodology_notes, methodology_type,
+            record_slug, photo_hash, document_hash,
+            survivor_cv_path, survivor_cv_text, survivor_cv_photo_path,
+            address_area, screenshot_hash, client_uuid
+        ) VALUES (
+            ?,?,?,?,?, ?,?,?,?,?,?, ?,?,?,?, ?,?,?,?,
+            ?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,?,?,
+            ?,?,?,?, ?,?,?, ?,?,?,?, ?,?,?, ?,?,?,?,?,
+            ?,?, ?,?,?,?, ?,?, ?,?,?,?,?, ?,
+            ?,?,?,?,?, ?,?, ?,?,?, ?,?, ?,?, ?,
+            ?,?,?, ?,?, ?,?, ?,?, ?,
+            ?,?,?,?, ?,?, ?,?,?,?, ?,?,?,?,?,?
+        )""", (
+            form.get('first_name', ''), form.get('father_name', ''), form.get('last_name', ''),
+            form.get('gender', ''), form.get('mother_name', ''),
+            int(form.get('birth_day', 0) or 0), int(form.get('birth_month', 0) or 0),
+            int(form.get('birth_year', 0) or 0),
+            form.get('province', ''), form.get('national_id', ''),
+            form.get('family_book_number', ''),
+            form.get('phone', ''), form.get('blood_type', ''),
+            photo_path, doc_path,
+            int(form.get('arrest_day', 0) or 0), int(form.get('arrest_month', 0) or 0),
+            int(form.get('arrest_year', 0) or 0), form.get('arrest_place', ''),
+            form.get('arrest_authority', ''), form.get('arrest_reason', ''),
+            form.get('arrest_causer', ''),
+            form.get('status', ''), int(form.get('release_day', 0) or 0),
+            int(form.get('release_month', 0) or 0), int(form.get('release_year', 0) or 0),
+            int(form.get('death_day', 0) or 0), int(form.get('death_month', 0) or 0),
+            int(form.get('death_year', 0) or 0), form.get('death_place', ''),
+            form.get('marital', ''), form.get('guardian_name', ''),
+            form.get('guardian_relation', ''), form.get('guardian_phone', ''),
+            form.get('spouse_name', ''), form.get('spouse_phone', ''),
+            form.get('has_kids', 'no'), int(form.get('kids_count', 0) or 0),
+            children_data,
+            form.get('ex_spouse_name', ''), form.get('has_kids_w', 'no'),
+            int(form.get('kids_count_w', 0) or 0), children_data_w,
+            form.get('address', ''), form.get('housing_type', ''),
+            form.get('rent_amount', ''),
+            form.get('employment', ''), form.get('profession', ''),
+            form.get('employer', ''), form.get('breadwinner', ''),
+            form.get('breadwinner_job', ''), form.get('breadwinner_relation', ''),
+            form.get('breadwinner_relation_other', ''),
+            chronic_value, form.get('diseases', ''),
+            has_hypertension, has_diabetes, form.get('other_diseases', ''),
+            int(form.get('has_special_needs', 0) or 0),
+            form.get('special_needs_details', ''),
+            form.get('education', ''), form.get('edu_type', ''),
+            form.get('edu_specialization', ''), form.get('edu_university', ''),
+            int(form.get('kids_under_18_count', 0) or 0),
+            int(form.get('is_officially_registered', 0) or 0),
+            form.get('legal', ''), form.get('legal_details', ''),
+            form.get('assoc', ''), form.get('assoc_name', ''),
+            form.get('service_type', ''),
+            form.get('notes', ''),
+            form.get('case_type', ''), form.get('reporter_name', ''),
+            form.get('reporter_relation', ''), form.get('reporter_phone', ''),
+            form.get('reporter_id', ''),
+            1 if form.get('informant_consent') else 0,
+            witnesses,
+            form.get('digital_evidence_type', ''), form.get('digital_evidence_url', ''),
+            form.get('digital_evidence_url_status', ''),
+            screenshot_path, form.get('digital_evidence_date', ''),
+            form.get('digital_evidence_description', ''),
+            form.get('digital_evidence_person_name', ''),
+            form.get('digital_evidence_death_date', ''),
+            form.get('civil_registry_status', ''), form.get('civil_registry_date', ''),
+            civil_doc_path,
+            1 if form.get('has_conflicting_info') else 0,
+            form.get('conflicting_info_details', ''),
+            form.get('evidence_level', 'unverified'),
+            int(form.get('evidence_sources_count', 0) or 0),
+            form.get('last_known_alive_date', ''), form.get('last_known_location', ''),
+            detention_facilities,
+            form.get('source_type', ''), form.get('source_url', ''),
+            form.get('collection_date', ''),
+            form.get('collector_name', '') or submitter,
+            'Unverified', form.get('methodology_notes', ''), form.get('methodology_type', ''),
+            slug, photo_hash, doc_hash,
+            cv_path, form.get('survivor_cv_text', ''), cv_photo_path,
+            form.get('address_area', ''), screenshot_hash, client_uuid
+        ))
+        db.commit()
+        new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        print(f"   ✅ SYNCED as record #{new_id}")
+        return _add_cors_headers(jsonify({
+            'success': True, 'server_id': new_id, 'warnings': warnings,
+            'message': f'تم المزامنة كسجل #{new_id}'
+        }))
+    except Exception as e:
+        print(f"   ❌ SYNC INSERT FAILED: {type(e).__name__}: {e}")
+        return _add_cors_headers(jsonify({'success': False, 'error': str(e)})), 500
+
+
+@app.route('/offline-form')
+@admin_required
+def offline_form_page():
+    """Admin page that explains the offline form and provides a download."""
+    return render_template('offline_form_info.html')
+
+
+@app.route('/offline-form/download')
+@admin_required
+def offline_form_download():
+    """Serve the standalone offline entry HTML file for download."""
+    template_path = os.path.join(BASE_DIR, 'templates', 'offline_entry.html')
+    return send_file(template_path, as_attachment=True,
+                     download_name='haqquna_offline_form.html',
+                     mimetype='text/html')
 
 
 if __name__ == '__main__':

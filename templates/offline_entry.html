@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>حقنا - نموذج إدخال بدون انترنت</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--primary:#1e40af;--primary-light:#3b82f6;--success:#059669;--danger:#dc2626;--warning:#f59e0b;--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--text:#1e293b;--text-light:#64748b;--radius:8px}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;direction:rtl}
+.container{max-width:800px;margin:0 auto;padding:1rem}
+h1{text-align:center;color:var(--primary);margin:1rem 0;font-size:1.5rem}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1rem}
+.section-title{font-weight:700;font-size:1rem;padding:0.5rem 0.8rem;margin:0 -1rem 0.8rem -1rem;background:#f1f5f9;border-bottom:1px solid var(--border);color:var(--primary)}
+.field{margin-bottom:0.7rem}
+.field label{display:block;font-size:0.85rem;font-weight:600;margin-bottom:0.2rem;color:var(--text)}
+.field input,.field select,.field textarea{width:100%;padding:0.45rem 0.6rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;font-family:inherit;background:#fff}
+.field textarea{resize:vertical}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary-light);box-shadow:0 0 0 2px rgba(59,130,246,0.15)}
+.row{display:flex;gap:0.6rem;flex-wrap:wrap}
+.row>.field{flex:1;min-width:140px}
+.row3>.field{flex:1;min-width:80px}
+.btn{display:inline-flex;align-items:center;gap:0.3rem;padding:0.5rem 1.2rem;border:none;border-radius:6px;font-size:0.9rem;font-family:inherit;cursor:pointer;transition:opacity 0.2s}
+.btn:hover{opacity:0.85}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-warning{background:var(--warning);color:#fff}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-sm{padding:0.3rem 0.7rem;font-size:0.82rem}
+.badge{display:inline-block;padding:0.15rem 0.5rem;border-radius:10px;font-size:0.78rem;font-weight:600}
+.badge-pending{background:#fef3c7;color:#92400e}
+.badge-synced{background:#d1fae5;color:#065f46}
+.badge-failed{background:#fee2e2;color:#991b1b}
+.tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:1rem;gap:0}
+.tab{padding:0.6rem 1.2rem;cursor:pointer;font-weight:600;font-size:0.9rem;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-light);transition:all 0.2s}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%);padding:0.7rem 1.5rem;border-radius:8px;color:#fff;font-weight:600;z-index:9999;animation:slideDown 0.3s ease}
+.toast-success{background:var(--success)}
+.toast-error{background:var(--danger)}
+.toast-info{background:var(--primary)}
+@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.file-preview{display:flex;align-items:center;gap:0.5rem;margin-top:0.3rem;font-size:0.82rem;color:var(--text-light)}
+.file-preview img{width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid var(--border)}
+.entries-list{max-height:60vh;overflow-y:auto}
+.entry-item{padding:0.7rem;border:1px solid var(--border);border-radius:6px;margin-bottom:0.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem}
+.entry-item:hover{background:#f8fafc}
+.stats-bar{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;font-size:0.88rem}
+.stat{padding:0.4rem 0.8rem;border-radius:6px;font-weight:600}
+.stat-total{background:#e0e7ff;color:#3730a3}
+.stat-pending{background:#fef3c7;color:#92400e}
+.stat-synced{background:#d1fae5;color:#065f46}
+.hidden{display:none!important}
+.sync-progress{margin:0.5rem 0;padding:0.5rem;background:#f1f5f9;border-radius:6px;font-size:0.85rem}
+.sync-progress .bar{height:6px;background:#e2e8f0;border-radius:3px;margin-top:0.3rem;overflow:hidden}
+.sync-progress .bar-fill{height:100%;background:var(--primary);transition:width 0.3s;border-radius:3px}
+@media(max-width:600px){.container{padding:0.5rem}.row>.field{min-width:100%}.tabs{overflow-x:auto}.tab{white-space:nowrap;padding:0.5rem 0.8rem;font-size:0.82rem}}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>حقنا - نموذج إدخال بدون انترنت</h1>
+
+<!-- Tabs -->
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('form')">نموذج جديد</div>
+    <div class="tab" onclick="switchTab('entries')">الحالات المحفوظة <span id="entriesCountBadge" style="background:var(--primary);color:#fff;padding:0 6px;border-radius:10px;font-size:0.75rem;margin-right:4px;">0</span></div>
+    <div class="tab" onclick="switchTab('settings')">الإعدادات والمزامنة</div>
+</div>
+
+<!-- ============ TAB: SETTINGS ============ -->
+<div id="tab-settings" class="tab-content">
+<div class="card">
+    <div class="section-title">اتصال السرفر</div>
+    <div class="field">
+        <label>عنوان السرفر (IP:Port)</label>
+        <input type="text" id="serverUrl" placeholder="مثال: 192.168.1.50:5000" dir="ltr" style="text-align:left">
+    </div>
+    <div class="field">
+        <label>اسم المستخدم</label>
+        <input type="text" id="syncUsername" placeholder="اسم المستخدم">
+    </div>
+    <div class="field">
+        <label>كلمة المرور</label>
+        <input type="password" id="syncPassword" placeholder="كلمة المرور">
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
+        <button class="btn btn-primary btn-sm" onclick="testConnection()">اختبار الاتصال</button>
+        <button class="btn btn-outline btn-sm" onclick="saveSettings()">حفظ الإعدادات</button>
+    </div>
+    <div id="connStatus" style="margin-top:0.5rem;font-size:0.85rem"></div>
+</div>
+
+<div class="card">
+    <div class="section-title">المزامنة</div>
+    <div class="stats-bar">
+        <span class="stat stat-total" id="statTotal">الإجمالي: 0</span>
+        <span class="stat stat-pending" id="statPending">بانتظار المزامنة: 0</span>
+        <span class="stat stat-synced" id="statSynced">تمت المزامنة: 0</span>
+    </div>
+    <button class="btn btn-success" onclick="syncAll()" id="syncBtn">مزامنة الحالات المعلقة</button>
+    <div id="syncProgress" class="sync-progress hidden">
+        <span id="syncText">جارٍ المزامنة...</span>
+        <div class="bar"><div class="bar-fill" id="syncBarFill" style="width:0%"></div></div>
+    </div>
+    <div id="syncLog" style="margin-top:0.5rem;font-size:0.82rem;max-height:200px;overflow-y:auto"></div>
+</div>
+
+<div class="card">
+    <div class="section-title">إدارة البيانات المحلية</div>
+    <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.5rem">البيانات محفوظة داخل المتصفح (IndexedDB). لا تمسح بيانات المتصفح قبل المزامنة!</p>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="exportLocalData()">تصدير نسخة احتياطية (JSON)</button>
+        <button class="btn btn-danger btn-sm" onclick="clearSyncedEntries()">حذف الحالات المتزامنة فقط</button>
+    </div>
+</div>
+</div>
+
+<!-- ============ TAB: ENTRIES LIST ============ -->
+<div id="tab-entries" class="tab-content">
+<div class="card">
+    <div class="section-title">الحالات المحفوظة محلياً</div>
+    <div class="stats-bar">
+        <span class="stat stat-total" id="statTotal2">الإجمالي: 0</span>
+        <span class="stat stat-pending" id="statPending2">معلقة: 0</span>
+        <span class="stat stat-synced" id="statSynced2">متزامنة: 0</span>
+    </div>
+    <div id="entriesList" class="entries-list">
+        <p style="text-align:center;color:var(--text-light);padding:2rem 0">لا توجد حالات محفوظة بعد.</p>
+    </div>
+</div>
+</div>
+
+<!-- ============ TAB: FORM ============ -->
+<div id="tab-form" class="tab-content active">
+<div id="entryForm">
+
+<!-- Section 1: Reporter & Case Classification -->
+<div class="card">
+    <div class="section-title">بيانات المُبلِّغ وتصنيف الحالة</div>
+    <div class="row">
+        <div class="field"><label>حالة الشخص *</label>
+            <select name="status" id="offStatus" onchange="handleStatusChange()">
+                <option value="">-- اختر --</option>
+                <option value="survivor">ناجٍ (على قيد الحياة)</option>
+                <option value="enforced">اختفاء قسري</option>
+                <option value="deceased">متوفى</option>
+                <option value="released">مُفرَج عنه</option>
+                <option value="unknown">غير معروف</option>
+            </select>
+        </div>
+        <div class="field"><label>تصنيف الحالة</label>
+            <select name="case_type" id="offCaseType"></select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="field"><label>اسم المُبلِّغ *</label>
+            <input type="text" name="reporter_name" required placeholder="الاسم الكامل"></div>
+        <div class="field"><label>صلة المُبلِّغ بالضحية *</label>
+            <select name="reporter_relation" required>
+                <option value="">-- اختر --</option>
+                <option value="self">الشخص نفسه</option>
+                <option value="spouse">زوج/ة</option>
+                <option value="parent">أب/أم</option>
+                <option value="sibling">أخ/أخت</option>
+                <option value="child">ابن/ابنة</option>
+                <option value="relative">قريب</option>
+                <option value="friend">صديق</option>
+                <option value="neighbor">جار</option>
+                <option value="lawyer">محامٍ</option>
+                <option value="other">أخرى</option>
+            </select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="field"><label>هاتف المُبلِّغ</label>
+            <input type="tel" name="reporter_phone" placeholder="رقم الهاتف"></div>
+        <div class="field"><label>الرقم الوطني للمُبلِّغ</label>
+            <input type="text" name="reporter_id" placeholder="الرقم الوطني"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>اسم جامع البيانات</label>
+            <input type="text" name="collector_name" placeholder="اسم الموظف/المتطوع"></div>
+        <div class="field"><label>تاريخ الجمع</label>
+            <input type="date" name="collection_date"></div>
+        <div class="field"><label>نوع المصدر *</label>
+            <select name="source_type" required>
+                <option value="">-- اختر --</option>
+                <option value="family">عائلة الضحية</option>
+                <option value="survivor">الناجي نفسه</option>
+                <option value="witness">شاهد عيان</option>
+                <option value="ngo">منظمة غير حكومية</option>
+                <option value="media">وسائل إعلام</option>
+                <option value="leaked">تسريبات</option>
+                <option value="other">أخرى</option>
+            </select>
+        </div>
+    </div>
+    <div class="field" style="margin-top:0.3rem">
+        <label><input type="checkbox" name="informant_consent" value="1"> أوافق على استخدام هذه البيانات لأغراض التوثيق</label>
+    </div>
+</div>
+
+<!-- Section 2: Personal Info -->
+<div class="card">
+    <div class="section-title">البيانات الشخصية للضحية</div>
+    <div class="row">
+        <div class="field"><label>الاسم الأول *</label>
+            <input type="text" name="first_name" required placeholder="الاسم الأول"></div>
+        <div class="field"><label>اسم الأب *</label>
+            <input type="text" name="father_name" required placeholder="اسم الأب"></div>
+        <div class="field"><label>اسم العائلة *</label>
+            <input type="text" name="last_name" required placeholder="الكنية"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>اسم الأم</label>
+            <input type="text" name="mother_name" placeholder="اسم الأم الكامل"></div>
+        <div class="field"><label>الجنس *</label>
+            <select name="gender" required>
+                <option value="">-- اختر --</option>
+                <option value="male">ذكر</option>
+                <option value="female">أنثى</option>
+            </select>
+        </div>
+    </div>
+    <div class="row row3">
+        <div class="field"><label>يوم الميلاد</label>
+            <input type="number" name="birth_day" min="0" max="31" placeholder="اليوم"></div>
+        <div class="field"><label>شهر الميلاد</label>
+            <input type="number" name="birth_month" min="0" max="12" placeholder="الشهر"></div>
+        <div class="field"><label>سنة الميلاد</label>
+            <input type="number" name="birth_year" min="1900" max="2026" placeholder="السنة"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>المحافظة *</label>
+            <select name="province" required>
+                <option value="">-- اختر --</option>
+                <option value="دمشق">دمشق</option>
+                <option value="ريف دمشق">ريف دمشق</option>
+                <option value="حلب">حلب</option>
+                <option value="حمص">حمص</option>
+                <option value="حماة">حماة</option>
+                <option value="اللاذقية">اللاذقية</option>
+                <option value="طرطوس">طرطوس</option>
+                <option value="إدلب">إدلب</option>
+                <option value="دير الزور">دير الزور</option>
+                <option value="الرقة">الرقة</option>
+                <option value="الحسكة">الحسكة</option>
+                <option value="درعا">درعا</option>
+                <option value="السويداء">السويداء</option>
+                <option value="القنيطرة">القنيطرة</option>
+            </select>
+        </div>
+        <div class="field"><label>الرقم الوطني *</label>
+            <input type="text" name="national_id" required placeholder="الرقم الوطني"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>رقم دفتر العائلة</label>
+            <input type="text" name="family_book_number" placeholder="رقم دفتر العائلة"></div>
+        <div class="field"><label>هاتف الضحية</label>
+            <input type="tel" name="phone" placeholder="رقم الهاتف"></div>
+        <div class="field"><label>فصيلة الدم</label>
+            <select name="blood_type">
+                <option value="">--</option>
+                <option>A+</option><option>A-</option>
+                <option>B+</option><option>B-</option>
+                <option>AB+</option><option>AB-</option>
+                <option>O+</option><option>O-</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Section 3: Attachments -->
+<div class="card">
+    <div class="section-title">المرفقات</div>
+    <div class="row">
+        <div class="field">
+            <label>صورة شخصية</label>
+            <input type="file" name="photo" accept="image/*" onchange="previewFile(this,'photoPreview')">
+            <div id="photoPreview" class="file-preview"></div>
+        </div>
+        <div class="field">
+            <label>وثيقة هوية</label>
+            <input type="file" name="document" accept="image/*,.pdf" onchange="previewFile(this,'docPreview')">
+            <div id="docPreview" class="file-preview"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 4: Arrest & Detention -->
+<div class="card">
+    <div class="section-title">تفاصيل الاعتقال والاحتجاز</div>
+    <div class="row row3">
+        <div class="field"><label>يوم الاعتقال</label>
+            <input type="number" name="arrest_day" min="0" max="31" placeholder="اليوم"></div>
+        <div class="field"><label>شهر الاعتقال</label>
+            <input type="number" name="arrest_month" min="0" max="12" placeholder="الشهر"></div>
+        <div class="field"><label>سنة الاعتقال</label>
+            <input type="number" name="arrest_year" min="2000" max="2026" placeholder="السنة"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>الجهة المعتقِلة *</label>
+            <select name="arrest_authority" required>
+                <option value="">-- اختر --</option>
+                <option value="security">الأمن</option>
+                <option value="military">الجيش</option>
+                <option value="police">الشرطة</option>
+                <option value="militia">ميليشيا</option>
+                <option value="unknown">غير معروف</option>
+                <option value="other">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>مكان الاعتقال</label>
+            <input type="text" name="arrest_place" placeholder="المدينة أو الحي أو الحاجز"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>سبب الاعتقال *</label>
+            <input type="text" name="arrest_reason" required placeholder="مظاهرة، تقرير كيدي، حاجز..."></div>
+        <div class="field"><label>المتسبب بالاعتقال</label>
+            <input type="text" name="arrest_causer" placeholder="اسم الشخص أو الجهة"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>آخر مكان معروف</label>
+            <input type="text" name="last_known_location" placeholder="آخر مكان عُرف أن الشخص كان فيه"></div>
+        <div class="field"><label>آخر تاريخ معروف على قيد الحياة</label>
+            <input type="date" name="last_known_alive_date"></div>
+    </div>
+    <!-- Detention facilities -->
+    <div style="margin-top:0.5rem">
+        <label style="font-size:0.85rem;font-weight:600;">مراكز الاحتجاز</label>
+        <div id="detentionList"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addDetention()" style="margin-top:0.3rem">+ إضافة مركز احتجاز</button>
+    </div>
+</div>
+
+<!-- Section 5: Release (survivors) -->
+<div class="card" id="releaseSection">
+    <div class="section-title">بيانات الإفراج (للناجين)</div>
+    <div class="row row3">
+        <div class="field"><label>يوم الإفراج</label>
+            <input type="number" name="release_day" min="0" max="31" placeholder="اليوم"></div>
+        <div class="field"><label>شهر الإفراج</label>
+            <input type="number" name="release_month" min="0" max="12" placeholder="الشهر"></div>
+        <div class="field"><label>سنة الإفراج</label>
+            <input type="number" name="release_year" min="2000" max="2026" placeholder="السنة"></div>
+    </div>
+    <div class="field">
+        <label>وصف تجربة الاحتجاز</label>
+        <textarea name="survivor_cv_text" rows="3" placeholder="وصف مختصر لتجربة الاعتقال والاحتجاز..."></textarea>
+    </div>
+</div>
+
+<!-- Section 6: Death -->
+<div class="card" id="deathSection">
+    <div class="section-title">بيانات الوفاة</div>
+    <div class="row row3">
+        <div class="field"><label>يوم الوفاة</label>
+            <input type="number" name="death_day" min="0" max="31" placeholder="اليوم"></div>
+        <div class="field"><label>شهر الوفاة</label>
+            <input type="number" name="death_month" min="0" max="12" placeholder="الشهر"></div>
+        <div class="field"><label>سنة الوفاة</label>
+            <input type="number" name="death_year" min="2000" max="2026" placeholder="السنة"></div>
+    </div>
+    <div class="field">
+        <label>مكان الوفاة</label>
+        <input type="text" name="death_place" placeholder="مكان الوفاة إن عُرف">
+    </div>
+</div>
+
+<!-- Section 7: Digital Evidence -->
+<div class="card">
+    <div class="section-title">الأدلة الرقمية والتحقق</div>
+    <div class="row">
+        <div class="field"><label>نوع الدليل الرقمي</label>
+            <select name="digital_evidence_type" id="offDigitalType" onchange="toggleDigitalDetails()">
+                <option value="">لا يوجد</option>
+                <option value="leaked_db">تسريبات قاعدة بيانات</option>
+                <option value="news_report">تقرير إخباري</option>
+                <option value="social_media">وسائل تواصل اجتماعي</option>
+                <option value="ngo_report">تقرير منظمة</option>
+                <option value="caesar_photos">صور قيصر</option>
+                <option value="other">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>مستوى التحقق</label>
+            <select name="evidence_level">
+                <option value="unverified">غير مُتحقق منه</option>
+                <option value="partially_verified">مُتحقق منه جزئياً</option>
+                <option value="verified">مُتحقق منه بالكامل</option>
+            </select>
+        </div>
+    </div>
+    <div id="digitalDetailsSection" class="hidden">
+        <div class="row">
+            <div class="field"><label>رابط الدليل</label>
+                <input type="url" name="digital_evidence_url" placeholder="https://..." dir="ltr"></div>
+            <div class="field"><label>حالة الرابط</label>
+                <select name="digital_evidence_url_status">
+                    <option value="">--</option>
+                    <option value="active">الرابط فعّال</option>
+                    <option value="deleted">الرابط محذوف</option>
+                    <option value="archived">مؤرشف (Wayback Machine)</option>
+                    <option value="no_url">لم يكن هناك رابط أصلاً</option>
+                    <option value="url_forgotten">الرابط غير متاح (نُسي)</option>
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="field"><label>رابط المصدر الأصلي</label>
+                <input type="url" name="source_url" placeholder="https://... حتى لو كان محذوفاً" dir="ltr"></div>
+            <div class="field"><label>تاريخ الدليل</label>
+                <input type="date" name="digital_evidence_date"></div>
+        </div>
+        <div class="field">
+            <label>لقطة شاشة الدليل</label>
+            <input type="file" name="digital_evidence_screenshot" accept="image/*,.pdf" onchange="previewFile(this,'ssPreview')">
+            <div id="ssPreview" class="file-preview"></div>
+        </div>
+        <div class="row">
+            <div class="field"><label>الاسم في التسريب</label>
+                <input type="text" name="digital_evidence_person_name" placeholder="الاسم كما ظهر"></div>
+            <div class="field"><label>تاريخ الوفاة في التسريب</label>
+                <input type="date" name="digital_evidence_death_date"></div>
+        </div>
+        <div class="field">
+            <label>وصف الدليل</label>
+            <textarea name="digital_evidence_description" rows="2" placeholder="وصف تفصيلي..."></textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Section 8: Civil Registry -->
+<div class="card">
+    <div class="section-title">حالة السجل المدني (النفوس)</div>
+    <div class="row">
+        <div class="field"><label>حالة السجل المدني</label>
+            <select name="civil_registry_status">
+                <option value="">--</option>
+                <option value="alive">مسجّل حي</option>
+                <option value="dead">مسجّل متوفى</option>
+                <option value="missing">مسجّل مفقود</option>
+                <option value="unknown">غير معروف</option>
+            </select>
+        </div>
+        <div class="field"><label>تاريخ آخر تحديث</label>
+            <input type="date" name="civil_registry_date"></div>
+    </div>
+    <div class="field">
+        <label>وثيقة السجل المدني</label>
+        <input type="file" name="civil_registry_document" accept="image/*,.pdf" onchange="previewFile(this,'civilPreview')">
+        <div id="civilPreview" class="file-preview"></div>
+    </div>
+    <div class="field" style="margin-top:0.3rem">
+        <label><input type="checkbox" name="has_conflicting_info" value="1" id="offConflictCheck" onchange="document.getElementById('offConflictDetails').classList.toggle('hidden',!this.checked)"> توجد معلومات متضاربة</label>
+    </div>
+    <div id="offConflictDetails" class="hidden field">
+        <textarea name="conflicting_info_details" rows="2" placeholder="اشرح التضارب..."></textarea>
+    </div>
+</div>
+
+<!-- Section 9: Witnesses -->
+<div class="card">
+    <div class="section-title">الشهود</div>
+    <div id="witnessList"></div>
+    <button type="button" class="btn btn-outline btn-sm" onclick="addWitness()">+ إضافة شاهد</button>
+</div>
+
+<!-- Section 10: Family -->
+<div class="card">
+    <div class="section-title">البيانات العائلية</div>
+    <div class="row">
+        <div class="field"><label>الحالة الاجتماعية</label>
+            <select name="marital" id="offMarital" onchange="toggleSpouse()">
+                <option value="">--</option>
+                <option value="single">أعزب/عزباء</option>
+                <option value="married">متزوج/ة</option>
+                <option value="divorced">مطلق/ة</option>
+                <option value="widowed">أرمل/ة</option>
+            </select>
+        </div>
+        <div class="field"><label>اسم الولي/الوصي</label>
+            <input type="text" name="guardian_name"></div>
+        <div class="field"><label>صلة الولي</label>
+            <input type="text" name="guardian_relation"></div>
+        <div class="field"><label>هاتف الولي</label>
+            <input type="tel" name="guardian_phone"></div>
+    </div>
+    <div id="spouseSection" class="hidden" style="margin-top:0.5rem">
+        <div class="row">
+            <div class="field"><label>اسم الزوج/ة</label>
+                <input type="text" name="spouse_name"></div>
+            <div class="field"><label>هاتف الزوج/ة</label>
+                <input type="tel" name="spouse_phone"></div>
+        </div>
+    </div>
+    <!-- Children -->
+    <div style="margin-top:0.7rem">
+        <label style="font-size:0.85rem;font-weight:600;">الأطفال</label>
+        <div id="childrenList"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addChild()" style="margin-top:0.3rem">+ إضافة طفل</button>
+    </div>
+</div>
+
+<!-- Section 11: Housing & Economy -->
+<div class="card">
+    <div class="section-title">البيانات السكنية والاقتصادية</div>
+    <div class="row">
+        <div class="field"><label>العنوان *</label>
+            <input type="text" name="address" required placeholder="العنوان التفصيلي"></div>
+        <div class="field"><label>المنطقة</label>
+            <input type="text" name="address_area" placeholder="الحي أو المنطقة"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>نوع السكن *</label>
+            <select name="housing_type" required>
+                <option value="">-- اختر --</option>
+                <option value="owned">ملك</option>
+                <option value="rented">إيجار</option>
+                <option value="hosted">مستضاف</option>
+                <option value="homeless">بلا مأوى</option>
+                <option value="camp">مخيم</option>
+            </select>
+        </div>
+        <div class="field"><label>مبلغ الإيجار</label>
+            <input type="text" name="rent_amount" placeholder="بالليرة السورية"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>العمل</label>
+            <input type="text" name="employment" placeholder="يعمل / لا يعمل"></div>
+        <div class="field"><label>المهنة</label>
+            <input type="text" name="profession"></div>
+        <div class="field"><label>جهة العمل</label>
+            <input type="text" name="employer"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>المعيل</label>
+            <input type="text" name="breadwinner" placeholder="اسم المعيل"></div>
+        <div class="field"><label>عمل المعيل</label>
+            <input type="text" name="breadwinner_job"></div>
+        <div class="field"><label>صلة المعيل</label>
+            <select name="breadwinner_relation">
+                <option value="">--</option>
+                <option value="self">هو نفسه</option>
+                <option value="spouse">الزوج/ة</option>
+                <option value="parent">الأب/الأم</option>
+                <option value="sibling">أخ/أخت</option>
+                <option value="child">ابن/ابنة</option>
+                <option value="other">أخرى</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Section 12: Education -->
+<div class="card">
+    <div class="section-title">التحصيل العلمي</div>
+    <div class="row">
+        <div class="field"><label>المستوى التعليمي</label>
+            <select name="education">
+                <option value="">--</option>
+                <option value="illiterate">أمي</option>
+                <option value="primary">ابتدائي</option>
+                <option value="middle">إعدادي</option>
+                <option value="secondary">ثانوي</option>
+                <option value="university">جامعي</option>
+                <option value="postgrad">دراسات عليا</option>
+            </select>
+        </div>
+        <div class="field"><label>نوع التعليم</label>
+            <select name="edu_type">
+                <option value="">--</option>
+                <option value="public">حكومي</option>
+                <option value="private">خاص</option>
+                <option value="religious">ديني</option>
+                <option value="vocational">مهني</option>
+            </select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="field"><label>التخصص</label>
+            <input type="text" name="edu_specialization"></div>
+        <div class="field"><label>الجامعة/المعهد</label>
+            <input type="text" name="edu_university"></div>
+    </div>
+</div>
+
+<!-- Section 13: Health -->
+<div class="card">
+    <div class="section-title">الحالة الصحية</div>
+    <div class="field">
+        <label>أمراض مزمنة</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem 1rem;margin:0.3rem 0">
+            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="ضغط الدم"> ضغط الدم</label>
+            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="السكري"> السكري</label>
+            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="قلب"> قلب</label>
+            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="ربو"> ربو</label>
+            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="كلى"> كلى</label>
+            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="سرطان"> سرطان</label>
+        </div>
+        <input type="text" name="other_diseases" placeholder="أمراض أخرى...">
+    </div>
+    <div class="field" style="margin-top:0.3rem">
+        <label><input type="checkbox" name="has_special_needs" value="1" id="offSpecialCheck" onchange="document.getElementById('offSpecialDetails').classList.toggle('hidden',!this.checked)"> لديه احتياجات خاصة</label>
+    </div>
+    <div id="offSpecialDetails" class="hidden field">
+        <input type="text" name="special_needs_details" placeholder="تفاصيل الاحتياجات الخاصة">
+    </div>
+</div>
+
+<!-- Section 14: Legal & Associations -->
+<div class="card">
+    <div class="section-title">المشاكل القانونية والجمعيات</div>
+    <div class="row">
+        <div class="field"><label>مشاكل قانونية</label>
+            <select name="legal" onchange="document.getElementById('offLegalDetails').classList.toggle('hidden',this.value!=='نعم')">
+                <option value="">--</option>
+                <option value="نعم">نعم</option>
+                <option value="لا">لا</option>
+            </select>
+        </div>
+        <div class="field"><label>مسجّل لدى جمعية</label>
+            <select name="assoc" onchange="document.getElementById('offAssocDetails').classList.toggle('hidden',this.value!=='نعم')">
+                <option value="">--</option>
+                <option value="نعم">نعم</option>
+                <option value="لا">لا</option>
+            </select>
+        </div>
+    </div>
+    <div id="offLegalDetails" class="hidden field">
+        <textarea name="legal_details" rows="2" placeholder="تفاصيل المشاكل القانونية"></textarea>
+    </div>
+    <div id="offAssocDetails" class="hidden field">
+        <div class="row">
+            <div class="field"><input type="text" name="assoc_name" placeholder="اسم الجمعية"></div>
+            <div class="field"><input type="text" name="service_type" placeholder="نوع الخدمة المقدمة"></div>
+        </div>
+    </div>
+    <div class="field" style="margin-top:0.3rem">
+        <label><input type="checkbox" name="is_officially_registered" value="1"> مسجّل رسمياً لدى جهة حكومية</label>
+    </div>
+</div>
+
+<!-- Section 15: Notes -->
+<div class="card">
+    <div class="section-title">ملاحظات إضافية</div>
+    <div class="field">
+        <textarea name="notes" rows="4" placeholder="أي ملاحظات إضافية أو معلومات لم تُذكر أعلاه..."></textarea>
+    </div>
+    <div class="field">
+        <label>ملاحظات المنهجية</label>
+        <textarea name="methodology_notes" rows="2" placeholder="ملاحظات حول منهجية جمع البيانات..."></textarea>
+    </div>
+</div>
+
+<!-- Submit button -->
+<div style="text-align:center;padding:1rem 0">
+    <button type="button" class="btn btn-primary" onclick="saveEntry()" style="padding:0.7rem 2.5rem;font-size:1.05rem">حفظ الحالة محلياً</button>
+    <button type="button" class="btn btn-outline" onclick="resetForm()" style="margin-right:0.5rem">مسح النموذج</button>
+</div>
+
+</div><!-- end entryForm -->
+</div><!-- end tab-form -->
+
+</div><!-- end container -->
+
+<script>
+// ===================== IndexedDB Setup =====================
+const DB_NAME = 'HaqqunaOffline';
+const DB_VERSION = 1;
+let db = null;
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = e => {
+            const d = e.target.result;
+            if (!d.objectStoreNames.contains('entries')) {
+                const store = d.createObjectStore('entries', { keyPath: 'client_uuid' });
+                store.createIndex('status', 'status', { unique: false });
+                store.createIndex('created_at', 'created_at', { unique: false });
+            }
+            if (!d.objectStoreNames.contains('files')) {
+                d.createObjectStore('files', { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = e => { db = e.target.result; resolve(db); };
+        req.onerror = e => reject(e.target.error);
+    });
+}
+
+function dbPut(store, data) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readwrite');
+        tx.objectStore(store).put(data);
+        tx.oncomplete = () => resolve();
+        tx.onerror = e => reject(e.target.error);
+    });
+}
+
+function dbGet(store, key) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readonly');
+        const req = tx.objectStore(store).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = e => reject(e.target.error);
+    });
+}
+
+function dbGetAll(store) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readonly');
+        const req = tx.objectStore(store).getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = e => reject(e.target.error);
+    });
+}
+
+function dbDelete(store, key) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readwrite');
+        tx.objectStore(store).delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = e => reject(e.target.error);
+    });
+}
+
+function uuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+
+// ===================== Toast Notifications =====================
+function showToast(msg, type) {
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + (type || 'info');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+}
+
+// ===================== Tab Switching =====================
+function switchTab(name) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    const tabs = document.querySelectorAll('.tab');
+    if (name === 'form') tabs[0].classList.add('active');
+    else if (name === 'entries') tabs[1].classList.add('active');
+    else tabs[2].classList.add('active');
+    if (name === 'entries') renderEntries();
+    if (name === 'settings') updateStats();
+}
+
+// ===================== Status Change Logic =====================
+function handleStatusChange() {
+    const st = document.getElementById('offStatus').value;
+    const rel = document.getElementById('releaseSection');
+    const death = document.getElementById('deathSection');
+    rel.classList.toggle('hidden', st !== 'survivor' && st !== 'released');
+    death.classList.toggle('hidden', st !== 'deceased');
+    updateCaseTypes(st);
+}
+
+function updateCaseTypes(status) {
+    const sel = document.getElementById('offCaseType');
+    sel.innerHTML = '<option value="">-- اختر --</option>';
+    const opts = {
+        'survivor': [['survivor_released','ناجٍ مُفرَج عنه'],['survivor_escaped','ناجٍ هارب'],['survivor_amnesty','ناجٍ بعفو']],
+        'enforced': [['enforced_disappearance','اختفاء قسري'],['enforced_disappearance_leaked_not_confirmed','تسريبات تؤكد الوفاة - غير مؤكد بالنفوس'],['enforced_disappearance_leaked_confirmed_dead','تسريبات + مؤكد بالنفوس']],
+        'deceased': [['deceased_custody','متوفى أثناء الاحتجاز'],['deceased_released','متوفى بعد الإفراج'],['deceased_execution','إعدام']],
+        'released': [['released_recent','مُفرَج عنه حديثاً'],['released_old','مُفرَج عنه قديماً']],
+        'unknown': [['unknown','غير معروف']]
+    };
+    (opts[status] || []).forEach(([v, t]) => {
+        sel.innerHTML += '<option value="' + v + '">' + t + '</option>';
+    });
+}
+
+// ===================== Toggle Helpers =====================
+function toggleDigitalDetails() {
+    const v = document.getElementById('offDigitalType').value;
+    document.getElementById('digitalDetailsSection').classList.toggle('hidden', !v);
+}
+
+function toggleSpouse() {
+    const v = document.getElementById('offMarital').value;
+    document.getElementById('spouseSection').classList.toggle('hidden', v !== 'married' && v !== 'divorced' && v !== 'widowed');
+}
+
+// ===================== File Preview =====================
+function previewFile(input, previewId) {
+    const container = document.getElementById(previewId);
+    container.innerHTML = '';
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const div = document.createElement('div');
+    div.className = 'file-preview';
+    if (file.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        div.appendChild(img);
+    }
+    div.appendChild(document.createTextNode(file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)'));
+    container.appendChild(div);
+}
+
+// ===================== Dynamic Rows: Detention, Witnesses, Children =====================
+let detentionCount = 0, witnessCount = 0, childCount = 0;
+
+function addDetention(data) {
+    const i = detentionCount++;
+    const d = data || {};
+    const div = document.createElement('div');
+    div.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:0.5rem;margin-top:0.4rem;position:relative';
+    div.innerHTML = '<button type="button" onclick="this.parentElement.remove()" style="position:absolute;left:0.3rem;top:0.3rem;background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem">&times;</button>' +
+        '<div class="row"><div class="field"><label style="font-size:0.8rem">اسم المركز</label><input type="text" class="det-name" value="' + (d.facility_name||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">من تاريخ</label><input type="text" class="det-from" placeholder="شهر/سنة" value="' + (d.date_from||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">إلى تاريخ</label><input type="text" class="det-to" placeholder="شهر/سنة" value="' + (d.date_to||'') + '"></div></div>' +
+        '<div class="field"><label style="font-size:0.8rem">ملاحظات</label><input type="text" class="det-notes" value="' + (d.notes||'') + '"></div>';
+    document.getElementById('detentionList').appendChild(div);
+}
+
+function addWitness(data) {
+    const i = witnessCount++;
+    const d = data || {};
+    const div = document.createElement('div');
+    div.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:0.5rem;margin-top:0.4rem;position:relative';
+    div.innerHTML = '<button type="button" onclick="this.parentElement.remove()" style="position:absolute;left:0.3rem;top:0.3rem;background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem">&times;</button>' +
+        '<div class="row"><div class="field"><label style="font-size:0.8rem">الاسم</label><input type="text" class="wit-name" value="' + (d.name||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">الصلة</label><input type="text" class="wit-relation" value="' + (d.relation||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">التواصل</label><input type="text" class="wit-contact" value="' + (d.contact||'') + '"></div></div>' +
+        '<div class="field"><label style="font-size:0.8rem">ملخص الشهادة</label><input type="text" class="wit-summary" value="' + (d.testimony_summary||'') + '"></div>';
+    document.getElementById('witnessList').appendChild(div);
+}
+
+function addChild(data) {
+    const i = childCount++;
+    const d = data || {};
+    const div = document.createElement('div');
+    div.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:0.5rem;margin-top:0.4rem;position:relative';
+    div.innerHTML = '<button type="button" onclick="this.parentElement.remove()" style="position:absolute;left:0.3rem;top:0.3rem;background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem">&times;</button>' +
+        '<div class="row"><div class="field"><label style="font-size:0.8rem">اسم الطفل</label><input type="text" class="ch-name" value="' + (d.name||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">سنة الميلاد</label><input type="number" class="ch-year" min="1990" max="2026" value="' + (d.birth_year||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">الجنس</label><select class="ch-gender"><option value="">--</option><option value="male"' + (d.gender==='male'?' selected':'') + '>ذكر</option><option value="female"' + (d.gender==='female'?' selected':'') + '>أنثى</option></select></div></div>' +
+        '<div class="row"><div class="field"><label style="font-size:0.8rem">المدرسة</label><select class="ch-school"><option value="">--</option><option value="yes"' + (d.in_school==='yes'?' selected':'') + '>نعم</option><option value="no"' + (d.in_school==='no'?' selected':'') + '>لا</option></select></div>' +
+        '<div class="field"><label style="font-size:0.8rem">احتياجات خاصة</label><select class="ch-special"><option value="">--</option><option value="نعم"' + (d.special_needs==='نعم'?' selected':'') + '>نعم</option><option value="لا"' + (d.special_needs==='لا'?' selected':'') + '>لا</option></select></div></div>';
+    document.getElementById('childrenList').appendChild(div);
+}
+
+// ===================== Collect Dynamic Data =====================
+function collectDetentions() {
+    const list = [];
+    document.querySelectorAll('#detentionList > div').forEach(div => {
+        const name = div.querySelector('.det-name');
+        if (name && name.value.trim()) {
+            list.push({
+                facility_name: name.value.trim(),
+                date_from: div.querySelector('.det-from').value.trim(),
+                date_to: div.querySelector('.det-to').value.trim(),
+                notes: div.querySelector('.det-notes').value.trim()
+            });
+        }
+    });
+    return list;
+}
+
+function collectWitnesses() {
+    const list = [];
+    document.querySelectorAll('#witnessList > div').forEach(div => {
+        const name = div.querySelector('.wit-name');
+        if (name && name.value.trim()) {
+            list.push({
+                name: name.value.trim(),
+                relation: div.querySelector('.wit-relation').value.trim(),
+                contact: div.querySelector('.wit-contact').value.trim(),
+                testimony_summary: div.querySelector('.wit-summary').value.trim()
+            });
+        }
+    });
+    return list;
+}
+
+function collectChildren() {
+    const list = [];
+    document.querySelectorAll('#childrenList > div').forEach(div => {
+        const name = div.querySelector('.ch-name');
+        if (name && name.value.trim()) {
+            list.push({
+                name: name.value.trim(),
+                birth_year: div.querySelector('.ch-year').value || '',
+                gender: div.querySelector('.ch-gender').value,
+                in_school: div.querySelector('.ch-school').value,
+                special_needs: div.querySelector('.ch-special').value
+            });
+        }
+    });
+    return list;
+}
+
+// ===================== Read File as Base64 =====================
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        if (!file || !file.size) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve({ name: file.name, type: file.type, size: file.size, data: reader.result });
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+    });
+}
+
+// ===================== Save Entry to IndexedDB =====================
+async function saveEntry() {
+    const form = document.getElementById('entryForm');
+    const firstName = form.querySelector('[name="first_name"]').value.trim();
+    const fatherName = form.querySelector('[name="father_name"]').value.trim();
+    const lastName = form.querySelector('[name="last_name"]').value.trim();
+    const status = form.querySelector('[name="status"]').value;
+
+    if (!firstName || !lastName) {
+        showToast('الاسم الأول واسم العائلة مطلوبان', 'error');
+        return;
+    }
+    if (!status) {
+        showToast('يرجى اختيار حالة الشخص', 'error');
+        return;
+    }
+
+    showToast('جارٍ الحفظ...', 'info');
+
+    const fields = {};
+    form.querySelectorAll('input:not([type="file"]):not([type="checkbox"]),select,textarea').forEach(el => {
+        if (el.name) fields[el.name] = el.value;
+    });
+    form.querySelectorAll('input[type="checkbox"]').forEach(el => {
+        if (el.name === 'chronic_list') {
+            if (!fields._chronic_list) fields._chronic_list = [];
+            if (el.checked) fields._chronic_list.push(el.value);
+        } else {
+            fields[el.name] = el.checked ? el.value : '';
+        }
+    });
+
+    fields.detention_facilities_data = JSON.stringify(collectDetentions());
+    fields.witnesses_data = JSON.stringify(collectWitnesses());
+    const children = collectChildren();
+    fields.children_data = JSON.stringify(children);
+    fields.has_kids = children.length > 0 ? 'yes' : 'no';
+    fields.kids_count = String(children.length);
+    fields.kids_under_18_count = String(children.filter(c => {
+        const y = parseInt(c.birth_year);
+        return y && (new Date().getFullYear() - y) < 18;
+    }).length);
+
+    const fileFields = ['photo', 'document', 'digital_evidence_screenshot', 'civil_registry_document'];
+    const fileData = {};
+    for (const fname of fileFields) {
+        const input = form.querySelector('[name="' + fname + '"]');
+        if (input && input.files && input.files[0]) {
+            fileData[fname] = await readFileAsBase64(input.files[0]);
+        }
+    }
+
+    const entryId = uuid();
+    const entry = {
+        client_uuid: entryId,
+        fields: fields,
+        files: fileData,
+        status: 'pending',
+        server_id: null,
+        created_at: new Date().toISOString(),
+        display_name: [firstName, fatherName, lastName].filter(Boolean).join(' ')
+    };
+
+    await dbPut('entries', entry);
+    showToast('تم حفظ الحالة بنجاح — ' + entry.display_name, 'success');
+    resetForm();
+    updateBadge();
+}
+
+// ===================== Reset Form =====================
+function resetForm() {
+    const form = document.getElementById('entryForm');
+    form.querySelectorAll('input:not([type="checkbox"]),select,textarea').forEach(el => {
+        if (el.type === 'file') el.value = '';
+        else if (el.tagName === 'SELECT') el.selectedIndex = 0;
+        else el.value = '';
+    });
+    form.querySelectorAll('input[type="checkbox"]').forEach(el => el.checked = false);
+    document.getElementById('detentionList').innerHTML = '';
+    document.getElementById('witnessList').innerHTML = '';
+    document.getElementById('childrenList').innerHTML = '';
+    detentionCount = witnessCount = childCount = 0;
+    ['photoPreview','docPreview','ssPreview','civilPreview'].forEach(id => {
+        document.getElementById(id).innerHTML = '';
+    });
+    document.getElementById('releaseSection').classList.add('hidden');
+    document.getElementById('deathSection').classList.add('hidden');
+    document.getElementById('spouseSection').classList.add('hidden');
+    document.getElementById('digitalDetailsSection').classList.add('hidden');
+    document.getElementById('offCaseType').innerHTML = '<option value="">-- اختر --</option>';
+}
+
+// ===================== Render Entries List =====================
+async function renderEntries() {
+    const entries = await dbGetAll('entries');
+    entries.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const container = document.getElementById('entriesList');
+    if (!entries.length) {
+        container.innerHTML = '<p style="text-align:center;color:var(--text-light);padding:2rem 0">لا توجد حالات محفوظة بعد.</p>';
+        updateStats();
+        return;
+    }
+    let html = '';
+    entries.forEach(e => {
+        const badge = e.status === 'synced' ? '<span class="badge badge-synced">متزامنة #' + e.server_id + '</span>' :
+                      e.status === 'failed' ? '<span class="badge badge-failed">فشلت</span>' :
+                      '<span class="badge badge-pending">معلقة</span>';
+        const date = new Date(e.created_at).toLocaleString('ar-SY');
+        const fileCount = Object.keys(e.files || {}).length;
+        html += '<div class="entry-item">' +
+            '<div><strong>' + (e.display_name || '---') + '</strong>' +
+            '<br><span style="font-size:0.8rem;color:var(--text-light)">' + date +
+            (fileCount ? ' | ' + fileCount + ' مرفقات' : '') +
+            ' | ' + (e.fields.status || '') + '</span></div>' +
+            '<div style="display:flex;gap:0.3rem;align-items:center">' + badge +
+            (e.status !== 'synced' ? ' <button class="btn btn-outline btn-sm" onclick="editEntry(\'' + e.client_uuid + '\')">تعديل</button>' : '') +
+            ' <button class="btn btn-danger btn-sm" onclick="deleteEntry(\'' + e.client_uuid + '\')">حذف</button></div></div>';
+    });
+    container.innerHTML = html;
+    updateStats();
+}
+
+// ===================== Delete Entry =====================
+async function deleteEntry(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه الحالة؟')) return;
+    await dbDelete('entries', id);
+    showToast('تم الحذف', 'info');
+    renderEntries();
+    updateBadge();
+}
+
+// ===================== Edit Entry (load back into form) =====================
+async function editEntry(id) {
+    const entry = await dbGet('entries', id);
+    if (!entry) return;
+    switchTab('form');
+    const form = document.getElementById('entryForm');
+    const f = entry.fields;
+    Object.keys(f).forEach(key => {
+        if (key.startsWith('_')) return;
+        const el = form.querySelector('[name="' + key + '"]');
+        if (!el) return;
+        if (el.type === 'checkbox') el.checked = !!f[key];
+        else el.value = f[key] || '';
+    });
+    if (f._chronic_list) {
+        f._chronic_list.forEach(v => {
+            const cb = form.querySelector('input[name="chronic_list"][value="' + v + '"]');
+            if (cb) cb.checked = true;
+        });
+    }
+    handleStatusChange();
+    toggleDigitalDetails();
+    toggleSpouse();
+    // Re-create dynamic rows
+    document.getElementById('detentionList').innerHTML = '';
+    document.getElementById('witnessList').innerHTML = '';
+    document.getElementById('childrenList').innerHTML = '';
+    detentionCount = witnessCount = childCount = 0;
+    try { JSON.parse(f.detention_facilities_data || '[]').forEach(d => addDetention(d)); } catch(e){}
+    try { JSON.parse(f.witnesses_data || '[]').forEach(d => addWitness(d)); } catch(e){}
+    try { JSON.parse(f.children_data || '[]').forEach(d => addChild(d)); } catch(e){}
+    // Delete old entry so re-save creates fresh
+    await dbDelete('entries', id);
+    updateBadge();
+    showToast('تم تحميل الحالة للتعديل — احفظ مجدداً بعد التعديل', 'info');
+}
+
+// ===================== Update Stats & Badge =====================
+async function updateStats() {
+    const entries = await dbGetAll('entries');
+    const total = entries.length;
+    const pending = entries.filter(e => e.status === 'pending' || e.status === 'failed').length;
+    const synced = entries.filter(e => e.status === 'synced').length;
+    ['statTotal','statTotal2'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = 'الإجمالي: ' + total; });
+    ['statPending','statPending2'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = (id.includes('2') ? 'معلقة: ' : 'بانتظار المزامنة: ') + pending; });
+    ['statSynced','statSynced2'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = (id.includes('2') ? 'متزامنة: ' : 'تمت المزامنة: ') + synced; });
+    updateBadge();
+}
+
+async function updateBadge() {
+    const entries = await dbGetAll('entries');
+    document.getElementById('entriesCountBadge').textContent = entries.length;
+}
+
+// ===================== Settings Persistence =====================
+function saveSettings() {
+    const url = document.getElementById('serverUrl').value.trim();
+    const user = document.getElementById('syncUsername').value.trim();
+    if (url) localStorage.setItem('haqquna_server', url);
+    if (user) localStorage.setItem('haqquna_user', user);
+    showToast('تم حفظ الإعدادات', 'success');
+}
+
+function loadSettings() {
+    const url = localStorage.getItem('haqquna_server') || '';
+    const user = localStorage.getItem('haqquna_user') || '';
+    document.getElementById('serverUrl').value = url;
+    document.getElementById('syncUsername').value = user;
+}
+
+function getServerBase() {
+    let url = document.getElementById('serverUrl').value.trim();
+    if (!url) { showToast('أدخل عنوان السرفر أولاً', 'error'); return null; }
+    if (!url.startsWith('http')) url = 'http://' + url;
+    return url.replace(/\/+$/, '');
+}
+
+// ===================== Connection Test =====================
+async function testConnection() {
+    const base = getServerBase();
+    if (!base) return;
+    const user = document.getElementById('syncUsername').value.trim();
+    const pass = document.getElementById('syncPassword').value;
+    const statusEl = document.getElementById('connStatus');
+    statusEl.innerHTML = '<span style="color:var(--warning)">جارٍ الاختبار...</span>';
+    try {
+        const pingResp = await fetch(base + '/api/sync/ping', { method: 'GET', mode: 'cors' });
+        if (!pingResp.ok) throw new Error('server not reachable');
+        const pingData = await pingResp.json();
+        if (!pingData.ok) throw new Error('not haqquna server');
+
+        if (!user || !pass) {
+            statusEl.innerHTML = '<span style="color:var(--success)">السرفر متصل (حقنا ' + (pingData.version||'') + '). أدخل اسم المستخدم وكلمة المرور للمزامنة.</span>';
+            return;
+        }
+        const loginResp = await fetch(base + '/api/sync/login', {
+            method: 'POST', mode: 'cors',
+            headers: { 'Content-Type': 'application/json', 'X-Sync-User': user, 'X-Sync-Pass': pass }
+        });
+        const loginData = await loginResp.json();
+        if (loginData.success) {
+            statusEl.innerHTML = '<span style="color:var(--success)">متصل بنجاح — مرحباً ' + loginData.display_name + ' (' + loginData.role + ')</span>';
+            saveSettings();
+        } else {
+            statusEl.innerHTML = '<span style="color:var(--danger)">فشل تسجيل الدخول: ' + (loginData.error === 'invalid_credentials' ? 'اسم المستخدم أو كلمة المرور خاطئة' : loginData.error === 'insufficient_role' ? 'صلاحيتك لا تسمح بالمزامنة' : loginData.error) + '</span>';
+        }
+    } catch (e) {
+        statusEl.innerHTML = '<span style="color:var(--danger)">لا يمكن الاتصال بالسرفر — تأكد من العنوان وأن السرفر يعمل. (' + e.message + ')</span>';
+    }
+}
+
+// ===================== Base64 to Blob =====================
+function base64ToBlob(dataUrl) {
+    const parts = dataUrl.split(',');
+    const mime = parts[0].match(/:(.*?);/)[1];
+    const raw = atob(parts[1]);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+}
+
+// ===================== Sync All Pending Entries =====================
+async function syncAll() {
+    const base = getServerBase();
+    if (!base) return;
+    const user = document.getElementById('syncUsername').value.trim();
+    const pass = document.getElementById('syncPassword').value;
+    if (!user || !pass) { showToast('أدخل اسم المستخدم وكلمة المرور', 'error'); return; }
+
+    const entries = await dbGetAll('entries');
+    const pending = entries.filter(e => e.status === 'pending' || e.status === 'failed');
+    if (!pending.length) { showToast('لا توجد حالات معلقة للمزامنة', 'info'); return; }
+
+    const progressEl = document.getElementById('syncProgress');
+    const textEl = document.getElementById('syncText');
+    const barEl = document.getElementById('syncBarFill');
+    const logEl = document.getElementById('syncLog');
+    const syncBtn = document.getElementById('syncBtn');
+
+    progressEl.classList.remove('hidden');
+    syncBtn.disabled = true;
+    logEl.innerHTML = '';
+    let synced = 0, failed = 0;
+
+    for (let idx = 0; idx < pending.length; idx++) {
+        const entry = pending[idx];
+        const pct = Math.round(((idx + 1) / pending.length) * 100);
+        textEl.textContent = 'مزامنة ' + (idx + 1) + ' من ' + pending.length + ' — ' + entry.display_name;
+        barEl.style.width = pct + '%';
+
+        try {
+            const fd = new FormData();
+            fd.append('client_uuid', entry.client_uuid);
+
+            // Add all form fields
+            const f = entry.fields;
+            Object.keys(f).forEach(key => {
+                if (key.startsWith('_')) return;
+                if (key === 'chronic_list') return;
+                fd.append(key, f[key] || '');
+            });
+
+            // Handle chronic_list → chronic
+            if (f._chronic_list && f._chronic_list.length) {
+                f._chronic_list.forEach(v => fd.append('chronic_list', v));
+            }
+
+            // Add files as blobs
+            const files = entry.files || {};
+            Object.keys(files).forEach(fname => {
+                const fileInfo = files[fname];
+                if (fileInfo && fileInfo.data) {
+                    const blob = base64ToBlob(fileInfo.data);
+                    fd.append(fname, blob, fileInfo.name || (fname + '.jpg'));
+                }
+            });
+
+            const resp = await fetch(base + '/api/sync/entries', {
+                method: 'POST', mode: 'cors', body: fd,
+                headers: { 'X-Sync-User': user, 'X-Sync-Pass': pass }
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                entry.status = 'synced';
+                entry.server_id = data.server_id;
+                await dbPut('entries', entry);
+                synced++;
+                logEl.innerHTML += '<div style="color:var(--success)">✓ ' + entry.display_name + ' → سجل #' + data.server_id + (data.duplicate_uuid ? ' (موجود مسبقاً)' : '') + '</div>';
+            } else {
+                entry.status = 'failed';
+                entry.error = (data.errors || [data.error]).join(', ');
+                await dbPut('entries', entry);
+                failed++;
+                logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + entry.error + '</div>';
+            }
+        } catch (e) {
+            entry.status = 'failed';
+            entry.error = e.message;
+            await dbPut('entries', entry);
+            failed++;
+            logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + e.message + '</div>';
+        }
+    }
+
+    barEl.style.width = '100%';
+    textEl.textContent = 'اكتملت المزامنة — ' + synced + ' نجحت، ' + failed + ' فشلت';
+    syncBtn.disabled = false;
+    updateStats();
+    updateBadge();
+    showToast('المزامنة: ' + synced + ' نجحت' + (failed ? '، ' + failed + ' فشلت' : ''), synced && !failed ? 'success' : 'error');
+}
+
+// ===================== Export Local Data =====================
+async function exportLocalData() {
+    const entries = await dbGetAll('entries');
+    if (!entries.length) { showToast('لا توجد بيانات للتصدير', 'info'); return; }
+    // Remove heavy base64 from export (keep filenames only)
+    const exportData = entries.map(e => {
+        const clean = { ...e };
+        const filesSummary = {};
+        Object.keys(clean.files || {}).forEach(k => {
+            if (clean.files[k]) filesSummary[k] = { name: clean.files[k].name, size: clean.files[k].size };
+        });
+        clean.files_summary = filesSummary;
+        delete clean.files;
+        return clean;
+    });
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'haqquna_offline_backup_' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('تم التصدير', 'success');
+}
+
+// ===================== Clear Synced Entries =====================
+async function clearSyncedEntries() {
+    const entries = await dbGetAll('entries');
+    const synced = entries.filter(e => e.status === 'synced');
+    if (!synced.length) { showToast('لا توجد حالات متزامنة لحذفها', 'info'); return; }
+    if (!confirm('حذف ' + synced.length + ' حالة متزامنة من المتصفح؟ (لن يؤثر على السرفر)')) return;
+    for (const e of synced) await dbDelete('entries', e.client_uuid);
+    showToast('تم حذف ' + synced.length + ' حالة متزامنة', 'success');
+    updateStats();
+    updateBadge();
+}
+
+// ===================== Initialize =====================
+async function init() {
+    await openDB();
+    loadSettings();
+    updateBadge();
+    updateStats();
+    // Set today's date for collection_date
+    const today = new Date().toISOString().slice(0, 10);
+    const dateInput = document.querySelector('[name="collection_date"]');
+    if (dateInput && !dateInput.value) dateInput.value = today;
+}
+
+init();
+</script>
+
+</body>
+</html>

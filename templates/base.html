@@ -58,6 +58,7 @@
                 {% if role == 'data_entry' %}
                 {# data_entry: entry form + records browsing + suggest edits #}
                 <a href="{{ url_for('entry_form') }}">إدخال بيانات</a>
+                <a href="{{ url_for('offline_form_page') }}">بدون انترنت</a>
                 <a href="{{ url_for('admin_records') }}">السجلات</a>
                 <span class="notif-bell" id="notifBell" title="الإشعارات" onclick="toggleNotifPanel()" style="cursor:pointer;position:relative;font-size:1.2rem;">&#x1F514;<span id="notifBadge" style="display:none;position:absolute;top:-5px;right:-8px;background:#dc2626;color:#fff;border-radius:50%;font-size:0.6rem;width:16px;height:16px;text-align:center;line-height:16px;"></span></span>
                 <span style="background:#f59e0b;color:#fff;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;">{{ display_name or 'مُدخِل بيانات' }}</span>
@@ -89,6 +90,7 @@
                 <a href="{{ url_for('admin_dedup') }}">فحص التكرار</a>
                 <a href="{{ url_for('admin_trash') }}">سلة المحذوفات</a>
                 <a href="{{ url_for('admin_audit_log') }}">سجل العمليات</a>
+                <a href="{{ url_for('offline_form_page') }}">بدون انترنت</a>
                 <a href="{{ url_for('admin_users') }}">المستخدمون</a>
                 <a href="{{ url_for('admin_notifications') }}">الإشعارات</a>
                 <a href="{{ url_for('admin_pending_edits') }}">تعديلات معلقة</a>

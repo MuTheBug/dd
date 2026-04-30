@@ -2,72 +2,147 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1e40af">
 <title>حقنا - نموذج إدخال بدون انترنت</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--primary:#1e40af;--primary-light:#3b82f6;--success:#059669;--danger:#dc2626;--warning:#f59e0b;--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--text:#1e293b;--text-light:#64748b;--radius:8px}
-body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;direction:rtl}
-.container{max-width:800px;margin:0 auto;padding:1rem}
-h1{text-align:center;color:var(--primary);margin:1rem 0;font-size:1.5rem}
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1rem}
-.section-title{font-weight:700;font-size:1rem;padding:0.5rem 0.8rem;margin:0 -1rem 0.8rem -1rem;background:#f1f5f9;border-bottom:1px solid var(--border);color:var(--primary)}
-.field{margin-bottom:0.7rem}
-.field label{display:block;font-size:0.85rem;font-weight:600;margin-bottom:0.2rem;color:var(--text)}
-.field input,.field select,.field textarea{width:100%;padding:0.45rem 0.6rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;font-family:inherit;background:#fff}
-.field textarea{resize:vertical}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary-light);box-shadow:0 0 0 2px rgba(59,130,246,0.15)}
-.row{display:flex;gap:0.6rem;flex-wrap:wrap}
-.row>.field{flex:1;min-width:140px}
-.row3>.field{flex:1;min-width:80px}
-.btn{display:inline-flex;align-items:center;gap:0.3rem;padding:0.5rem 1.2rem;border:none;border-radius:6px;font-size:0.9rem;font-family:inherit;cursor:pointer;transition:opacity 0.2s}
-.btn:hover{opacity:0.85}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--primary:#1e40af;--primary-light:#3b82f6;--success:#059669;--danger:#dc2626;--warning:#f59e0b;--bg:#f0f2f5;--card:#fff;--border:#dfe3e8;--text:#1e293b;--text-light:#64748b;--radius:12px;--safe-bottom:env(safe-area-inset-bottom,0px)}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;direction:rtl;padding-bottom:calc(70px + var(--safe-bottom));min-height:100vh;min-height:100dvh}
+.container{max-width:800px;margin:0 auto;padding:0.6rem}
+
+/* Mobile-first header */
+.app-header{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;padding:0.8rem 1rem;text-align:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+.app-header h1{font-size:1.15rem;margin:0;font-weight:700;letter-spacing:-0.3px}
+.app-header .subtitle{font-size:0.75rem;opacity:0.85;margin-top:0.1rem}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:0.8rem;margin-bottom:0.7rem;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.section-title{font-weight:700;font-size:0.92rem;padding:0.5rem 0.8rem;margin:-0.8rem -0.8rem 0.7rem -0.8rem;background:linear-gradient(to bottom,#f8fafc,#f1f5f9);border-bottom:1px solid var(--border);color:var(--primary);border-radius:var(--radius) var(--radius) 0 0}
+
+/* Form fields — large touch targets */
+.field{margin-bottom:0.6rem}
+.field label{display:block;font-size:0.82rem;font-weight:600;margin-bottom:0.25rem;color:var(--text)}
+.field input,.field select,.field textarea{width:100%;padding:0.65rem 0.7rem;border:1.5px solid var(--border);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;appearance:none;-webkit-appearance:none;transition:border-color 0.2s}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 0.7rem center;padding-left:2rem}
+.field textarea{resize:vertical;min-height:60px}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary-light);box-shadow:0 0 0 3px rgba(59,130,246,0.12)}
+.field input[type="file"]{padding:0.5rem;font-size:0.88rem;border-style:dashed;background:#fafbfc}
+.field input[type="checkbox"]{width:auto;margin-left:0.4rem;transform:scale(1.2)}
+
+/* Layout rows — stack on mobile by default */
+.row{display:flex;gap:0.5rem;flex-direction:column}
+.row3{display:flex;gap:0.5rem;flex-direction:row}
+.row3>.field{flex:1;min-width:0}
+
+/* Buttons — fat touch targets */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.7rem 1.3rem;border:none;border-radius:10px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.15s;touch-action:manipulation;min-height:44px}
+.btn:active{transform:scale(0.97)}
 .btn-primary{background:var(--primary);color:#fff}
 .btn-success{background:var(--success);color:#fff}
 .btn-danger{background:var(--danger);color:#fff}
 .btn-warning{background:var(--warning);color:#fff}
-.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
-.btn-sm{padding:0.3rem 0.7rem;font-size:0.82rem}
-.badge{display:inline-block;padding:0.15rem 0.5rem;border-radius:10px;font-size:0.78rem;font-weight:600}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text)}
+.btn-sm{padding:0.45rem 0.7rem;font-size:0.82rem;min-height:36px;border-radius:8px}
+.btn-block{width:100%}
+
+/* Badges */
+.badge{display:inline-block;padding:0.2rem 0.6rem;border-radius:10px;font-size:0.75rem;font-weight:600}
 .badge-pending{background:#fef3c7;color:#92400e}
 .badge-synced{background:#d1fae5;color:#065f46}
 .badge-failed{background:#fee2e2;color:#991b1b}
-.tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:1rem;gap:0}
-.tab{padding:0.6rem 1.2rem;cursor:pointer;font-weight:600;font-size:0.9rem;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-light);transition:all 0.2s}
-.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* Bottom tab bar — fixed, mobile-native feel */
+.bottom-tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:flex;justify-content:space-around;align-items:stretch;z-index:200;padding-bottom:var(--safe-bottom);box-shadow:0 -2px 10px rgba(0,0,0,0.06)}
+.bottom-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0.5rem 0;cursor:pointer;color:var(--text-light);font-size:0.68rem;font-weight:600;transition:color 0.15s;position:relative;-webkit-tap-highlight-color:transparent;touch-action:manipulation;min-height:56px}
+.bottom-tab .tab-icon{font-size:1.4rem;line-height:1;margin-bottom:0.15rem}
+.bottom-tab.active{color:var(--primary)}
+.bottom-tab.active::after{content:'';position:absolute;top:0;left:20%;right:20%;height:2.5px;background:var(--primary);border-radius:0 0 2px 2px}
+.bottom-tab .tab-badge{position:absolute;top:4px;right:calc(50% - 18px);background:var(--danger);color:#fff;font-size:0.6rem;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px}
+
+/* Hide old top tabs */
+.tabs{display:none}
+
+/* Tab content */
 .tab-content{display:none}
 .tab-content.active{display:block}
-.toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%);padding:0.7rem 1.5rem;border-radius:8px;color:#fff;font-weight:600;z-index:9999;animation:slideDown 0.3s ease}
+
+/* Toast — mobile friendly */
+.toast{position:fixed;top:0;left:0;right:0;padding:0.9rem 1rem;color:#fff;font-weight:600;z-index:9999;animation:slideDown 0.3s ease;text-align:center;font-size:0.9rem}
 .toast-success{background:var(--success)}
 .toast-error{background:var(--danger)}
 .toast-info{background:var(--primary)}
-@keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.file-preview{display:flex;align-items:center;gap:0.5rem;margin-top:0.3rem;font-size:0.82rem;color:var(--text-light)}
-.file-preview img{width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid var(--border)}
-.entries-list{max-height:60vh;overflow-y:auto}
-.entry-item{padding:0.7rem;border:1px solid var(--border);border-radius:6px;margin-bottom:0.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem}
-.entry-item:hover{background:#f8fafc}
-.stats-bar{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;font-size:0.88rem}
-.stat{padding:0.4rem 0.8rem;border-radius:6px;font-weight:600}
+@keyframes slideDown{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:translateY(0)}}
+
+/* File preview */
+.file-preview{display:flex;align-items:center;gap:0.5rem;margin-top:0.3rem;font-size:0.78rem;color:var(--text-light);padding:0.3rem;background:#f8fafc;border-radius:6px}
+.file-preview img{width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border)}
+
+/* Entries list */
+.entries-list{max-height:calc(100vh - 220px);max-height:calc(100dvh - 220px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.entry-item{padding:0.7rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.5rem;background:#fff}
+.entry-item-header{display:flex;justify-content:space-between;align-items:flex-start;gap:0.3rem}
+.entry-item-actions{display:flex;gap:0.3rem;margin-top:0.4rem;flex-wrap:wrap}
+
+/* Stats */
+.stats-bar{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.7rem;font-size:0.8rem}
+.stat{padding:0.35rem 0.6rem;border-radius:8px;font-weight:600;flex:1;text-align:center;min-width:0}
 .stat-total{background:#e0e7ff;color:#3730a3}
 .stat-pending{background:#fef3c7;color:#92400e}
 .stat-synced{background:#d1fae5;color:#065f46}
+
 .hidden{display:none!important}
-.sync-progress{margin:0.5rem 0;padding:0.5rem;background:#f1f5f9;border-radius:6px;font-size:0.85rem}
-.sync-progress .bar{height:6px;background:#e2e8f0;border-radius:3px;margin-top:0.3rem;overflow:hidden}
-.sync-progress .bar-fill{height:100%;background:var(--primary);transition:width 0.3s;border-radius:3px}
-@media(max-width:600px){.container{padding:0.5rem}.row>.field{min-width:100%}.tabs{overflow-x:auto}.tab{white-space:nowrap;padding:0.5rem 0.8rem;font-size:0.82rem}}
+
+/* Sync progress */
+.sync-progress{margin:0.5rem 0;padding:0.6rem;background:#f1f5f9;border-radius:8px;font-size:0.82rem}
+.sync-progress .bar{height:8px;background:#e2e8f0;border-radius:4px;margin-top:0.3rem;overflow:hidden}
+.sync-progress .bar-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-light));transition:width 0.3s;border-radius:4px}
+
+/* Collapsible sections */
+.card-collapse .section-title{cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:0}
+.card-collapse .section-title::after{content:'▼';font-size:0.7rem;transition:transform 0.2s}
+.card-collapse.collapsed .section-title::after{transform:rotate(-90deg)}
+.card-collapse.collapsed .card-body{display:none}
+.card-collapse .card-body{margin-top:0.7rem}
+
+/* Dynamic row items (detention, witness, child) */
+.dyn-row{border:1px solid var(--border);border-radius:8px;padding:0.6rem;margin-top:0.4rem;position:relative;background:#fafbfc}
+.dyn-row .dyn-remove{position:absolute;left:0.3rem;top:0.3rem;background:var(--danger);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+
+/* Desktop: side-by-side rows */
+@media(min-width:601px){
+    .row{flex-direction:row}
+    .row>.field{flex:1;min-width:0}
+    .container{padding:1rem}
+    .card{padding:1rem}
+    .section-title{margin:-1rem -1rem 0.8rem -1rem;padding:0.6rem 1rem}
+    .bottom-tabs{display:none}
+    .tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:1rem;gap:0}
+    .tab{padding:0.6rem 1.2rem;cursor:pointer;font-weight:600;font-size:0.9rem;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-light);transition:all 0.2s}
+    .tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+    body{padding-bottom:0}
+    .app-header h1{font-size:1.4rem}
+}
 </style>
 </head>
 <body>
 
-<div class="container">
-<h1>حقنا - نموذج إدخال بدون انترنت</h1>
+<!-- App Header -->
+<div class="app-header">
+    <h1>حقنا</h1>
+    <div class="subtitle">نموذج إدخال بدون انترنت</div>
+</div>
 
-<!-- Tabs -->
+<div class="container">
+
+<!-- Desktop Tabs (hidden on mobile) -->
 <div class="tabs">
     <div class="tab active" onclick="switchTab('form')">نموذج جديد</div>
-    <div class="tab" onclick="switchTab('entries')">الحالات المحفوظة <span id="entriesCountBadge" style="background:var(--primary);color:#fff;padding:0 6px;border-radius:10px;font-size:0.75rem;margin-right:4px;">0</span></div>
+    <div class="tab" onclick="switchTab('entries')">الحالات المحفوظة <span id="entriesCountBadge2" style="background:var(--primary);color:#fff;padding:0 6px;border-radius:10px;font-size:0.75rem;margin-right:4px;">0</span></div>
     <div class="tab" onclick="switchTab('settings')">الإعدادات والمزامنة</div>
 </div>
 
@@ -87,9 +162,9 @@ h1{text-align:center;color:var(--primary);margin:1rem 0;font-size:1.5rem}
         <label>كلمة المرور</label>
         <input type="password" id="syncPassword" placeholder="كلمة المرور">
     </div>
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
-        <button class="btn btn-primary btn-sm" onclick="testConnection()">اختبار الاتصال</button>
-        <button class="btn btn-outline btn-sm" onclick="saveSettings()">حفظ الإعدادات</button>
+    <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+        <button class="btn btn-primary" onclick="testConnection()" style="flex:1">اختبار الاتصال</button>
+        <button class="btn btn-outline" onclick="saveSettings()" style="flex:1">حفظ</button>
     </div>
     <div id="connStatus" style="margin-top:0.5rem;font-size:0.85rem"></div>
 </div>
@@ -101,7 +176,7 @@ h1{text-align:center;color:var(--primary);margin:1rem 0;font-size:1.5rem}
         <span class="stat stat-pending" id="statPending">بانتظار المزامنة: 0</span>
         <span class="stat stat-synced" id="statSynced">تمت المزامنة: 0</span>
     </div>
-    <button class="btn btn-success" onclick="syncAll()" id="syncBtn">مزامنة الحالات المعلقة</button>
+    <button class="btn btn-success btn-block" onclick="syncAll()" id="syncBtn" style="font-size:1rem;padding:0.8rem">&#x21BA; مزامنة الحالات المعلقة</button>
     <div id="syncProgress" class="sync-progress hidden">
         <span id="syncText">جارٍ المزامنة...</span>
         <div class="bar"><div class="bar-fill" id="syncBarFill" style="width:0%"></div></div>
@@ -112,9 +187,9 @@ h1{text-align:center;color:var(--primary);margin:1rem 0;font-size:1.5rem}
 <div class="card">
     <div class="section-title">إدارة البيانات المحلية</div>
     <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.5rem">البيانات محفوظة داخل المتصفح (IndexedDB). لا تمسح بيانات المتصفح قبل المزامنة!</p>
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm" onclick="exportLocalData()">تصدير نسخة احتياطية (JSON)</button>
-        <button class="btn btn-danger btn-sm" onclick="clearSyncedEntries()">حذف الحالات المتزامنة فقط</button>
+    <div style="display:flex;flex-direction:column;gap:0.5rem">
+        <button class="btn btn-outline btn-block" onclick="exportLocalData()">تصدير نسخة احتياطية (JSON)</button>
+        <button class="btn btn-danger btn-block" onclick="clearSyncedEntries()">حذف الحالات المتزامنة فقط</button>
     </div>
 </div>
 </div>
@@ -656,16 +731,33 @@ h1{text-align:center;color:var(--primary);margin:1rem 0;font-size:1.5rem}
     </div>
 </div>
 
-<!-- Submit button -->
-<div style="text-align:center;padding:1rem 0">
-    <button type="button" class="btn btn-primary" onclick="saveEntry()" style="padding:0.7rem 2.5rem;font-size:1.05rem">حفظ الحالة محلياً</button>
-    <button type="button" class="btn btn-outline" onclick="resetForm()" style="margin-right:0.5rem">مسح النموذج</button>
+<!-- Submit buttons — stacked on mobile -->
+<div style="padding:0.8rem 0 1.5rem;display:flex;flex-direction:column;gap:0.5rem">
+    <button type="button" class="btn btn-primary btn-block" onclick="saveEntry()" style="padding:0.85rem;font-size:1.05rem">حفظ الحالة محلياً</button>
+    <button type="button" class="btn btn-outline btn-block" onclick="resetForm()">مسح النموذج</button>
 </div>
 
 </div><!-- end entryForm -->
 </div><!-- end tab-form -->
 
 </div><!-- end container -->
+
+<!-- Bottom Tab Bar (mobile) -->
+<div class="bottom-tabs">
+    <div class="bottom-tab active" onclick="switchTab('form')" id="btab-form">
+        <span class="tab-icon">&#x1F4DD;</span>
+        نموذج جديد
+    </div>
+    <div class="bottom-tab" onclick="switchTab('entries')" id="btab-entries">
+        <span class="tab-icon">&#x1F4CB;</span>
+        المحفوظة
+        <span class="tab-badge" id="entriesCountBadge" style="display:none">0</span>
+    </div>
+    <div class="bottom-tab" onclick="switchTab('settings')" id="btab-settings">
+        <span class="tab-icon">&#x2699;&#xFE0F;</span>
+        مزامنة
+    </div>
+</div>
 
 <script>
 // ===================== IndexedDB Setup =====================
@@ -747,14 +839,20 @@ function showToast(msg, type) {
 // ===================== Tab Switching =====================
 function switchTab(name) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
-    const tabs = document.querySelectorAll('.tab');
-    if (name === 'form') tabs[0].classList.add('active');
-    else if (name === 'entries') tabs[1].classList.add('active');
-    else tabs[2].classList.add('active');
+    // Desktop tabs
+    document.querySelectorAll('.tabs .tab').forEach(el => el.classList.remove('active'));
+    const tabs = document.querySelectorAll('.tabs .tab');
+    if (name === 'form') tabs[0] && tabs[0].classList.add('active');
+    else if (name === 'entries') tabs[1] && tabs[1].classList.add('active');
+    else tabs[2] && tabs[2].classList.add('active');
+    // Bottom tabs (mobile)
+    document.querySelectorAll('.bottom-tab').forEach(el => el.classList.remove('active'));
+    const bt = document.getElementById('btab-' + name);
+    if (bt) bt.classList.add('active');
     if (name === 'entries') renderEntries();
     if (name === 'settings') updateStats();
+    window.scrollTo(0, 0);
 }
 
 // ===================== Status Change Logic =====================
@@ -814,42 +912,42 @@ function previewFile(input, previewId) {
 let detentionCount = 0, witnessCount = 0, childCount = 0;
 
 function addDetention(data) {
-    const i = detentionCount++;
+    detentionCount++;
     const d = data || {};
     const div = document.createElement('div');
-    div.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:0.5rem;margin-top:0.4rem;position:relative';
-    div.innerHTML = '<button type="button" onclick="this.parentElement.remove()" style="position:absolute;left:0.3rem;top:0.3rem;background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem">&times;</button>' +
-        '<div class="row"><div class="field"><label style="font-size:0.8rem">اسم المركز</label><input type="text" class="det-name" value="' + (d.facility_name||'') + '"></div>' +
-        '<div class="field"><label style="font-size:0.8rem">من تاريخ</label><input type="text" class="det-from" placeholder="شهر/سنة" value="' + (d.date_from||'') + '"></div>' +
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div class="field" style="margin-left:2rem"><label style="font-size:0.8rem">اسم المركز</label><input type="text" class="det-name" value="' + (d.facility_name||'') + '"></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">من تاريخ</label><input type="text" class="det-from" placeholder="شهر/سنة" value="' + (d.date_from||'') + '"></div>' +
         '<div class="field"><label style="font-size:0.8rem">إلى تاريخ</label><input type="text" class="det-to" placeholder="شهر/سنة" value="' + (d.date_to||'') + '"></div></div>' +
         '<div class="field"><label style="font-size:0.8rem">ملاحظات</label><input type="text" class="det-notes" value="' + (d.notes||'') + '"></div>';
     document.getElementById('detentionList').appendChild(div);
 }
 
 function addWitness(data) {
-    const i = witnessCount++;
+    witnessCount++;
     const d = data || {};
     const div = document.createElement('div');
-    div.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:0.5rem;margin-top:0.4rem;position:relative';
-    div.innerHTML = '<button type="button" onclick="this.parentElement.remove()" style="position:absolute;left:0.3rem;top:0.3rem;background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem">&times;</button>' +
-        '<div class="row"><div class="field"><label style="font-size:0.8rem">الاسم</label><input type="text" class="wit-name" value="' + (d.name||'') + '"></div>' +
-        '<div class="field"><label style="font-size:0.8rem">الصلة</label><input type="text" class="wit-relation" value="' + (d.relation||'') + '"></div>' +
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div class="field" style="margin-left:2rem"><label style="font-size:0.8rem">الاسم</label><input type="text" class="wit-name" value="' + (d.name||'') + '"></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">الصلة</label><input type="text" class="wit-relation" value="' + (d.relation||'') + '"></div>' +
         '<div class="field"><label style="font-size:0.8rem">التواصل</label><input type="text" class="wit-contact" value="' + (d.contact||'') + '"></div></div>' +
         '<div class="field"><label style="font-size:0.8rem">ملخص الشهادة</label><input type="text" class="wit-summary" value="' + (d.testimony_summary||'') + '"></div>';
     document.getElementById('witnessList').appendChild(div);
 }
 
 function addChild(data) {
-    const i = childCount++;
+    childCount++;
     const d = data || {};
     const div = document.createElement('div');
-    div.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:0.5rem;margin-top:0.4rem;position:relative';
-    div.innerHTML = '<button type="button" onclick="this.parentElement.remove()" style="position:absolute;left:0.3rem;top:0.3rem;background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem">&times;</button>' +
-        '<div class="row"><div class="field"><label style="font-size:0.8rem">اسم الطفل</label><input type="text" class="ch-name" value="' + (d.name||'') + '"></div>' +
-        '<div class="field"><label style="font-size:0.8rem">سنة الميلاد</label><input type="number" class="ch-year" min="1990" max="2026" value="' + (d.birth_year||'') + '"></div>' +
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div class="field" style="margin-left:2rem"><label style="font-size:0.8rem">اسم الطفل</label><input type="text" class="ch-name" value="' + (d.name||'') + '"></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">سنة الميلاد</label><input type="number" class="ch-year" min="1990" max="2026" value="' + (d.birth_year||'') + '"></div>' +
         '<div class="field"><label style="font-size:0.8rem">الجنس</label><select class="ch-gender"><option value="">--</option><option value="male"' + (d.gender==='male'?' selected':'') + '>ذكر</option><option value="female"' + (d.gender==='female'?' selected':'') + '>أنثى</option></select></div></div>' +
-        '<div class="row"><div class="field"><label style="font-size:0.8rem">المدرسة</label><select class="ch-school"><option value="">--</option><option value="yes"' + (d.in_school==='yes'?' selected':'') + '>نعم</option><option value="no"' + (d.in_school==='no'?' selected':'') + '>لا</option></select></div>' +
-        '<div class="field"><label style="font-size:0.8rem">احتياجات خاصة</label><select class="ch-special"><option value="">--</option><option value="نعم"' + (d.special_needs==='نعم'?' selected':'') + '>نعم</option><option value="لا"' + (d.special_needs==='لا'?' selected':'') + '>لا</option></select></div></div>';
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">مدرسة</label><select class="ch-school"><option value="">--</option><option value="yes"' + (d.in_school==='yes'?' selected':'') + '>نعم</option><option value="no"' + (d.in_school==='no'?' selected':'') + '>لا</option></select></div>' +
+        '<div class="field"><label style="font-size:0.8rem">احت. خاصة</label><select class="ch-special"><option value="">--</option><option value="نعم"' + (d.special_needs==='نعم'?' selected':'') + '>نعم</option><option value="لا"' + (d.special_needs==='لا'?' selected':'') + '>لا</option></select></div></div>';
     document.getElementById('childrenList').appendChild(div);
 }
 
@@ -1024,13 +1122,13 @@ async function renderEntries() {
         const date = new Date(e.created_at).toLocaleString('ar-SY');
         const fileCount = Object.keys(e.files || {}).length;
         html += '<div class="entry-item">' +
-            '<div><strong>' + (e.display_name || '---') + '</strong>' +
-            '<br><span style="font-size:0.8rem;color:var(--text-light)">' + date +
-            (fileCount ? ' | ' + fileCount + ' مرفقات' : '') +
-            ' | ' + (e.fields.status || '') + '</span></div>' +
-            '<div style="display:flex;gap:0.3rem;align-items:center">' + badge +
-            (e.status !== 'synced' ? ' <button class="btn btn-outline btn-sm" onclick="editEntry(\'' + e.client_uuid + '\')">تعديل</button>' : '') +
-            ' <button class="btn btn-danger btn-sm" onclick="deleteEntry(\'' + e.client_uuid + '\')">حذف</button></div></div>';
+            '<div class="entry-item-header"><div><strong style="font-size:0.95rem">' + (e.display_name || '---') + '</strong> ' + badge + '</div></div>' +
+            '<div style="font-size:0.78rem;color:var(--text-light);margin:0.2rem 0">' + date +
+            (fileCount ? ' &middot; ' + fileCount + ' مرفقات' : '') +
+            ' &middot; ' + (e.fields.status || '') + '</div>' +
+            '<div class="entry-item-actions">' +
+            (e.status !== 'synced' ? '<button class="btn btn-outline btn-sm" onclick="editEntry(\'' + e.client_uuid + '\')">تعديل</button>' : '') +
+            '<button class="btn btn-danger btn-sm" onclick="deleteEntry(\'' + e.client_uuid + '\')">حذف</button></div></div>';
     });
     container.innerHTML = html;
     updateStats();
@@ -1096,7 +1194,17 @@ async function updateStats() {
 
 async function updateBadge() {
     const entries = await dbGetAll('entries');
-    document.getElementById('entriesCountBadge').textContent = entries.length;
+    const count = entries.length;
+    const pending = entries.filter(e => e.status === 'pending' || e.status === 'failed').length;
+    // Desktop tab badge
+    const b2 = document.getElementById('entriesCountBadge2');
+    if (b2) b2.textContent = count;
+    // Mobile bottom tab badge (show only if there are pending entries)
+    const b = document.getElementById('entriesCountBadge');
+    if (b) {
+        if (pending > 0) { b.style.display = 'block'; b.textContent = pending; }
+        else b.style.display = 'none';
+    }
 }
 
 // ===================== Settings Persistence =====================

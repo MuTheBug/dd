@@ -97,6 +97,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 .hidden{display:none!important}
 
+/* Methodology tags */
+.method-tag{display:inline-block;padding:0.35rem 0.7rem;border:1.5px solid var(--border);border-radius:16px;background:var(--card);color:var(--text);font-size:0.78rem;cursor:pointer;transition:all 0.15s;font-family:inherit;touch-action:manipulation;min-height:32px}
+.method-tag:hover{border-color:var(--primary-light);background:#eff6ff}
+.method-tag.selected{border-color:var(--primary);background:var(--primary);color:#fff;font-weight:600}
+
 /* Sync progress */
 .sync-progress{margin:0.5rem 0;padding:0.6rem;background:#f1f5f9;border-radius:8px;font-size:0.82rem}
 .sync-progress .bar{height:8px;background:#e2e8f0;border-radius:4px;margin-top:0.3rem;overflow:hidden}
@@ -220,65 +225,66 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="card">
     <div class="section-title">بيانات المُبلِّغ وتصنيف الحالة</div>
     <div class="row">
-        <div class="field"><label>حالة الشخص *</label>
+        <div class="field"><label>تصنيف الحالة *</label>
             <select name="status" id="offStatus" onchange="handleStatusChange()">
-                <option value="">-- اختر --</option>
-                <option value="survivor">ناجٍ (على قيد الحياة)</option>
-                <option value="enforced">اختفاء قسري</option>
-                <option value="deceased">متوفى</option>
-                <option value="released">مُفرَج عنه</option>
-                <option value="unknown">غير معروف</option>
+                <option value="">-- اختر التصنيف --</option>
+                <option value="survivor">ناجٍ (شخص أُفرج عنه / هرب)</option>
+                <option value="enforced">مغيّب قسراً (لا يُعرف مصيره)</option>
+                <option value="deceased">متوفى (مؤكد الوفاة)</option>
             </select>
         </div>
-        <div class="field"><label>تصنيف الحالة</label>
-            <select name="case_type" id="offCaseType"></select>
+        <div class="field"><label>نوع الحالة التفصيلي</label>
+            <select name="case_type" id="offCaseType"><option value="">-- اختر التصنيف أولاً --</option></select>
         </div>
     </div>
     <div class="row">
         <div class="field"><label>اسم المُبلِّغ *</label>
-            <input type="text" name="reporter_name" required placeholder="الاسم الكامل"></div>
+            <input type="text" name="reporter_name" required placeholder="الاسم الكامل للمُبلِّغ"></div>
         <div class="field"><label>صلة المُبلِّغ بالضحية *</label>
             <select name="reporter_relation" required>
-                <option value="">-- اختر --</option>
-                <option value="self">الشخص نفسه</option>
-                <option value="spouse">زوج/ة</option>
-                <option value="parent">أب/أم</option>
-                <option value="sibling">أخ/أخت</option>
-                <option value="child">ابن/ابنة</option>
-                <option value="relative">قريب</option>
-                <option value="friend">صديق</option>
-                <option value="neighbor">جار</option>
-                <option value="lawyer">محامٍ</option>
-                <option value="other">أخرى</option>
+                <option value="">-- اختر الصلة --</option>
+                <option value="أم">أم</option>
+                <option value="أب">أب</option>
+                <option value="أخ">أخ</option>
+                <option value="أخت">أخت</option>
+                <option value="زوج/ة">زوج/ة</option>
+                <option value="ابن/ة">ابن/ة</option>
+                <option value="قريب">قريب</option>
+                <option value="صديق">صديق</option>
+                <option value="جار">جار</option>
+                <option value="زميل">زميل</option>
+                <option value="الشخص نفسه">الشخص نفسه</option>
+                <option value="أخرى">أخرى</option>
             </select>
         </div>
     </div>
     <div class="row">
         <div class="field"><label>هاتف المُبلِّغ</label>
             <input type="tel" name="reporter_phone" placeholder="رقم الهاتف"></div>
-        <div class="field"><label>الرقم الوطني للمُبلِّغ</label>
-            <input type="text" name="reporter_id" placeholder="الرقم الوطني"></div>
+        <div class="field"><label>رقم هوية المُبلِّغ</label>
+            <input type="text" name="reporter_id" placeholder="الرقم الوطني للمُبلِّغ"></div>
     </div>
     <div class="row">
         <div class="field"><label>اسم جامع البيانات</label>
             <input type="text" name="collector_name" placeholder="اسم الموظف/المتطوع"></div>
-        <div class="field"><label>تاريخ الجمع</label>
+        <div class="field"><label>تاريخ جمع البيانات</label>
             <input type="date" name="collection_date"></div>
         <div class="field"><label>نوع المصدر *</label>
             <select name="source_type" required>
-                <option value="">-- اختر --</option>
-                <option value="family">عائلة الضحية</option>
-                <option value="survivor">الناجي نفسه</option>
-                <option value="witness">شاهد عيان</option>
-                <option value="ngo">منظمة غير حكومية</option>
-                <option value="media">وسائل إعلام</option>
-                <option value="leaked">تسريبات</option>
-                <option value="other">أخرى</option>
+                <option value="">-- اختر نوع المصدر --</option>
+                <option value="مقابلة مباشرة">مقابلة مباشرة</option>
+                <option value="مقابلة هاتفية">مقابلة هاتفية</option>
+                <option value="وثائق رسمية">وثائق رسمية</option>
+                <option value="مصادر مفتوحة">مصادر مفتوحة (إنترنت / إعلام)</option>
+                <option value="شهادة شاهد">شهادة شاهد</option>
+                <option value="تسريبات">تسريبات</option>
+                <option value="إحالة">إحالة من منظمة / جهة أخرى</option>
+                <option value="أخرى">أخرى</option>
             </select>
         </div>
     </div>
     <div class="field" style="margin-top:0.3rem">
-        <label><input type="checkbox" name="informant_consent" value="1"> أوافق على استخدام هذه البيانات لأغراض التوثيق</label>
+        <label><input type="checkbox" name="informant_consent" value="1"> أقرّ بموافقتي الواعية على جمع هذه المعلومات واستخدامها لأغراض التوثيق وفق بروتوكول بيركلي</label>
     </div>
 </div>
 
@@ -316,20 +322,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
         <div class="field"><label>المحافظة *</label>
             <select name="province" required>
                 <option value="">-- اختر --</option>
+                <option value="اللاذقية">اللاذقية</option>
                 <option value="دمشق">دمشق</option>
                 <option value="ريف دمشق">ريف دمشق</option>
                 <option value="حلب">حلب</option>
                 <option value="حمص">حمص</option>
                 <option value="حماة">حماة</option>
-                <option value="اللاذقية">اللاذقية</option>
-                <option value="طرطوس">طرطوس</option>
                 <option value="إدلب">إدلب</option>
-                <option value="دير الزور">دير الزور</option>
-                <option value="الرقة">الرقة</option>
-                <option value="الحسكة">الحسكة</option>
                 <option value="درعا">درعا</option>
                 <option value="السويداء">السويداء</option>
                 <option value="القنيطرة">القنيطرة</option>
+                <option value="الرقة">الرقة</option>
+                <option value="دير الزور">دير الزور</option>
+                <option value="الحسكة">الحسكة</option>
+                <option value="طرطوس">طرطوس</option>
+                <option value="أخرى">أخرى</option>
             </select>
         </div>
         <div class="field"><label>الرقم الوطني *</label>
@@ -384,39 +391,78 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
         <div class="field"><label>الجهة المعتقِلة *</label>
             <select name="arrest_authority" required>
                 <option value="">-- اختر --</option>
-                <option value="security">الأمن</option>
-                <option value="military">الجيش</option>
-                <option value="police">الشرطة</option>
-                <option value="militia">ميليشيا</option>
-                <option value="unknown">غير معروف</option>
-                <option value="other">أخرى</option>
+                <option value="الأمن العسكري">الأمن العسكري</option>
+                <option value="الأمن السياسي">الأمن السياسي</option>
+                <option value="أمن الدولة">أمن الدولة</option>
+                <option value="المخابرات الجوية">المخابرات الجوية</option>
+                <option value="الدفاع الوطني">الدفاع الوطني</option>
+                <option value="الشرطة العسكرية">الشرطة العسكرية</option>
+                <option value="الأمن الجنائي">الأمن الجنائي</option>
+                <option value="الجيش">الجيش</option>
+                <option value="حاجز أمني">حاجز أمني</option>
+                <option value="دورية مشتركة">دورية مشتركة</option>
+                <option value="غير معروف">غير معروف</option>
+                <option value="أخرى">أخرى</option>
             </select>
         </div>
-        <div class="field"><label>مكان الاعتقال</label>
-            <input type="text" name="arrest_place" placeholder="المدينة أو الحي أو الحاجز"></div>
+        <div class="field"><label>مكان الاحتجاز / المعتقل</label>
+            <select name="arrest_place">
+                <option value="">-- اختر --</option>
+                <option value="صيدنايا الامني (الاحمر)">صيدنايا الامني (الاحمر)</option>
+                <option value="صيدنايا القضائي (الابيض)">صيدنايا القضائي (الابيض)</option>
+                <option value="فرع 215، بسرية المداهمة والاقتحام">فرع 215، بسرية المداهمة والاقتحام</option>
+                <option value="فرع 216، فرع الدوريات">فرع 216، فرع الدوريات</option>
+                <option value="فرع 227، فرع المنطقة">فرع 227، فرع المنطقة</option>
+                <option value="فرع 235 فرع فلسطين">فرع 235 فرع فلسطين</option>
+                <option value="فرع 248، التحقيق العسكري">فرع 248، التحقيق العسكري</option>
+                <option value="فرع 251، فرع الخطيب">فرع 251، فرع الخطيب</option>
+                <option value="فرع 285، فرع التحقيق">فرع 285، فرع التحقيق</option>
+                <option value="فرع 293">فرع 293</option>
+                <option value="فرع 295، مكافحة الإرهاب">فرع 295، مكافحة الإرهاب</option>
+                <option value="فرع الأمن العسكري">فرع الأمن العسكري</option>
+                <option value="فرع الأمن السياسي">فرع الأمن السياسي</option>
+                <option value="فرع أمن الدولة">فرع أمن الدولة</option>
+                <option value="فرع المخابرات الجوية">فرع المخابرات الجوية</option>
+                <option value="السجن المدني">السجن المدني</option>
+                <option value="سجن تدمر">سجن تدمر</option>
+                <option value="سجن عدرا">سجن عدرا</option>
+                <option value="سجن حمص المركزي">سجن حمص المركزي</option>
+                <option value="مطار المزة">مطار المزة</option>
+                <option value="المدينة الرياضية">المدينة الرياضية</option>
+                <option value="غير معروف">غير معروف</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
     </div>
     <div class="row">
         <div class="field"><label>سبب الاعتقال *</label>
-            <input type="text" name="arrest_reason" required placeholder="مظاهرة، تقرير كيدي، حاجز..."></div>
-        <div class="field"><label>المتسبب بالاعتقال</label>
+            <input type="text" name="arrest_reason" required placeholder="مثال: مظاهرة، تقرير كيدي، حاجز..."></div>
+        <div class="field"><label>المتسبب بالاعتقال (إن وُجد)</label>
             <input type="text" name="arrest_causer" placeholder="اسم الشخص أو الجهة"></div>
     </div>
     <div class="row">
         <div class="field"><label>آخر مكان معروف</label>
             <input type="text" name="last_known_location" placeholder="آخر مكان عُرف أن الشخص كان فيه"></div>
-        <div class="field"><label>آخر تاريخ معروف على قيد الحياة</label>
+        <div class="field"><label>آخر تاريخ عُرف أنه حي</label>
             <input type="date" name="last_known_alive_date"></div>
     </div>
     <!-- Detention facilities -->
     <div style="margin-top:0.5rem">
-        <label style="font-size:0.85rem;font-weight:600;">مراكز الاحتجاز</label>
+        <label style="font-size:0.85rem;font-weight:600;">مراكز الاحتجاز (يمكن إضافة أكثر من مركز)</label>
         <div id="detentionList"></div>
         <button type="button" class="btn btn-outline btn-sm" onclick="addDetention()" style="margin-top:0.3rem">+ إضافة مركز احتجاز</button>
+    </div>
+    <!-- Companions -->
+    <div style="margin-top:0.7rem;border-top:1px solid var(--border);padding-top:0.6rem">
+        <label style="font-size:0.85rem;font-weight:600;">أشخاص كانوا معه (مرافقون)</label>
+        <p style="font-size:0.78rem;color:var(--text-light);margin:0.2rem 0 0.4rem">إذا كان المعتقل برفقة أشخاص آخرين أثناء الاعتقال أو الاحتجاز</p>
+        <div id="companionsList"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addCompanion()" style="margin-top:0.3rem">+ إضافة مرافق</button>
     </div>
 </div>
 
 <!-- Section 5: Release (survivors) -->
-<div class="card" id="releaseSection">
+<div class="card hidden" id="releaseSection">
     <div class="section-title">بيانات الإفراج (للناجين)</div>
     <div class="row row3">
         <div class="field"><label>يوم الإفراج</label>
@@ -427,13 +473,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
             <input type="number" name="release_year" min="2000" max="2026" placeholder="السنة"></div>
     </div>
     <div class="field">
-        <label>وصف تجربة الاحتجاز</label>
+        <label>وصف تجربة الاعتقال</label>
         <textarea name="survivor_cv_text" rows="3" placeholder="وصف مختصر لتجربة الاعتقال والاحتجاز..."></textarea>
+    </div>
+    <div class="row">
+        <div class="field">
+            <label>ملخص التجربة / السيرة الذاتية</label>
+            <input type="file" name="survivor_cv" accept="image/*,.pdf,.doc,.docx" onchange="previewFile(this,'cvPreview')">
+            <div id="cvPreview" class="file-preview"></div>
+        </div>
+        <div class="field">
+            <label>صورة بعد الإفراج</label>
+            <input type="file" name="survivor_cv_photo" accept="image/*" onchange="previewFile(this,'cvPhotoPreview')">
+            <div id="cvPhotoPreview" class="file-preview"></div>
+        </div>
     </div>
 </div>
 
 <!-- Section 6: Death -->
-<div class="card" id="deathSection">
+<div class="card hidden" id="deathSection">
     <div class="section-title">بيانات الوفاة</div>
     <div class="row row3">
         <div class="field"><label>يوم الوفاة</label>
@@ -455,60 +513,75 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
     <div class="row">
         <div class="field"><label>نوع الدليل الرقمي</label>
             <select name="digital_evidence_type" id="offDigitalType" onchange="toggleDigitalDetails()">
-                <option value="">لا يوجد</option>
-                <option value="leaked_db">تسريبات قاعدة بيانات</option>
+                <option value="">-- لا يوجد --</option>
+                <option value="caesar_files">ملفات قي��ر</option>
+                <option value="leaked_database">تسريبات قاعدة بيانات</option>
+                <option value="social_media">وسائل التواصل الاجتماعي</option>
                 <option value="news_report">تقرير إخباري</option>
-                <option value="social_media">وسائل تواصل اجتماعي</option>
                 <option value="ngo_report">تقرير منظمة</option>
-                <option value="caesar_photos">صور قيصر</option>
+                <option value="civil_registry">��جل مدني</option>
+                <option value="official_document">وثيقة رسمية</option>
                 <option value="other">أخرى</option>
             </select>
         </div>
-        <div class="field"><label>مستوى التحقق</label>
+        <div class="field"><label>مستوى الأدلة</label>
             <select name="evidence_level">
                 <option value="unverified">غير مُتحقق منه</option>
-                <option value="partially_verified">مُتحقق منه جزئياً</option>
-                <option value="verified">مُتحقق منه بالكامل</option>
+                <option value="low">منخفض - شهادة شفهية فقط</option>
+                <option value="medium">متوسط - دليل واحد موثق</option>
+                <option value="high">عالي - أدلة موثقة متعددة</option>
             </select>
         </div>
+        <div class="field"><label>عدد مصادر الأدلة</label>
+            <input type="number" name="evidence_sources_count" min="0" value="0"></div>
     </div>
     <div id="digitalDetailsSection" class="hidden">
         <div class="row">
-            <div class="field"><label>رابط الدليل</label>
+            <div class="field"><label>رابط الدليل (إن وُجد)</label>
                 <input type="url" name="digital_evidence_url" placeholder="https://..." dir="ltr"></div>
             <div class="field"><label>حالة الرابط</label>
                 <select name="digital_evidence_url_status">
-                    <option value="">--</option>
-                    <option value="active">الرابط فعّال</option>
-                    <option value="deleted">الرابط محذوف</option>
-                    <option value="archived">مؤرشف (Wayback Machine)</option>
+                    <option value="">-- اختر --</option>
+                    <option value="active">فعّال</option>
+                    <option value="deleted">محذوف</option>
+                    <option value="archived">مؤرشف</option>
+                    <option value="unknown">غير معروف</option>
                     <option value="no_url">لم يكن هناك رابط أصلاً</option>
-                    <option value="url_forgotten">الرابط غير متاح (نُسي)</option>
+                    <option value="url_forgotten">الر��بط غير متاح (نُسي)</option>
                 </select>
             </div>
         </div>
         <div class="row">
-            <div class="field"><label>رابط المصدر الأصلي</label>
-                <input type="url" name="source_url" placeholder="https://... حتى لو كان محذوفاً" dir="ltr"></div>
-            <div class="field"><label>تاريخ الدليل</label>
+            <div class="field"><label>رابط ��لمصدر الأصلي</label>
+                <input type="url" name="source_url" placeholder="https://... حتى لو كان الرابط محذوفاً، وثّقه هنا" dir="ltr">
+                <span style="font-size:0.75rem;color:var(--text-light)">وثّق الرابط حتى لو كان محذوفاً - مهم لإثبات المصدر</span></div>
+            <div class="field"><label>تاريخ الدليل الرقمي</label>
                 <input type="date" name="digital_evidence_date"></div>
         </div>
         <div class="field">
-            <label>لقطة شاشة الدليل</label>
+            <label>لقطة شاشة للدليل</label>
             <input type="file" name="digital_evidence_screenshot" accept="image/*,.pdf" onchange="previewFile(this,'ssPreview')">
             <div id="ssPreview" class="file-preview"></div>
         </div>
         <div class="row">
-            <div class="field"><label>الاسم في التسريب</label>
-                <input type="text" name="digital_evidence_person_name" placeholder="الاسم كما ظهر"></div>
-            <div class="field"><label>تاريخ الوفاة في التسريب</label>
+            <div class="field"><label>ا��اسم الوارد في الدليل</label>
+                <input type="text" name="digital_evidence_person_name" placeholder="الاسم كما ظهر في التسريبات"></div>
+            <div class="field"><label>تاريخ الوفاة الوارد في الدليل</label>
                 <input type="date" name="digital_evidence_death_date"></div>
         </div>
         <div class="field">
             <label>وصف الدليل</label>
-            <textarea name="digital_evidence_description" rows="2" placeholder="وصف تفصيلي..."></textarea>
+            <textarea name="digital_evidence_description" rows="2" placeholder="وصف تفصيلي للدليل الرقمي..."></textarea>
         </div>
     </div>
+</div>
+
+<!-- Section 7b: Extra Documents -->
+<div class="card">
+    <div class="section-title">وثائق وأدلة إضافية</div>
+    <p style="font-size:0.78rem;color:var(--text-light);margin-bottom:0.4rem">أوامر محكمة، كروت زيارة سجين، أوراق إفراج، لقطات شاشة تسريبات، شهادات وفاة</p>
+    <div id="extraDocsList"></div>
+    <button type="button" class="btn btn-outline btn-sm" onclick="addExtraDoc()" style="margin-top:0.3rem">+ إ��افة وثيقة</button>
 </div>
 
 <!-- Section 8: Civil Registry -->
@@ -518,25 +591,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
         <div class="field"><label>حالة السجل المدني</label>
             <select name="civil_registry_status">
                 <option value="">--</option>
-                <option value="alive">مسجّل حي</option>
-                <option value="dead">مسجّل متوفى</option>
-                <option value="missing">مسجّل مفقود</option>
+                <option value="alive">حي في السجل المدني</option>
+                <option value="deceased">متوفى في السجل المدني</option>
                 <option value="unknown">غير معروف</option>
+                <option value="not_checked">لم يتم التحقق</option>
             </select>
         </div>
-        <div class="field"><label>تاريخ آخر تحديث</label>
+        <div class="field"><label>تاريخ مراجعة النفوس</label>
             <input type="date" name="civil_registry_date"></div>
     </div>
     <div class="field">
-        <label>وثيقة السجل المدني</label>
+        <label>وثيقة من النفوس (إخراج قيد)</label>
         <input type="file" name="civil_registry_document" accept="image/*,.pdf" onchange="previewFile(this,'civilPreview')">
         <div id="civilPreview" class="file-preview"></div>
     </div>
     <div class="field" style="margin-top:0.3rem">
-        <label><input type="checkbox" name="has_conflicting_info" value="1" id="offConflictCheck" onchange="document.getElementById('offConflictDetails').classList.toggle('hidden',!this.checked)"> توجد معلومات متضاربة</label>
+        <label><input type="checkbox" name="has_conflicting_info" value="1" id="offConflictCheck" onchange="document.getElementById('offConflictDetails').classList.toggle('hidden',!this.checked)"> يوجد تضارب في المعلومات</label>
     </div>
     <div id="offConflictDetails" class="hidden field">
-        <textarea name="conflicting_info_details" rows="2" placeholder="اشرح التضارب..."></textarea>
+        <label>تفاصيل التضارب</label>
+        <textarea name="conflicting_info_details" rows="2" placeholder="مثال: التسريبات تقول متوفى لكن النفوس تقول حي..."></textarea>
     </div>
 </div>
 
@@ -549,7 +623,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <!-- Section 10: Family -->
 <div class="card">
-    <div class="section-title">البيانات العائلية</div>
+    <div class="section-title">البيانات العائلية والاجتماعية</div>
     <div class="row">
         <div class="field"><label>الحالة الاجتماعية</label>
             <select name="marital" id="offMarital" onchange="toggleSpouse()">
@@ -560,11 +634,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
                 <option value="widowed">أرمل/ة</option>
             </select>
         </div>
-        <div class="field"><label>اسم الولي/الوصي</label>
+        <div class="field"><label>اسم ولي الأمر / المعرّف</label>
             <input type="text" name="guardian_name"></div>
-        <div class="field"><label>صلة الولي</label>
+        <div class="field"><label>صلة ولي الأمر</label>
             <input type="text" name="guardian_relation"></div>
-        <div class="field"><label>هاتف الولي</label>
+        <div class="field"><label>هاتف ولي الأمر</label>
             <input type="tel" name="guardian_phone"></div>
     </div>
     <div id="spouseSection" class="hidden" style="margin-top:0.5rem">
@@ -575,9 +649,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
                 <input type="tel" name="spouse_phone"></div>
         </div>
     </div>
+    <div id="exSpouseSection" class="hidden" style="margin-top:0.5rem;border-top:1px solid var(--border);padding-top:0.5rem">
+        <label style="font-size:0.85rem;font-weight:600;">بيانات الزوج/ة السابق/ة</label>
+        <div class="row">
+            <div class="field"><label>اسم الزوج/ة السابق/ة</label>
+                <input type="text" name="ex_spouse_name"></div>
+            <div class="field"><label>أطفال من الزواج السابق؟</label>
+                <select name="has_kids_w" onchange="document.getElementById('kidsWField').classList.toggle('hidden',this.value!=='yes')">
+                    <option value="no">لا</option>
+                    <option value="yes">نعم</option>
+                </select>
+            </div>
+            <div class="field hidden" id="kidsWField"><label>عددهم</label>
+                <input type="number" name="kids_count_w" min="0" value="0"></div>
+        </div>
+    </div>
     <!-- Children -->
-    <div style="margin-top:0.7rem">
-        <label style="font-size:0.85rem;font-weight:600;">الأطفال</label>
+    <div style="margin-top:0.7rem;border-top:1px solid var(--border);padding-top:0.5rem">
+        <label style="font-size:0.85rem;font-weight:600;">المسح الاجتماعي للأطفال</label>
         <div id="childrenList"></div>
         <button type="button" class="btn btn-outline btn-sm" onclick="addChild()" style="margin-top:0.3rem">+ إضافة طفل</button>
     </div>
@@ -587,27 +676,52 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="card">
     <div class="section-title">البيانات السكنية والاقتصادية</div>
     <div class="row">
-        <div class="field"><label>العنوان *</label>
+        <div class="field"><label>المنطقة / الحي</label>
+            <select name="address_area">
+                <option value="">-- اختر المنطقة --</option>
+                <option value="الرمل الجنوبي">الرمل الجنوبي</option>
+                <option value="قنينص">قنينص</option>
+                <option value="الحفة">الحفة</option>
+                <option value="الصليبة">الصليبة</option>
+                <option value="العوينة">العوينة</option>
+                <option value="الأشرفية">الأشرفية</option>
+                <option value="بستان الصيداوي">بستان الصيداوي</option>
+                <option value="الطابيات">الطابيات</option>
+                <option value="شيخ ضاهر">شيخ ضاهر</option>
+                <option value="حي القصور">حي القصور</option>
+                <option value="مرتقلا">مرتقلا</option>
+                <option value="شارع انطاكيا">شارع انطاكيا</option>
+                <option value="حي السجن">حي السجن</option>
+                <option value="مشروع القلعة">مشروع القلعة</option>
+                <option value="شارع ميسلون">شارع ميسلون</option>
+                <option value="سوق الداية">سوق الداية</option>
+                <option value="الريجي">الريجي</option>
+                <option value="شارع بور سعيد">شارع بور سعيد</option>
+                <option value="حي الفاروس">حي الفاروس</option>
+                <option value="طريق الحرش">طريق الحرش</option>
+                <option value="خارج اللاذقية">خارج اللاذقية</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>العنوان الحالي *</label>
             <input type="text" name="address" required placeholder="العنوان التفصيلي"></div>
-        <div class="field"><label>المنطقة</label>
-            <input type="text" name="address_area" placeholder="الحي أو المنطقة"></div>
     </div>
     <div class="row">
         <div class="field"><label>نوع السكن *</label>
             <select name="housing_type" required>
                 <option value="">-- اختر --</option>
-                <option value="owned">ملك</option>
-                <option value="rented">إيجار</option>
-                <option value="hosted">مستضاف</option>
-                <option value="homeless">بلا مأوى</option>
-                <option value="camp">مخيم</option>
+                <option value="ملك">ملك</option>
+                <option value="إيجار">إيجار</option>
+                <option value="رهن">رهن</option>
+                <option value="مستضاف">مستضاف</option>
+                <option value="أخرى">أخرى</option>
             </select>
         </div>
-        <div class="field"><label>مبلغ الإيجار</label>
+        <div class="field"><label>مبلغ الإيجار (إن وُجد)</label>
             <input type="text" name="rent_amount" placeholder="بالليرة السورية"></div>
     </div>
     <div class="row">
-        <div class="field"><label>العمل</label>
+        <div class="field"><label>الوضع الوظيفي</label>
             <input type="text" name="employment" placeholder="يعمل / لا يعمل"></div>
         <div class="field"><label>المهنة</label>
             <input type="text" name="profession"></div>
@@ -617,17 +731,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
     <div class="row">
         <div class="field"><label>المعيل</label>
             <input type="text" name="breadwinner" placeholder="اسم المعيل"></div>
-        <div class="field"><label>عمل المعيل</label>
+        <div class="field"><label>مهنة المعيل</label>
             <input type="text" name="breadwinner_job"></div>
-        <div class="field"><label>صلة المعيل</label>
+        <div class="field"><label>صلة المعيل بالضحية</label>
             <select name="breadwinner_relation">
-                <option value="">--</option>
-                <option value="self">هو نفسه</option>
-                <option value="spouse">الزوج/ة</option>
-                <option value="parent">الأب/الأم</option>
-                <option value="sibling">أخ/أخت</option>
-                <option value="child">ابن/ابنة</option>
-                <option value="other">أخرى</option>
+                <option value="">-- اختر --</option>
+                <option value="أم">أم</option>
+                <option value="أب">أب</option>
+                <option value="أخ">أخ</option>
+                <option value="أخت">أخت</option>
+                <option value="زوج/ة">زوج/ة</option>
+                <option value="ابن/ة">ابن/ة</option>
+                <option value="قريب">قريب</option>
+                <option value="صديق">صديق</option>
+                <option value="جار">جار</option>
+                <option value="زميل">زميل</option>
+                <option value="الشخص نفسه">الشخص نفسه</option>
+                <option value="أخرى">أخرى</option>
             </select>
         </div>
     </div>
@@ -640,28 +760,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
         <div class="field"><label>المستوى التعليمي</label>
             <select name="education">
                 <option value="">--</option>
-                <option value="illiterate">أمي</option>
-                <option value="primary">ابتدائي</option>
-                <option value="middle">إعدادي</option>
-                <option value="secondary">ثانوي</option>
-                <option value="university">جامعي</option>
-                <option value="postgrad">دراسات عليا</option>
+                <option value="أمّي">أمّي</option>
+                <option value="ابتدائية">ابتدائية</option>
+                <option value="إعدادية">إعدادية</option>
+                <option value="ثانوية">ثانوية</option>
+                <option value="معهد">معهد</option>
+                <option value="بكالوريوس">بكالوريوس</option>
+                <option value="ماجستير">ماجستير</option>
+                <option value="دكتوراه">دكتوراه</option>
             </select>
         </div>
-        <div class="field"><label>نوع التعليم</label>
+        <div class="field"><label>نوع الدراسة</label>
             <select name="edu_type">
                 <option value="">--</option>
-                <option value="public">حكومي</option>
-                <option value="private">خاص</option>
-                <option value="religious">ديني</option>
-                <option value="vocational">مهني</option>
+                <option value="علمي">علمي</option>
+                <option value="أدبي">أدبي</option>
+                <option value="شرعي">شرعي</option>
+                <option value="مهني">مهني</option>
+                <option value="تجاري">تجاري</option>
+                <option value="صناعي">صناعي</option>
+                <option value="نسوي">نسوي</option>
+                <option value="أخرى">أخرى</option>
             </select>
         </div>
     </div>
     <div class="row">
-        <div class="field"><label>التخصص</label>
+        <div class="field"><label>الاختصاص</label>
             <input type="text" name="edu_specialization"></div>
-        <div class="field"><label>الجامعة/المعهد</label>
+        <div class="field"><label>الجامعة / المعهد</label>
             <input type="text" name="edu_university"></div>
     </div>
 </div>
@@ -670,21 +796,38 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="card">
     <div class="section-title">الحالة الصحية</div>
     <div class="field">
-        <label>أمراض مزمنة</label>
-        <div style="display:flex;flex-wrap:wrap;gap:0.5rem 1rem;margin:0.3rem 0">
-            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="ضغط الدم"> ضغط الدم</label>
-            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="السكري"> السكري</label>
-            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="قلب"> قلب</label>
-            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="ربو"> ربو</label>
-            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="كلى"> كلى</label>
-            <label style="font-size:0.85rem"><input type="checkbox" name="chronic_list" value="سرطان"> سرطان</label>
+        <label>الأمراض المزمنة (اختر ما ينطبق)</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.3rem 0.8rem;margin:0.3rem 0">
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="ضغط الدم"> ضغط الدم</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="السكري"> السكري</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الربو"> الربو</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أمراض القلب"> أمراض القلب</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الكلى"> الكلى</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الكبد"> الكبد</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="السرطان"> السرطان</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الصرع"> الصرع</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الثلاسيميا"> الثلاسيميا</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="فقر الدم"> فقر الدم</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="التهاب المفاصل"> التهاب المفاصل</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="هشاشة العظام"> هشاشة العظام</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الغدة الدرقية"> الغدة الدرقية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أمراض الجهاز الهضمي"> أمراض الجهاز الهضمي</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أمراض الجهاز التنفسي"> أمراض الجهاز التنفسي</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أمراض نفسية"> أمراض نفسية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="اكتئاب"> اكتئاب</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="اضطراب ما بعد الصدمة (PTSD)"> PTSD</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="إعاقة حركية"> إعاقة حركية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="إعاقة بصرية"> إعاقة بصرية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="إعاقة سمعية"> إعاقة سمعية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أخرى"> أخرى</label>
         </div>
-        <input type="text" name="other_diseases" placeholder="أمراض أخرى...">
+        <input type="text" name="other_diseases" placeholder="أمراض أخرى غير مذكورة..." style="margin-top:0.3rem">
     </div>
     <div class="field" style="margin-top:0.3rem">
-        <label><input type="checkbox" name="has_special_needs" value="1" id="offSpecialCheck" onchange="document.getElementById('offSpecialDetails').classList.toggle('hidden',!this.checked)"> لديه احتياجات خاصة</label>
+        <label><input type="checkbox" name="has_special_needs" value="1" id="offSpecialCheck" onchange="document.getElementById('offSpecialDetails').classList.toggle('hidden',!this.checked)"> احتياجات خاصة</label>
     </div>
     <div id="offSpecialDetails" class="hidden field">
+        <label>تفاصيل الاحتياجات الخاصة</label>
         <input type="text" name="special_needs_details" placeholder="تفاصيل الاحتياجات الخاصة">
     </div>
 </div>
@@ -722,15 +865,50 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
     </div>
 </div>
 
-<!-- Section 15: Notes -->
+<!-- Section 15: Notes & Methodology -->
 <div class="card">
-    <div class="section-title">ملاحظات إضافية</div>
+    <div class="section-title">ملاحظات إضافية ومنهجية التوثيق</div>
     <div class="field">
         <textarea name="notes" rows="4" placeholder="أي ملاحظات إضافية أو معلومات لم تُذكر أعلاه..."></textarea>
     </div>
-    <div class="field">
-        <label>ملاحظات المنهجية</label>
-        <textarea name="methodology_notes" rows="2" placeholder="ملاحظات حول منهجية جمع البيانات..."></textarea>
+    <div class="field" style="margin-top:0.5rem">
+        <label style="font-weight:600;font-size:0.85rem">منهجية التوثيق (اختر الوسوم المناسبة)</label>
+        <div id="methodologyTags" style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-top:0.3rem">
+            <button type="button" class="method-tag" data-tag="مقابلة مباشرة">مقابلة مباشرة</button>
+            <button type="button" class="method-tag" data-tag="مقابلة هاتفية">مقابلة هاتفية</button>
+            <button type="button" class="method-tag" data-tag="مقابلة عبر الإنترنت">مقابلة عبر الإنترنت</button>
+            <button type="button" class="method-tag" data-tag="شهادة شاهد عيان">شهادة شاهد عيان</button>
+            <button type="button" class="method-tag" data-tag="شهادة أحد الأقارب">شهادة أحد الأقارب</button>
+            <button type="button" class="method-tag" data-tag="تسريبات قيصر">تسريبات قيصر</button>
+            <button type="button" class="method-tag" data-tag="وثائق رسمية">وثائق رسمية</button>
+            <button type="button" class="method-tag" data-tag="بيانات السجل المدني">بيانات السجل المدني</button>
+            <button type="button" class="method-tag" data-tag="تقارير إعلامية">تقارير إعلامية</button>
+            <button type="button" class="method-tag" data-tag="منشورات وسائل التواصل">منشورات وسائل التواصل</button>
+            <button type="button" class="method-tag" data-tag="تقارير منظمات حقوقية">تقارير منظمات حقوقية</button>
+            <button type="button" class="method-tag" data-tag="أرشيف رقمي">أرشيف رقمي</button>
+            <button type="button" class="method-tag" data-tag="تحليل صور/فيديو">تحليل صور/فيديو</button>
+            <button type="button" class="method-tag" data-tag="تقاطع معلومات من مصادر متعددة">تقاطع معلومات</button>
+            <button type="button" class="method-tag" data-tag="زيارة ميدانية">زيارة ميدانية</button>
+            <button type="button" class="method-tag" data-tag="بلاغ مجهول">بلاغ مجهول</button>
+        </div>
+    </div>
+    <div class="row" style="margin-top:0.4rem">
+        <div class="field"><label>نوع المنهجية</label>
+            <select name="methodology_type">
+                <option value="">-- اختر --</option>
+                <option value="interview">مقابلة شخصية</option>
+                <option value="document_review">مراجعة وثائق</option>
+                <option value="open_source">تحقيق مصادر مفتوحة</option>
+                <option value="field_visit">زيارة ميدانية</option>
+                <option value="remote_interview">مقابلة عن بعد</option>
+                <option value="database_cross_ref">تقاطع قواعد بيانات</option>
+                <option value="witness_testimony">شهادة شاهد</option>
+                <option value="other">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>ملاحظات المنهجية</label>
+            <textarea name="methodology_notes" rows="2" placeholder="ملاحظات حول منهجية جمع البيانات..."></textarea>
+        </div>
     </div>
 </div>
 
@@ -965,7 +1143,7 @@ function handleStatusChange() {
     const st = document.getElementById('offStatus').value;
     const rel = document.getElementById('releaseSection');
     const death = document.getElementById('deathSection');
-    rel.classList.toggle('hidden', st !== 'survivor' && st !== 'released');
+    rel.classList.toggle('hidden', st !== 'survivor');
     death.classList.toggle('hidden', st !== 'deceased');
     updateCaseTypes(st);
 }
@@ -974,11 +1152,20 @@ function updateCaseTypes(status) {
     const sel = document.getElementById('offCaseType');
     sel.innerHTML = '<option value="">-- اختر --</option>';
     const opts = {
-        'survivor': [['survivor_released','ناجٍ مُفرَج عنه'],['survivor_escaped','ناجٍ هارب'],['survivor_amnesty','ناجٍ بعفو']],
-        'enforced': [['enforced_disappearance','اختفاء قسري'],['enforced_disappearance_leaked_not_confirmed','تسريبات تؤكد الوفاة - غير مؤكد بالنفوس'],['enforced_disappearance_leaked_confirmed_dead','تسريبات + مؤكد بالنفوس']],
-        'deceased': [['deceased_custody','متوفى أثناء الاحتجاز'],['deceased_released','متوفى بعد الإفراج'],['deceased_execution','إعدام']],
-        'released': [['released_recent','مُفرَج عنه حديثاً'],['released_old','مُفرَج عنه قديماً']],
-        'unknown': [['unknown','غير معروف']]
+        'survivor': [
+            ['survivor_documented','ناجٍ - لديه وثائق'],
+            ['survivor_undocumented','ناجٍ - بدون وثائق']
+        ],
+        'enforced': [
+            ['enforced_disappearance_no_info','اختفاء قسري - لا معلومات بعد الاعتقال'],
+            ['enforced_disappearance_leaked_not_confirmed','تسريبات تؤكد الوفاة - غير مؤكد بالنفوس'],
+            ['enforced_disappearance_witnesses_alive_registry','شهود على الاعتقال - حي بالنفوس']
+        ],
+        'deceased': [
+            ['enforced_disappearance_leaked_confirmed_dead','تسريبات + مؤكد بالنفوس'],
+            ['enforced_disappearance_civil_registry_dead','متوفى بحسب النفوس فقط'],
+            ['deceased_caesar_files','متوفى - ملفات قيصر']
+        ]
     };
     (opts[status] || []).forEach(([v, t]) => {
         sel.innerHTML += '<option value="' + v + '">' + t + '</option>';
@@ -993,7 +1180,8 @@ function toggleDigitalDetails() {
 
 function toggleSpouse() {
     const v = document.getElementById('offMarital').value;
-    document.getElementById('spouseSection').classList.toggle('hidden', v !== 'married' && v !== 'divorced' && v !== 'widowed');
+    document.getElementById('spouseSection').classList.toggle('hidden', v !== 'married' && v !== 'widowed');
+    document.getElementById('exSpouseSection').classList.toggle('hidden', v !== 'divorced');
 }
 
 // ===================== File Preview =====================
@@ -1013,8 +1201,8 @@ function previewFile(input, previewId) {
     container.appendChild(div);
 }
 
-// ===================== Dynamic Rows: Detention, Witnesses, Children =====================
-let detentionCount = 0, witnessCount = 0, childCount = 0;
+// ===================== Dynamic Rows: Detention, Witnesses, Children, Companions, Extra Docs =====================
+let detentionCount = 0, witnessCount = 0, childCount = 0, companionCount = 0, extraDocCount = 0;
 
 function addDetention(data) {
     detentionCount++;
@@ -1106,6 +1294,110 @@ function collectChildren() {
     return list;
 }
 
+// ===================== Companions =====================
+function addCompanion(data) {
+    companionCount++;
+    const d = data || {};
+    const div = document.createElement('div');
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div class="row3" style="margin-left:2rem"><div class="field"><label style="font-size:0.8rem">الاسم الأول *</label><input type="text" class="comp-first" value="' + (d.first_name||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">اسم الأب</label><input type="text" class="comp-father" value="' + (d.father_name||'') + '"></div></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">الكنية</label><input type="text" class="comp-last" value="' + (d.last_name||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">اسم الأم</label><input type="text" class="comp-mother" value="' + (d.mother_name||'') + '"></div></div>' +
+        '<div class="field"><label style="font-size:0.8rem">ملاحظة</label><input type="text" class="comp-notes" value="' + (d.notes||'') + '" placeholder="مثال: كان معه في نفس الزنزانة..."></div>';
+    document.getElementById('companionsList').appendChild(div);
+}
+
+function collectCompanions() {
+    const list = [];
+    document.querySelectorAll('#companionsList > div').forEach(div => {
+        const first = div.querySelector('.comp-first');
+        if (first && first.value.trim()) {
+            list.push({
+                first_name: first.value.trim(),
+                father_name: (div.querySelector('.comp-father')||{}).value||'',
+                last_name: (div.querySelector('.comp-last')||{}).value||'',
+                mother_name: (div.querySelector('.comp-mother')||{}).value||'',
+                notes: (div.querySelector('.comp-notes')||{}).value||''
+            });
+        }
+    });
+    return list;
+}
+
+// ===================== Extra Documents =====================
+function addExtraDoc(data) {
+    extraDocCount++;
+    const d = data || {};
+    const idx = extraDocCount;
+    const div = document.createElement('div');
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div style="margin-left:2rem"><strong style="font-size:0.82rem">وثيقة #' + idx + '</strong></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">نوع الوثيقة</label><select class="edoc-type">' +
+        '<option value="">--</option>' +
+        '<option value="court_order"' + (d.doc_type==='court_order'?' selected':'') + '>أمر محكمة</option>' +
+        '<option value="visit_card"' + (d.doc_type==='visit_card'?' selected':'') + '>كرت زيارة سجين</option>' +
+        '<option value="release_paper"' + (d.doc_type==='release_paper'?' selected':'') + '>ورقة إفراج</option>' +
+        '<option value="death_certificate"' + (d.doc_type==='death_certificate'?' selected':'') + '>شهادة وفاة</option>' +
+        '<option value="leaked_screenshot"' + (d.doc_type==='leaked_screenshot'?' selected':'') + '>لقطة شاشة تسريب</option>' +
+        '<option value="witness_letter"' + (d.doc_type==='witness_letter'?' selected':'') + '>رسالة / شهادة شاهد</option>' +
+        '<option value="id_document"' + (d.doc_type==='id_document'?' selected':'') + '>وثيقة هوية</option>' +
+        '<option value="civil_registry_doc"' + (d.doc_type==='civil_registry_doc'?' selected':'') + '>إخراج قيد / سجل مدني</option>' +
+        '<option value="medical_report"' + (d.doc_type==='medical_report'?' selected':'') + '>تقرير طبي</option>' +
+        '<option value="ngo_report"' + (d.doc_type==='ngo_report'?' selected':'') + '>تقرير منظمة</option>' +
+        '<option value="photo_evidence"' + (d.doc_type==='photo_evidence'?' selected':'') + '>صورة كدليل</option>' +
+        '<option value="other"' + (d.doc_type==='other'?' selected':'') + '>أخرى</option>' +
+        '</select></div>' +
+        '<div class="field"><label style="font-size:0.8rem">تاريخ الوثيقة</label><input type="date" class="edoc-date" value="' + (d.doc_date||'') + '"></div></div>' +
+        '<div class="field"><label style="font-size:0.8rem">الملف</label><input type="file" class="edoc-file" accept="image/*,.pdf,.doc,.docx" style="font-size:0.85rem;border-style:dashed"></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">رابط المصدر</label><input type="url" class="edoc-url" value="' + (d.doc_url||'') + '" placeholder="https://..." dir="ltr"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">وصف مختصر</label><input type="text" class="edoc-desc" value="' + (d.doc_desc||'') + '" placeholder="مثال: أمر محكمة ميدانية..."></div></div>';
+    document.getElementById('extraDocsList').appendChild(div);
+}
+
+function collectExtraDocs() {
+    const list = [];
+    document.querySelectorAll('#extraDocsList > div').forEach(div => {
+        const type = div.querySelector('.edoc-type');
+        list.push({
+            doc_type: (type||{}).value||'',
+            doc_date: (div.querySelector('.edoc-date')||{}).value||'',
+            doc_url: (div.querySelector('.edoc-url')||{}).value||'',
+            doc_desc: (div.querySelector('.edoc-desc')||{}).value||''
+        });
+    });
+    return list;
+}
+
+async function collectExtraDocFiles() {
+    const files = {};
+    const rows = document.querySelectorAll('#extraDocsList > div');
+    for (let i = 0; i < rows.length; i++) {
+        const input = rows[i].querySelector('.edoc-file');
+        if (input && input.files && input.files[0]) {
+            files['record_doc_file_' + i] = await readFileAsBase64(input.files[0]);
+        }
+    }
+    return files;
+}
+
+// ===================== Methodology Tags =====================
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('method-tag')) {
+        e.target.classList.toggle('selected');
+    }
+});
+
+function getSelectedMethodologyTags() {
+    const tags = [];
+    document.querySelectorAll('#methodologyTags .method-tag.selected').forEach(btn => {
+        tags.push(btn.dataset.tag);
+    });
+    return tags;
+}
+
 // ===================== Read File as Base64 =====================
 function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
@@ -1160,7 +1452,21 @@ async function saveEntry() {
         return y && (new Date().getFullYear() - y) < 18;
     }).length);
 
-    const fileFields = ['photo', 'document', 'digital_evidence_screenshot', 'civil_registry_document'];
+    // Companions
+    const companions = collectCompanions();
+    fields.companions_count = String(companions.length);
+    fields._companions = companions;
+
+    // Extra documents metadata
+    const extraDocs = collectExtraDocs();
+    fields.record_doc_count = String(extraDocs.length);
+    fields._extra_docs = extraDocs;
+
+    // Methodology tags
+    const methodTags = getSelectedMethodologyTags();
+    fields._methodology_tags = methodTags;
+
+    const fileFields = ['photo', 'document', 'digital_evidence_screenshot', 'civil_registry_document', 'survivor_cv', 'survivor_cv_photo'];
     const fileData = {};
     for (const fname of fileFields) {
         const input = form.querySelector('[name="' + fname + '"]');
@@ -1168,6 +1474,9 @@ async function saveEntry() {
             fileData[fname] = await readFileAsBase64(input.files[0]);
         }
     }
+    // Extra document files
+    const extraDocFiles = await collectExtraDocFiles();
+    Object.assign(fileData, extraDocFiles);
 
     const entryId = uuid();
     const entry = {
@@ -1198,15 +1507,20 @@ function resetForm() {
     document.getElementById('detentionList').innerHTML = '';
     document.getElementById('witnessList').innerHTML = '';
     document.getElementById('childrenList').innerHTML = '';
-    detentionCount = witnessCount = childCount = 0;
-    ['photoPreview','docPreview','ssPreview','civilPreview'].forEach(id => {
-        document.getElementById(id).innerHTML = '';
+    document.getElementById('companionsList').innerHTML = '';
+    document.getElementById('extraDocsList').innerHTML = '';
+    detentionCount = witnessCount = childCount = companionCount = extraDocCount = 0;
+    ['photoPreview','docPreview','ssPreview','civilPreview','cvPreview','cvPhotoPreview'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
     });
     document.getElementById('releaseSection').classList.add('hidden');
     document.getElementById('deathSection').classList.add('hidden');
     document.getElementById('spouseSection').classList.add('hidden');
+    document.getElementById('exSpouseSection').classList.add('hidden');
     document.getElementById('digitalDetailsSection').classList.add('hidden');
     document.getElementById('offCaseType').innerHTML = '<option value="">-- اختر --</option>';
+    document.querySelectorAll('#methodologyTags .method-tag').forEach(t => t.classList.remove('selected'));
 }
 
 // ===================== Render Entries List =====================
@@ -1275,10 +1589,20 @@ async function editEntry(id) {
     document.getElementById('detentionList').innerHTML = '';
     document.getElementById('witnessList').innerHTML = '';
     document.getElementById('childrenList').innerHTML = '';
-    detentionCount = witnessCount = childCount = 0;
+    document.getElementById('companionsList').innerHTML = '';
+    document.getElementById('extraDocsList').innerHTML = '';
+    detentionCount = witnessCount = childCount = companionCount = extraDocCount = 0;
     try { JSON.parse(f.detention_facilities_data || '[]').forEach(d => addDetention(d)); } catch(e){}
     try { JSON.parse(f.witnesses_data || '[]').forEach(d => addWitness(d)); } catch(e){}
     try { JSON.parse(f.children_data || '[]').forEach(d => addChild(d)); } catch(e){}
+    if (f._companions) f._companions.forEach(d => addCompanion(d));
+    if (f._extra_docs) f._extra_docs.forEach(d => addExtraDoc(d));
+    // Restore methodology tags
+    if (f._methodology_tags) {
+        document.querySelectorAll('#methodologyTags .method-tag').forEach(btn => {
+            if (f._methodology_tags.includes(btn.dataset.tag)) btn.classList.add('selected');
+        });
+    }
     // Delete old entry so re-save creates fresh
     await dbDelete('entries', id);
     updateBadge();
@@ -1478,6 +1802,36 @@ async function syncAll() {
             // Handle chronic_list → chronic
             if (f._chronic_list && f._chronic_list.length) {
                 f._chronic_list.forEach(v => fd.append('chronic_list', v));
+            }
+
+            // Companions — flatten to comp_first_0, comp_father_0, etc.
+            if (f._companions && f._companions.length) {
+                fd.set('companions_count', String(f._companions.length));
+                f._companions.forEach((c, ci) => {
+                    fd.append('comp_first_' + ci, c.first_name || '');
+                    fd.append('comp_father_' + ci, c.father_name || '');
+                    fd.append('comp_last_' + ci, c.last_name || '');
+                    fd.append('comp_mother_' + ci, c.mother_name || '');
+                    fd.append('comp_notes_' + ci, c.notes || '');
+                });
+            }
+
+            // Extra documents — flatten to record_doc_type_0, etc.
+            if (f._extra_docs && f._extra_docs.length) {
+                fd.set('record_doc_count', String(f._extra_docs.length));
+                f._extra_docs.forEach((d, di) => {
+                    fd.append('record_doc_type_' + di, d.doc_type || '');
+                    fd.append('record_doc_date_' + di, d.doc_date || '');
+                    fd.append('record_doc_url_' + di, d.doc_url || '');
+                    fd.append('record_doc_desc_' + di, d.doc_desc || '');
+                });
+            }
+
+            // Methodology tags → methodology_notes prefix
+            if (f._methodology_tags && f._methodology_tags.length) {
+                const existingNotes = f.methodology_notes || '';
+                const tagsStr = '[وسوم: ' + f._methodology_tags.join('، ') + ']';
+                fd.set('methodology_notes', tagsStr + (existingNotes ? '\n' + existingNotes : ''));
             }
 
             // Add files as blobs

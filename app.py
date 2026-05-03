@@ -8648,6 +8648,44 @@ def api_sync_entries():
         db.commit()
         new_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
         print(f"   ✅ SYNCED as record #{new_id}")
+
+        # Save additional documents to record_documents table
+        doc_count = int(form.get('record_doc_count', 0) or 0)
+        for i in range(doc_count):
+            file_key = f'record_doc_file_{i}'
+            if file_key in request.files and request.files[file_key].filename:
+                rd_path, rd_hash = save_upload(request.files[file_key], 'documents')
+                if rd_path:
+                    db.execute("""INSERT INTO record_documents
+                        (record_id, doc_type, file_path, file_hash, original_filename,
+                         description, document_date, source_url, uploaded_by)
+                        VALUES (?,?,?,?,?,?,?,?,?)""",
+                        (new_id, form.get(f'record_doc_type_{i}', 'other'),
+                         rd_path, rd_hash or '', request.files[file_key].filename,
+                         form.get(f'record_doc_desc_{i}', ''),
+                         form.get(f'record_doc_date_{i}', ''),
+                         form.get(f'record_doc_url_{i}', ''),
+                         submitter))
+        if doc_count > 0:
+            db.commit()
+
+        # Save companions to record_companions table
+        comp_count = int(form.get('companions_count', 0) or 0)
+        for i in range(comp_count):
+            comp_first = form.get(f'comp_first_{i}', '').strip()
+            if not comp_first:
+                continue
+            db.execute("""INSERT INTO record_companions
+                (record_id, first_name, father_name, last_name, mother_name, notes)
+                VALUES (?,?,?,?,?,?)""",
+                (new_id, comp_first,
+                 form.get(f'comp_father_{i}', '').strip(),
+                 form.get(f'comp_last_{i}', '').strip(),
+                 form.get(f'comp_mother_{i}', '').strip(),
+                 form.get(f'comp_notes_{i}', '').strip()))
+        if comp_count > 0:
+            db.commit()
+
         return _add_cors_headers(jsonify({
             'success': True, 'server_id': new_id, 'warnings': warnings,
             'message': f'تم المزامنة كسجل #{new_id}'

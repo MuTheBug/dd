@@ -137,6 +137,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
     <div class="subtitle">نموذج إدخال بدون انترنت</div>
 </div>
 
+<!-- Storage warning banner (shown only when storage is degraded) -->
+<div id="storageBanner" class="hidden" style="background:#fef3c7;color:#92400e;padding:0.6rem 1rem;font-size:0.82rem;text-align:center;border-bottom:1px solid #f59e0b;line-height:1.5"></div>
+
 <div class="container">
 
 <!-- Desktop Tabs (hidden on mobile) -->
@@ -760,63 +763,165 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 
 <script>
-// ===================== IndexedDB Setup =====================
+// ===================== Storage Layer (IndexedDB with localStorage fallback) =====================
 const DB_NAME = 'HaqqunaOffline';
 const DB_VERSION = 1;
+const LS_KEY = 'haqquna_entries_fallback';
 let db = null;
+let storageMode = 'unknown'; // 'idb' | 'localstorage' | 'memory'
+let memoryStore = {};
 
 function openDB() {
-    return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
-        req.onupgradeneeded = e => {
-            const d = e.target.result;
-            if (!d.objectStoreNames.contains('entries')) {
-                const store = d.createObjectStore('entries', { keyPath: 'client_uuid' });
-                store.createIndex('status', 'status', { unique: false });
-                store.createIndex('created_at', 'created_at', { unique: false });
+    return new Promise((resolve) => {
+        // Detect IndexedDB availability (Safari Private Mode reports it but throws on open)
+        if (typeof indexedDB === 'undefined' || !indexedDB) {
+            console.warn('[Storage] IndexedDB not supported, falling back to localStorage');
+            storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+            resolve(null);
+            return;
+        }
+        let resolved = false;
+        // Timeout fallback: some browsers (Safari Private) just hang
+        const timeoutId = setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                console.warn('[Storage] IndexedDB open timeout, falling back to localStorage');
+                storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+                resolve(null);
             }
-            if (!d.objectStoreNames.contains('files')) {
-                d.createObjectStore('files', { keyPath: 'id' });
-            }
-        };
-        req.onsuccess = e => { db = e.target.result; resolve(db); };
-        req.onerror = e => reject(e.target.error);
+        }, 3000);
+
+        try {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = e => {
+                const d = e.target.result;
+                if (!d.objectStoreNames.contains('entries')) {
+                    const store = d.createObjectStore('entries', { keyPath: 'client_uuid' });
+                    store.createIndex('status', 'status', { unique: false });
+                    store.createIndex('created_at', 'created_at', { unique: false });
+                }
+                if (!d.objectStoreNames.contains('files')) {
+                    d.createObjectStore('files', { keyPath: 'id' });
+                }
+            };
+            req.onsuccess = e => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timeoutId);
+                db = e.target.result;
+                storageMode = 'idb';
+                console.log('[Storage] Using IndexedDB');
+                resolve(db);
+            };
+            req.onerror = e => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timeoutId);
+                console.warn('[Storage] IndexedDB error, falling back:', e.target.error);
+                storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+                resolve(null);
+            };
+            req.onblocked = () => {
+                console.warn('[Storage] IndexedDB blocked');
+            };
+        } catch (e) {
+            if (resolved) return;
+            resolved = true;
+            clearTimeout(timeoutId);
+            console.warn('[Storage] IndexedDB threw, falling back:', e);
+            storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+            resolve(null);
+        }
     });
+}
+
+function testLocalStorage() {
+    try {
+        const k = '__haqquna_test__';
+        localStorage.setItem(k, '1');
+        localStorage.removeItem(k);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function lsGetAll() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
+}
+function lsSetAll(obj) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(obj)); return true; }
+    catch (e) {
+        // QuotaExceeded — too many photos in localStorage
+        showToast('تجاوزت سعة التخزين المحلية! امسح الحالات المتزامنة أو قلّل عدد الصور.', 'error');
+        return false;
+    }
 }
 
 function dbPut(store, data) {
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(store, 'readwrite');
-        tx.objectStore(store).put(data);
-        tx.oncomplete = () => resolve();
-        tx.onerror = e => reject(e.target.error);
+        if (storageMode === 'idb' && db) {
+            const tx = db.transaction(store, 'readwrite');
+            tx.objectStore(store).put(data);
+            tx.oncomplete = () => resolve();
+            tx.onerror = e => reject(e.target.error);
+        } else if (storageMode === 'localstorage') {
+            const all = lsGetAll();
+            if (!all[store]) all[store] = {};
+            all[store][data.client_uuid || data.id] = data;
+            lsSetAll(all) ? resolve() : reject(new Error('localStorage quota exceeded'));
+        } else {
+            if (!memoryStore[store]) memoryStore[store] = {};
+            memoryStore[store][data.client_uuid || data.id] = data;
+            resolve();
+        }
     });
 }
 
 function dbGet(store, key) {
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(store, 'readonly');
-        const req = tx.objectStore(store).get(key);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = e => reject(e.target.error);
+        if (storageMode === 'idb' && db) {
+            const tx = db.transaction(store, 'readonly');
+            const req = tx.objectStore(store).get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = e => reject(e.target.error);
+        } else {
+            const all = storageMode === 'localstorage' ? lsGetAll() : memoryStore;
+            resolve((all[store] || {})[key] || null);
+        }
     });
 }
 
 function dbGetAll(store) {
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(store, 'readonly');
-        const req = tx.objectStore(store).getAll();
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = e => reject(e.target.error);
+        if (storageMode === 'idb' && db) {
+            const tx = db.transaction(store, 'readonly');
+            const req = tx.objectStore(store).getAll();
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = e => reject(e.target.error);
+        } else {
+            const all = storageMode === 'localstorage' ? lsGetAll() : memoryStore;
+            resolve(Object.values(all[store] || {}));
+        }
     });
 }
 
 function dbDelete(store, key) {
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(store, 'readwrite');
-        tx.objectStore(store).delete(key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = e => reject(e.target.error);
+        if (storageMode === 'idb' && db) {
+            const tx = db.transaction(store, 'readwrite');
+            tx.objectStore(store).delete(key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = e => reject(e.target.error);
+        } else if (storageMode === 'localstorage') {
+            const all = lsGetAll();
+            if (all[store]) delete all[store][key];
+            lsSetAll(all);
+            resolve();
+        } else {
+            if (memoryStore[store]) delete memoryStore[store][key];
+            resolve();
+        }
     });
 }
 
@@ -1238,29 +1343,84 @@ async function testConnection() {
     const pass = document.getElementById('syncPassword').value;
     const statusEl = document.getElementById('connStatus');
     statusEl.innerHTML = '<span style="color:var(--warning)">جارٍ الاختبار...</span>';
-    try {
-        const pingResp = await fetch(base + '/api/sync/ping', { method: 'GET', mode: 'cors' });
-        if (!pingResp.ok) throw new Error('server not reachable');
-        const pingData = await pingResp.json();
-        if (!pingData.ok) throw new Error('not haqquna server');
 
-        if (!user || !pass) {
-            statusEl.innerHTML = '<span style="color:var(--success)">السرفر متصل (حقنا ' + (pingData.version||'') + '). أدخل اسم المستخدم وكلمة المرور للمزامنة.</span>';
+    // Detect mixed-content issues upfront
+    if (location.protocol === 'https:' && base.startsWith('http://')) {
+        statusEl.innerHTML = '<div style="color:var(--danger)">' +
+            '<strong>مشكلة Mixed Content:</strong> النموذج محمّل عبر HTTPS لكن السرفر HTTP. ' +
+            'افتح النموذج عبر <code>http://' + base.replace(/^https?:\/\//, '') + '/offline-form/app</code> بدلاً من ذلك.' +
+            '</div>';
+        return;
+    }
+
+    try {
+        // Use AbortController for explicit timeout (some networks just hang)
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+
+        let pingResp;
+        try {
+            pingResp = await fetch(base + '/api/sync/ping', {
+                method: 'GET', mode: 'cors', signal: ctrl.signal,
+                cache: 'no-store'
+            });
+        } catch (fetchErr) {
+            clearTimeout(timeoutId);
+            // Distinguish between failure types
+            const isFile = location.protocol === 'file:';
+            const isAbort = fetchErr.name === 'AbortError';
+            let msg = '<div style="color:var(--danger)"><strong>فشل الاتصال بالسرفر.</strong><br>';
+            if (isAbort) {
+                msg += 'انتهت مهلة الاتصال (8 ثوانٍ). تأكد أن السرفر يعمل وأن الجهاز على نفس الشبكة.';
+            } else if (isFile) {
+                msg += '<strong>مشكلة محتملة:</strong> النموذج مفتوح من ملف محفوظ (file://) — بعض المتصفحات (خاصة iOS Safari) تمنع الاتصال من الملفات المحفوظة.<br>' +
+                       '<strong>الحل:</strong> افتح النموذج مباشرة عبر <code>' + base + '/offline-form/app</code> في متصفحك.';
+            } else {
+                msg += 'تأكد من:<br>' +
+                       '• العنوان صحيح: <code>' + base + '</code><br>' +
+                       '• السرفر يعمل ومتاح على هذا العنوان<br>' +
+                       '• الجهاز متصل بنفس الشبكة (Wi-Fi)<br>' +
+                       '• الجدار الناري لا يحجب المنفذ<br>' +
+                       '<small>تفاصيل تقنية: ' + fetchErr.message + '</small>';
+            }
+            msg += '</div>';
+            statusEl.innerHTML = msg;
             return;
         }
+        clearTimeout(timeoutId);
+
+        if (!pingResp.ok) {
+            statusEl.innerHTML = '<span style="color:var(--danger)">السرفر استجاب لكن بخطأ: HTTP ' + pingResp.status + '</span>';
+            return;
+        }
+        const pingData = await pingResp.json();
+        if (!pingData.ok) {
+            statusEl.innerHTML = '<span style="color:var(--danger)">العنوان لا يبدو سرفر حقنا.</span>';
+            return;
+        }
+
+        if (!user || !pass) {
+            statusEl.innerHTML = '<span style="color:var(--success)">&#x2713; السرفر متصل (حقنا ' + (pingData.version||'') + '). أدخل اسم المستخدم وكلمة المرور للمزامنة.</span>';
+            return;
+        }
+
         const loginResp = await fetch(base + '/api/sync/login', {
             method: 'POST', mode: 'cors',
             headers: { 'Content-Type': 'application/json', 'X-Sync-User': user, 'X-Sync-Pass': pass }
         });
         const loginData = await loginResp.json();
         if (loginData.success) {
-            statusEl.innerHTML = '<span style="color:var(--success)">متصل بنجاح — مرحباً ' + loginData.display_name + ' (' + loginData.role + ')</span>';
+            statusEl.innerHTML = '<span style="color:var(--success)">&#x2713; متصل بنجاح — مرحباً ' + loginData.display_name + ' (' + loginData.role + ')</span>';
             saveSettings();
         } else {
-            statusEl.innerHTML = '<span style="color:var(--danger)">فشل تسجيل الدخول: ' + (loginData.error === 'invalid_credentials' ? 'اسم المستخدم أو كلمة المرور خاطئة' : loginData.error === 'insufficient_role' ? 'صلاحيتك لا تسمح بالمزامنة' : loginData.error) + '</span>';
+            const msgMap = {
+                'invalid_credentials': 'اسم المستخدم أو كلمة المرور خاطئة',
+                'insufficient_role': 'صلاحيتك لا تسمح بالمزامنة (يجب أن تكون admin أو data_entry)'
+            };
+            statusEl.innerHTML = '<span style="color:var(--danger)">فشل تسجيل الدخول: ' + (msgMap[loginData.error] || loginData.error) + '</span>';
         }
     } catch (e) {
-        statusEl.innerHTML = '<span style="color:var(--danger)">لا يمكن الاتصال بالسرفر — تأكد من العنوان وأن السرفر يعمل. (' + e.message + ')</span>';
+        statusEl.innerHTML = '<span style="color:var(--danger)">خطأ غير متوقع: ' + e.message + '</span>';
     }
 }
 
@@ -1410,10 +1570,31 @@ async function init() {
     loadSettings();
     updateBadge();
     updateStats();
+    showStorageStatus();
     // Set today's date for collection_date
     const today = new Date().toISOString().slice(0, 10);
     const dateInput = document.querySelector('[name="collection_date"]');
     if (dateInput && !dateInput.value) dateInput.value = today;
+}
+
+function showStorageStatus() {
+    const banner = document.getElementById('storageBanner');
+    if (!banner) return;
+    if (storageMode === 'idb') {
+        banner.classList.add('hidden');
+    } else if (storageMode === 'localstorage') {
+        banner.classList.remove('hidden');
+        banner.style.background = '#fef3c7';
+        banner.style.color = '#92400e';
+        banner.innerHTML = '&#x26A0;&#xFE0F; التخزين الموسّع غير متاح. يستخدم النموذج التخزين البديل (سعة محدودة ~5 ميغا). ' +
+            'لتجنّب فقدان البيانات: زامن باستمرار، وافتح النموذج عبر <code>http://server-ip/offline-form/app</code>.';
+    } else {
+        banner.classList.remove('hidden');
+        banner.style.background = '#fee2e2';
+        banner.style.color = '#991b1b';
+        banner.innerHTML = '&#x26A0;&#xFE0F; <strong>التخزين معطّل!</strong> البيانات لن تُحفظ بعد إغلاق المتصفح. ' +
+            'افتح النموذج في وضع عادي (ليس incognito/private) أو عبر السرفر مباشرة.';
+    }
 }
 
 init();

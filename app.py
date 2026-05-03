@@ -141,7 +141,8 @@ def enforce_role_permissions():
         # data_entry can access entry form, submit, browse records, suggest edits, notifications
         allowed = common_allowed + ('entry_form', 'entry_submit', 'admin_dashboard',
                                      'api_draft_save', 'api_draft_load', 'api_draft_clear',
-                                     'offline_form_page', 'offline_form_download') + shared_endpoints
+                                     'offline_form_page', 'offline_form_download', 'offline_form_app',
+                                     'api_sync_ping', 'api_sync_login', 'api_sync_entries') + shared_endpoints
         if endpoint not in allowed:
             flash('صلاحيتك محدودة بصفحة إدخال البيانات والسجلات فقط', 'error')
             return redirect(url_for('entry_form'))
@@ -8394,11 +8395,19 @@ def _verify_sync_user(username, password):
 
 
 def _add_cors_headers(resp):
-    """Allow cross-origin sync requests (offline form may be served from file:// or LAN IP)."""
-    resp.headers['Access-Control-Allow-Origin'] = '*'
+    """Allow cross-origin sync requests (offline form may be served from file:// or LAN IP).
+
+    For file:// origins the browser sends Origin: null. We echo back '*' which
+    works for non-credentialed requests, plus explicitly allow null for safety.
+    """
+    origin = request.headers.get('Origin', '*')
+    # Echo origin when present (works for both null and real origins), else wildcard
+    resp.headers['Access-Control-Allow-Origin'] = origin if origin else '*'
+    resp.headers['Vary'] = 'Origin'
     resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS, GET'
-    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, X-Sync-User, X-Sync-Pass'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, X-Sync-User, X-Sync-Pass, Accept'
     resp.headers['Access-Control-Max-Age'] = '600'
+    resp.headers['Access-Control-Allow-Credentials'] = 'false'
     return resp
 
 
@@ -8663,6 +8672,18 @@ def offline_form_download():
     return send_file(template_path, as_attachment=True,
                      download_name='haqquna_offline_form.html',
                      mimetype='text/html')
+
+
+@app.route('/offline-form/app')
+def offline_form_app():
+    """Serve the offline form directly in-browser from the server origin.
+
+    Recommended over download for mobile devices: avoids file:// origin issues
+    that break IndexedDB on iOS Safari and CORS preflights for the sync API.
+    Public route (no auth required) — sync API still requires user credentials.
+    """
+    template_path = os.path.join(BASE_DIR, 'templates', 'offline_entry.html')
+    return send_file(template_path, mimetype='text/html')
 
 
 if __name__ == '__main__':

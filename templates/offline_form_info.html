@@ -8,41 +8,42 @@
         يحفظ الحالات وصورها داخل المتصفح، وعند الاتصال بالسرفر يقوم برفعها دفعة واحدة.
     </p>
 
-    <div class="card" style="padding:1rem;margin-bottom:1rem;background:#fff7ed;border-right:4px solid #f59e0b;">
-        <strong style="color:#b45309;">كيف يعمل؟</strong>
-        <ol style="margin:0.5rem 0 0 0;padding-right:1.2rem;line-height:1.9;">
-            <li>اضغط <strong>تنزيل النموذج</strong> أدناه — ستحصل على ملف HTML واحد.</li>
-            <li>افتح الملف في أي متصفح (حتى بدون انترنت). كل البيانات تُحفظ داخل المتصفح.</li>
-            <li>عند توفر اتصال بالسرفر، أدخل عنوان IP السرفر + اسم المستخدم وكلمة المرور.</li>
-            <li>اضغط <strong>مزامنة الآن</strong> — سترفع كل الحالات المعلقة دفعة واحدة.</li>
-            <li>الحالات المتزامنة لن تُرسل مرتين (نظام UUID لمنع التكرار).</li>
+    <!-- Recommended option: open from server -->
+    <div class="card" style="padding:1rem;margin-bottom:1rem;background:#ecfdf5;border-right:4px solid #059669;">
+        <strong style="color:#065f46;font-size:1.05rem;">&#x2728; الطريقة الموصى بها (للأجهزة المحمولة):</strong>
+        <p style="margin:0.5rem 0;line-height:1.7;">
+            افتح النموذج <strong>مباشرة عبر السرفر</strong> — يعمل أفضل على iPhone/Android، لا توجد مشاكل اتصال،
+            ويمكن إضافته لشاشة الهاتف الرئيسية كتطبيق.
+        </p>
+        <ol style="margin:0.5rem 0 0.7rem 0;padding-right:1.2rem;line-height:1.9;font-size:0.92rem;">
+            <li>افتح هذا الرابط على هاتفك (نفس شبكة Wi-Fi):
+                <br><code style="background:#fff;padding:0.3rem 0.5rem;border-radius:4px;display:inline-block;margin-top:0.3rem;direction:ltr;">http://{{ request.host }}/offline-form/app</code>
+            </li>
+            <li>على iPhone: اضغط زر المشاركة &rarr; "إضافة إلى الشاشة الرئيسية"</li>
+            <li>على Android: قائمة المتصفح &rarr; "تثبيت التطبيق" أو "إضافة إلى الشاشة"</li>
+            <li>الآن النموذج يعمل كتطبيق — يحفظ محلياً ويزامن عند توفر الاتصال</li>
         </ol>
+        <a href="/offline-form/app" target="_blank" class="btn btn-success">&#x1F4F1; افتح النموذج الآن</a>
+    </div>
+
+    <div class="card" style="padding:1rem;margin-bottom:1rem;background:#fff7ed;border-right:4px solid #f59e0b;">
+        <strong style="color:#b45309;">الطريقة البديلة: تنزيل ملف HTML</strong>
+        <p style="margin:0.5rem 0;line-height:1.7;font-size:0.92rem;">
+            للاستخدام مع أجهزة لا تستطيع الوصول للسرفر بشكل دائم. <strong>تحذير:</strong>
+            على iPhone قد لا تعمل المزامنة بسبب قيود Safari على ملفات file:// — استخدم الطريقة الموصى بها أعلاه.
+        </p>
+        <a href="{{ url_for('offline_form_download') }}" class="btn btn-outline" download>&#x2B07;&#xFE0F; تنزيل النموذج (HTML)</a>
     </div>
 
     <div class="card" style="padding:1rem;margin-bottom:1rem;background:#eff6ff;border-right:4px solid #3b82f6;">
         <strong style="color:#1e40af;">نصائح للاستخدام الميداني:</strong>
-        <ul style="margin:0.5rem 0 0 0;padding-right:1.2rem;line-height:1.9;">
-            <li>الملف يعمل بدون انترنت — احفظه على هاتفك أو لابتوبك أو على USB.</li>
+        <ul style="margin:0.5rem 0 0 0;padding-right:1.2rem;line-height:1.9;font-size:0.92rem;">
             <li>صور وثائق وصور شخصية تُحفظ بحجمها الكامل داخل المتصفح (IndexedDB).</li>
             <li>كلمة المرور لا تُحفظ على القرص؛ تُطلب فقط لحظة المزامنة.</li>
             <li>قبل مسح بيانات المتصفح أو حذف التطبيق، تأكد من المزامنة أولاً!</li>
-            <li>العنوان IP للسرفر = العنوان الذي يظهر عند تشغيل التطبيق (مثل 192.168.1.50:5000).</li>
+            <li>لا تستخدم الوضع الخاص (Incognito/Private) — التخزين قد لا يعمل.</li>
+            <li>العنوان IP للسرفر هو: <code style="background:#fff;padding:0.1rem 0.4rem;border-radius:3px;direction:ltr;display:inline-block;">{{ request.host }}</code></li>
         </ul>
-    </div>
-
-    <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center;margin-top:1rem;">
-        <a href="{{ url_for('offline_form_download') }}" class="btn btn-primary" download>
-            ⬇️ تنزيل النموذج (HTML)
-        </a>
-        <a href="{{ url_for('offline_form_download') }}" class="btn btn-outline" target="_blank">
-            🔍 معاينة في نافذة جديدة
-        </a>
-    </div>
-
-    <div style="margin-top:1.5rem;padding:0.8rem;background:#f3f4f6;border-radius:8px;font-size:0.88rem;">
-        <strong>عنوان السرفر الحالي:</strong>
-        <code style="background:#fff;padding:0.2rem 0.5rem;border-radius:4px;">{{ request.host }}</code>
-        — استخدم هذا العنوان في إعدادات النموذج بدون انترنت.
     </div>
 </div>
 {% endblock %}

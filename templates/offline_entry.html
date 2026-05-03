@@ -32,7 +32,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .field textarea{resize:vertical;min-height:60px}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary-light);box-shadow:0 0 0 3px rgba(59,130,246,0.12)}
 .field input[type="file"]{padding:0.5rem;font-size:0.88rem;border-style:dashed;background:#fafbfc}
-.field input[type="checkbox"]{width:auto;margin-left:0.4rem;transform:scale(1.2)}
+.field input[type="checkbox"]{width:auto;margin-left:0.4rem;transform:scale(1.3);appearance:checkbox;-webkit-appearance:checkbox;cursor:pointer;min-height:20px;min-width:20px}
 
 /* Layout rows — stack on mobile by default */
 .row{display:flex;gap:0.5rem;flex-direction:column}
@@ -158,6 +158,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div id="tab-settings" class="tab-content">
 <div class="card">
     <div class="section-title">اتصال السرفر</div>
+    <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:0.4rem">يمكن لعدة أجهزة استخدام النموذج والمزامنة في نفس الوقت. كل جهاز يحفظ بياناته محلياً ويزامنها مستقلاً.</p>
     <div class="field">
         <label>عنوان السرفر (IP:Port)</label>
         <input type="text" id="serverUrl" placeholder="مثال: 192.168.1.50:5000" dir="ltr" style="text-align:left">
@@ -194,7 +195,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <div class="card">
     <div class="section-title">إدارة البيانات المحلية</div>
-    <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.5rem">البيانات محفوظة داخل المتصفح (IndexedDB). لا تمسح بيانات المتصفح قبل المزامنة!</p>
+    <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.5rem">البيانات محفوظة بشكل دائم داخل المتصفح ولن تُحذف تلقائياً. تُحذف فقط يدوياً من هنا أو بمسح بيانات المتصفح.</p>
     <div style="display:flex;flex-direction:column;gap:0.5rem">
         <button class="btn btn-outline btn-block" onclick="exportLocalData()">تصدير نسخة احتياطية (JSON)</button>
         <button class="btn btn-danger btn-block" onclick="clearSyncedEntries()">حذف الحالات المتزامنة فقط</button>
@@ -1646,8 +1647,15 @@ function saveSettings() {
 }
 
 function loadSettings() {
-    const url = localStorage.getItem('haqquna_server') || '';
+    let url = localStorage.getItem('haqquna_server') || '';
     const user = localStorage.getItem('haqquna_user') || '';
+    // Auto-detect server URL when opened from the server itself
+    if (!url && location.protocol !== 'file:' && location.hostname !== 'localhost') {
+        url = location.origin;
+        localStorage.setItem('haqquna_server', url);
+    } else if (!url && location.protocol !== 'file:') {
+        url = location.origin;
+    }
     document.getElementById('serverUrl').value = url;
     document.getElementById('syncUsername').value = user;
 }
@@ -1921,6 +1929,7 @@ async function clearSyncedEntries() {
 // ===================== Initialize =====================
 async function init() {
     await openDB();
+    await requestPersistentStorage();
     loadSettings();
     updateBadge();
     updateStats();
@@ -1931,11 +1940,35 @@ async function init() {
     if (dateInput && !dateInput.value) dateInput.value = today;
 }
 
-function showStorageStatus() {
+async function requestPersistentStorage() {
+    if (!navigator.storage || !navigator.storage.persist) return;
+    try {
+        const persistent = await navigator.storage.persist();
+        if (persistent) {
+            console.log('[Storage] Persistent storage granted — data will not be auto-evicted');
+        } else {
+            console.warn('[Storage] Persistent storage denied — browser may evict data under pressure');
+        }
+    } catch (e) {
+        console.warn('[Storage] persist() error:', e);
+    }
+}
+
+async function showStorageStatus() {
     const banner = document.getElementById('storageBanner');
     if (!banner) return;
     if (storageMode === 'idb') {
-        banner.classList.add('hidden');
+        // Check if persistent
+        let isPersist = false;
+        try { if (navigator.storage && navigator.storage.persisted) isPersist = await navigator.storage.persisted(); } catch(e){}
+        if (!isPersist) {
+            banner.classList.remove('hidden');
+            banner.style.background = '#dbeafe';
+            banner.style.color = '#1e40af';
+            banner.innerHTML = '&#x1F4BE; البيانات محفوظة محلياً. لضمان عدم حذفها تلقائياً: أضف النموذج إلى الشاشة الرئيسية (Add to Home Screen).';
+        } else {
+            banner.classList.add('hidden');
+        }
     } else if (storageMode === 'localstorage') {
         banner.classList.remove('hidden');
         banner.style.background = '#fef3c7';
@@ -1949,6 +1982,34 @@ function showStorageStatus() {
         banner.innerHTML = '&#x26A0;&#xFE0F; <strong>التخزين معطّل!</strong> البيانات لن تُحفظ بعد إغلاق المتصفح. ' +
             'افتح النموذج في وضع عادي (ليس incognito/private) أو عبر السرفر مباشرة.';
     }
+}
+
+// ===================== Service Worker for offline PWA =====================
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    const swCode = `
+self.addEventListener('install', e => { self.skipWaiting(); });
+self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
+self.addEventListener('fetch', e => {
+    if (e.request.url.includes('/offline-form/app')) {
+        e.respondWith(
+            fetch(e.request).catch(() => caches.match(e.request))
+        );
+        e.waitUntil(
+            fetch(e.request).then(resp => {
+                if (resp.ok) {
+                    return caches.open('haqquna-offline-v1').then(c => c.put(e.request, resp));
+                }
+            }).catch(() => {})
+        );
+    }
+});`;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl, { scope: '/offline-form/' }).then(() => {
+        console.log('[SW] Service Worker registered for offline support');
+    }).catch(e => {
+        console.warn('[SW] Registration failed:', e.message);
+    });
 }
 
 init();

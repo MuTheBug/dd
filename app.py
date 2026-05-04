@@ -8405,10 +8405,35 @@ def _add_cors_headers(resp):
     resp.headers['Access-Control-Allow-Origin'] = origin if origin else '*'
     resp.headers['Vary'] = 'Origin'
     resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS, GET'
-    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, X-Sync-User, X-Sync-Pass, Accept'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, X-Sync-User, X-Sync-Pass, Accept, Access-Control-Request-Private-Network'
     resp.headers['Access-Control-Max-Age'] = '600'
     resp.headers['Access-Control-Allow-Credentials'] = 'false'
+    # Chrome 104+ blocks fetches to private-network IPs unless the server opts in
+    if request.headers.get('Access-Control-Request-Private-Network'):
+        resp.headers['Access-Control-Allow-Private-Network'] = 'true'
     return resp
+
+
+@app.after_request
+def global_cors_for_sync(resp):
+    """Ensure CORS headers on ALL /api/sync/ responses, including error pages.
+
+    Some mobile browsers get 'Failed to fetch' if a 500 or framework-level
+    error response lacks CORS headers.  This guarantees they are always present.
+    """
+    if request.path.startswith('/api/sync/'):
+        if 'Access-Control-Allow-Origin' not in resp.headers:
+            _add_cors_headers(resp)
+    return resp
+
+
+@app.errorhandler(500)
+def handle_500_cors(e):
+    """Return CORS headers even on unhandled 500 errors for sync API."""
+    if request.path.startswith('/api/sync/'):
+        resp = make_response(jsonify({'success': False, 'error': 'Internal server error'}), 500)
+        return _add_cors_headers(resp)
+    return e
 
 
 @app.route('/api/sync/ping', methods=['GET', 'OPTIONS'])

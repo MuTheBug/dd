@@ -1912,25 +1912,44 @@ async function testConnection() {
             });
         } catch (fetchErr) {
             clearTimeout(timeoutId);
-            // Distinguish between failure types
             const isFile = location.protocol === 'file:';
             const isAbort = fetchErr.name === 'AbortError';
-            let msg = '<div style="color:var(--danger)"><strong>فشل الاتصال بالسرفر.</strong><br>';
+            const errText = fetchErr.message || '';
+            let msg = '<div style="color:var(--danger);line-height:1.8"><strong>فشل الاتصال بالسرفر.</strong><br>';
+
             if (isAbort) {
-                msg += 'انتهت مهلة الاتصال (8 ثوانٍ). تأكد أن السرفر يعمل وأن الجهاز على نفس الشبكة.';
+                msg += '<strong>السبب:</strong> انتهت مهلة الاتصال (8 ثوانٍ).<br>' +
+                       '<strong>الحلول:</strong><br>' +
+                       '١. تأكد أن السرفر يعمل (شغّل البرنامج على الكمبيوتر)<br>' +
+                       '٢. تأكد أن هذا الجهاز على <u>نفس شبكة WiFi</u><br>' +
+                       '٣. جرّب فتح <code>' + base + '</code> في المتصفح مباشرة — إذا لم يفتح فالمشكلة في الشبكة';
             } else if (isFile) {
-                msg += '<strong>مشكلة محتملة:</strong> النموذج مفتوح من ملف محفوظ (file://) — بعض المتصفحات (خاصة iOS Safari) تمنع الاتصال من الملفات المحفوظة.<br>' +
-                       '<strong>الحل:</strong> افتح النموذج مباشرة عبر <code>' + base + '/offline-form/app</code> في متصفحك.';
+                msg += '<strong>السبب:</strong> النموذج مفتوح من ملف محفوظ (<code>file://</code>).<br>' +
+                       'معظم المتصفحات تمنع الاتصال بالشبكة من الملفات المحفوظة.<br>' +
+                       '<strong>الحل:</strong> افتح النموذج عبر السرفر مباشرة:<br>' +
+                       '<code style="background:#1e293b;color:#f1f5f9;padding:0.2rem 0.5rem;border-radius:4px;display:inline-block;margin:0.3rem 0">' + base + '/offline-form/app</code>';
             } else {
-                msg += 'تأكد من:<br>' +
-                       '• العنوان صحيح: <code>' + base + '</code><br>' +
-                       '• السرفر يعمل ومتاح على هذا العنوان<br>' +
-                       '• الجهاز متصل بنفس الشبكة (Wi-Fi)<br>' +
-                       '• الجدار الناري لا يحجب المنفذ<br>' +
-                       '<small>تفاصيل تقنية: ' + fetchErr.message + '</small>';
+                // Check if it's a Private Network Access block (Chrome 104+)
+                const sameOrigin = location.origin === base;
+                const isPrivateIP = /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|localhost|127\.)/.test(base);
+
+                msg += '<strong>السبب المحتمل:</strong><br>';
+                if (!sameOrigin && isPrivateIP) {
+                    msg += '• المتصفح يحظر الوصول لعناوين الشبكة المحلية (Private Network Access)<br>' +
+                           '<strong>الحل الأفضل:</strong> افتح النموذج عبر السرفر مباشرة:<br>' +
+                           '<code style="background:#1e293b;color:#f1f5f9;padding:0.2rem 0.5rem;border-radius:4px;display:inline-block;margin:0.3rem 0">' + base + '/offline-form/app</code><br>';
+                }
+                msg += '• تأكد أن العنوان صحيح: <code>' + base + '</code><br>' +
+                       '• تأكد أن السرفر يعمل على الكمبيوتر<br>' +
+                       '• تأكد أن الجهاز متصل بنفس شبكة WiFi<br>' +
+                       '• تأكد أن الجدار الناري (Firewall) لا يحجب المنفذ<br>';
+                if (errText) {
+                    msg += '<small style="color:#f87171">تفاصيل تقنية: ' + errText + '</small>';
+                }
             }
             msg += '</div>';
             statusEl.innerHTML = msg;
+            diagAdd('فشل اختبار الاتصال: ' + (isAbort ? 'timeout' : errText), 'error');
             return;
         }
         clearTimeout(timeoutId);

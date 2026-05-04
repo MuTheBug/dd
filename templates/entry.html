@@ -194,6 +194,10 @@
 
 <form method="POST" action="{{ url_for('entry_submit') }}" enctype="multipart/form-data" id="entryForm">
 
+<div style="display:flex;justify-content:flex-start;margin-bottom:0.5rem">
+    <button type="button" class="btn btn-outline" onclick="resetAllFields()" style="color:var(--danger);border-color:var(--danger);font-size:0.85rem;padding:0.4rem 1rem">&#x1F5D1; مسح جميع الحقول</button>
+</div>
+
 <!-- STEP 1: Reporter & Classification -->
 <div class="form-step active" data-step="1">
     <div class="entry-section">
@@ -1023,6 +1027,25 @@
 var currentStep = 1;
 var totalSteps = 7;
 var isSubmitting = false;
+
+function resetAllFields() {
+    if (!confirm('هل أنت متأكد من مسح جميع الحقول؟ سيتم حذف كل البيانات المدخلة.')) return;
+    var form = document.getElementById('entryForm');
+    form.reset();
+    ['companionsContainer','documentsContainer','witnessesContainer','entryChildrenContainer'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
+    var cc = document.getElementById('companionsCount');
+    if (cc) cc.value = '0';
+    var wd = document.getElementById('witnessesData');
+    if (wd) wd.value = '[]';
+    if (typeof witnessCount !== 'undefined') witnessCount = 0;
+    document.querySelectorAll('.file-upload-name').forEach(function(el) { el.textContent = ''; });
+    currentStep = 1;
+    updateStepUI();
+    window.scrollTo(0, 0);
+}
 
 // === Step Navigation ===
 function updateStepUI() {

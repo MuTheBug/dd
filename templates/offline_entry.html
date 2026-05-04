@@ -7,12 +7,15 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1e40af">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600;700&display=swap">
 <title>حقنا - نموذج إدخال بدون انترنت</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--primary:#1e40af;--primary-light:#3b82f6;--success:#059669;--danger:#dc2626;--warning:#f59e0b;--bg:#f0f2f5;--card:#fff;--border:#dfe3e8;--text:#1e293b;--text-light:#64748b;--radius:12px;--safe-bottom:env(safe-area-inset-bottom,0px)}
 html{font-size:16px;-webkit-text-size-adjust:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;direction:rtl;padding-bottom:calc(70px + var(--safe-bottom));min-height:100vh;min-height:100dvh}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Arabic','Droid Arabic Naskh','Tahoma','Arial',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;direction:rtl;padding-bottom:calc(70px + var(--safe-bottom));min-height:100vh;min-height:100dvh}
 .container{max-width:800px;margin:0 auto;padding:0.6rem}
 
 /* Mobile-first header */
@@ -132,6 +135,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
     body{padding-bottom:0}
     .app-header h1{font-size:1.4rem}
 }
+/* Diagnostic panel */
+.diag-panel{background:#1e293b;color:#e2e8f0;border-radius:var(--radius);padding:0.6rem 0.8rem;margin-bottom:0.7rem;font-size:0.78rem;direction:rtl;max-height:250px;overflow-y:auto;font-family:'Courier New',monospace}
+.diag-panel .diag-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;font-weight:700;font-size:0.82rem;color:#94a3b8;font-family:inherit}
+.diag-panel .diag-line{padding:0.15rem 0;border-bottom:1px solid #334155;direction:ltr;text-align:left;word-break:break-all}
+.diag-panel .diag-line:last-child{border-bottom:none}
+.diag-panel .d-ok{color:#34d399}
+.diag-panel .d-warn{color:#fbbf24}
+.diag-panel .d-err{color:#f87171}
+.diag-panel .d-info{color:#60a5fa}
+.diag-panel .d-time{color:#94a3b8;margin-left:0.5rem;font-size:0.7rem}
+/* Status strip at top of form */
+.status-strip{display:flex;gap:0.4rem;flex-wrap:wrap;padding:0.4rem 0.6rem;background:#f8fafc;border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;font-size:0.75rem;align-items:center}
+.status-strip .ss-item{display:flex;align-items:center;gap:0.2rem;padding:0.2rem 0.5rem;border-radius:6px;font-weight:600}
+.ss-storage-idb{background:#d1fae5;color:#065f46}
+.ss-storage-ls{background:#fef3c7;color:#92400e}
+.ss-storage-mem{background:#fee2e2;color:#991b1b}
+.ss-conn-ok{background:#d1fae5;color:#065f46}
+.ss-conn-off{background:#fee2e2;color:#991b1b}
+.ss-conn-unknown{background:#e0e7ff;color:#3730a3}
 </style>
 </head>
 <body>
@@ -220,6 +242,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 
 <!-- ============ TAB: FORM ============ -->
 <div id="tab-form" class="tab-content active">
+
+<!-- Status Strip — always visible -->
+<div class="status-strip" id="statusStrip">
+    <div class="ss-item ss-conn-unknown" id="ssConn">الاتصال: غير معروف</div>
+    <div class="ss-item ss-storage-idb" id="ssStorage">التخزين: جارٍ التحميل...</div>
+    <div class="ss-item" id="ssLastSave" style="background:#e0e7ff;color:#3730a3">آخر حفظ: —</div>
+</div>
+
+<!-- Diagnostic Log Panel (collapsible) -->
+<details id="diagDetails" style="margin-bottom:0.5rem">
+    <summary style="cursor:pointer;font-size:0.8rem;font-weight:600;color:var(--text-light);padding:0.3rem 0">سجل التشخيص (اضغط لعرض التفاصيل)</summary>
+    <div class="diag-panel" id="diagPanel">
+        <div class="diag-header"><span>سجل الأحداث</span><button onclick="document.getElementById('diagPanel').innerHTML='<div class=\'diag-header\'><span>سجل الأحداث</span></div>'" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:0.1rem 0.4rem;font-size:0.7rem;cursor:pointer">مسح</button></div>
+    </div>
+</details>
+
 <div id="entryForm">
 
 <!-- Section 1: Reporter & Case Classification -->
@@ -952,20 +990,22 @@ let memoryStore = {};
 
 function openDB() {
     return new Promise((resolve) => {
-        // Detect IndexedDB availability (Safari Private Mode reports it but throws on open)
         if (typeof indexedDB === 'undefined' || !indexedDB) {
-            console.warn('[Storage] IndexedDB not supported, falling back to localStorage');
             storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+            diagAdd('IndexedDB غير متاح — وضع التخزين: ' + storageMode, storageMode === 'memory' ? 'error' : 'warn');
+            if (storageMode === 'memory') {
+                diagAdd('تحذير خطير: التخزين في الذاكرة فقط! البيانات ستضيع عند إغلاق المتصفح. الحل: افتح المتصفح في الوضع العادي', 'error');
+            }
             resolve(null);
             return;
         }
         let resolved = false;
-        // Timeout fallback: some browsers (Safari Private) just hang
         const timeoutId = setTimeout(() => {
             if (!resolved) {
                 resolved = true;
-                console.warn('[Storage] IndexedDB open timeout, falling back to localStorage');
                 storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+                diagAdd('IndexedDB لم يستجب خلال 3 ثوانٍ (timeout) — بديل: ' + storageMode, 'warn');
+                diagAdd('الحل: أغلق جميع نوافذ هذا الموقع الأخرى ثم أعد تحميل الصفحة', 'warn');
                 resolve(null);
             }
         }, 3000);
@@ -982,6 +1022,7 @@ function openDB() {
                 if (!d.objectStoreNames.contains('files')) {
                     d.createObjectStore('files', { keyPath: 'id' });
                 }
+                diagAdd('تم إنشاء/تحديث قاعدة البيانات المحلية', 'ok');
             };
             req.onsuccess = e => {
                 if (resolved) return;
@@ -989,26 +1030,35 @@ function openDB() {
                 clearTimeout(timeoutId);
                 db = e.target.result;
                 storageMode = 'idb';
-                console.log('[Storage] Using IndexedDB');
+                diagAdd('IndexedDB جاهز — التخزين يعمل بشكل طبيعي', 'ok');
                 resolve(db);
             };
             req.onerror = e => {
                 if (resolved) return;
                 resolved = true;
                 clearTimeout(timeoutId);
-                console.warn('[Storage] IndexedDB error, falling back:', e.target.error);
+                const errDetail = e.target.error ? e.target.error.message || e.target.error.name : 'unknown';
                 storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+                diagAdd('خطأ في فتح IndexedDB: ' + errDetail + ' — بديل: ' + storageMode, 'error');
+                if (storageMode === 'localstorage') {
+                    diagAdd('التخزين البديل (localStorage) يعمل لكن بسعة محدودة (~5MB). قلّل المرفقات.', 'warn');
+                } else {
+                    diagAdd('لا يوجد تخزين دائم! البيانات ستضيع. افتح الوضع العادي للمتصفح.', 'error');
+                }
                 resolve(null);
             };
             req.onblocked = () => {
-                console.warn('[Storage] IndexedDB blocked');
+                diagAdd('IndexedDB محظور — أغلق النوافذ/التبويبات الأخرى لهذا الموقع', 'warn');
             };
         } catch (e) {
             if (resolved) return;
             resolved = true;
             clearTimeout(timeoutId);
-            console.warn('[Storage] IndexedDB threw, falling back:', e);
             storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+            diagAdd('استثناء IndexedDB: ' + e.message + ' — بديل: ' + storageMode, 'error');
+            if (storageMode === 'memory') {
+                diagAdd('البيانات في الذاكرة فقط! لن تُحفظ بعد الإغلاق. الحل: وضع عادي أو متصفح آخر', 'error');
+            }
             resolve(null);
         }
     });
@@ -1112,12 +1162,95 @@ function uuid() {
 }
 
 // ===================== Toast Notifications =====================
-function showToast(msg, type) {
+function showToast(msg, type, duration) {
     const t = document.createElement('div');
     t.className = 'toast toast-' + (type || 'info');
+    if (msg.includes('\n')) {
+        t.style.whiteSpace = 'pre-wrap';
+        t.style.textAlign = 'right';
+        t.style.maxWidth = '92vw';
+        t.style.fontSize = '0.82rem';
+        t.style.lineHeight = '1.6';
+    }
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 3500);
+    setTimeout(() => t.remove(), duration || (type === 'error' ? 8000 : 3500));
+}
+
+// ===================== Diagnostic Logging =====================
+let diagLog = [];
+const DIAG_MAX = 50;
+
+function diagAdd(msg, level) {
+    level = level || 'info';
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('ar-EG', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const entry = { time: timeStr, msg: msg, level: level, ts: now.getTime() };
+    diagLog.push(entry);
+    if (diagLog.length > DIAG_MAX) diagLog.shift();
+    const panel = document.getElementById('diagPanel');
+    if (panel) {
+        const cls = level === 'ok' ? 'd-ok' : level === 'warn' ? 'd-warn' : level === 'error' ? 'd-err' : 'd-info';
+        const line = document.createElement('div');
+        line.className = 'diag-line ' + cls;
+        line.innerHTML = '<span class="d-time">' + timeStr + '</span> ' + msg;
+        panel.appendChild(line);
+        panel.scrollTop = panel.scrollHeight;
+    }
+}
+
+function updateStatusStrip() {
+    const ssConn = document.getElementById('ssConn');
+    const ssStorage = document.getElementById('ssStorage');
+    if (ssStorage) {
+        const modeMap = { 'idb': 'IndexedDB', 'localstorage': 'localStorage', 'memory': 'ذاكرة مؤقتة' };
+        const modeLabel = modeMap[storageMode] || storageMode;
+        ssStorage.className = 'ss-item ' + (storageMode === 'idb' ? 'ss-storage-idb' : storageMode === 'localstorage' ? 'ss-storage-ls' : 'ss-storage-mem');
+        ssStorage.textContent = 'التخزين: ' + modeLabel;
+    }
+}
+
+function updateLastSave(success, name) {
+    const el = document.getElementById('ssLastSave');
+    if (!el) return;
+    const now = new Date().toLocaleTimeString('ar-EG', {hour:'2-digit',minute:'2-digit'});
+    if (success) {
+        el.style.background = '#d1fae5';
+        el.style.color = '#065f46';
+        el.textContent = 'آخر حفظ: ' + now + ' (' + name + ')';
+    } else {
+        el.style.background = '#fee2e2';
+        el.style.color = '#991b1b';
+        el.textContent = 'فشل الحفظ: ' + now;
+    }
+}
+
+async function checkServerConnection() {
+    const ssConn = document.getElementById('ssConn');
+    let url = document.getElementById('serverUrl').value.trim();
+    if (!url) {
+        if (ssConn) { ssConn.className = 'ss-item ss-conn-unknown'; ssConn.textContent = 'السرفر: غير مُعدّ'; }
+        return;
+    }
+    if (!url.startsWith('http')) url = 'http://' + url;
+    const base = url.replace(/\/+$/, '');
+    try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 5000);
+        const resp = await fetch(base + '/api/sync/ping', { method:'GET', mode:'cors', signal:ctrl.signal, cache:'no-store' });
+        clearTimeout(tid);
+        if (resp.ok) {
+            if (ssConn) { ssConn.className = 'ss-item ss-conn-ok'; ssConn.textContent = 'السرفر: متصل'; }
+            diagAdd('اتصال بالسرفر ناجح: ' + base, 'ok');
+        } else {
+            if (ssConn) { ssConn.className = 'ss-item ss-conn-off'; ssConn.textContent = 'السرفر: خطأ ' + resp.status; }
+            diagAdd('السرفر استجاب بخطأ: HTTP ' + resp.status, 'warn');
+        }
+    } catch (e) {
+        if (ssConn) { ssConn.className = 'ss-item ss-conn-off'; ssConn.textContent = 'السرفر: غير متصل'; }
+        const reason = e.name === 'AbortError' ? 'انتهت المهلة (5 ثوانٍ)' : e.message;
+        diagAdd('فشل الاتصال بالسرفر: ' + reason, 'error');
+    }
 }
 
 // ===================== Tab Switching =====================
@@ -1420,65 +1553,86 @@ async function saveEntry() {
 
     if (!firstName || !lastName) {
         showToast('الاسم الأول واسم العائلة مطلوبان', 'error');
+        diagAdd('محاولة حفظ بدون اسم — مطلوب الاسم الأول واسم العائلة', 'warn');
         return;
     }
     if (!status) {
         showToast('يرجى اختيار حالة الشخص', 'error');
+        diagAdd('محاولة حفظ بدون اختيار حالة الشخص', 'warn');
         return;
     }
 
+    const displayName = [firstName, fatherName, lastName].filter(Boolean).join(' ');
+    diagAdd('بدء حفظ الحالة: ' + displayName, 'info');
     showToast('جارٍ الحفظ...', 'info');
 
-    const fields = {};
-    form.querySelectorAll('input:not([type="file"]):not([type="checkbox"]),select,textarea').forEach(el => {
-        if (el.name) fields[el.name] = el.value;
-    });
-    form.querySelectorAll('input[type="checkbox"]').forEach(el => {
-        if (el.name === 'chronic_list') {
-            if (!fields._chronic_list) fields._chronic_list = [];
-            if (el.checked) fields._chronic_list.push(el.value);
-        } else {
-            fields[el.name] = el.checked ? el.value : '';
-        }
-    });
+    // Step 1: Collect form fields
+    let fields, fileData;
+    try {
+        fields = {};
+        form.querySelectorAll('input:not([type="file"]):not([type="checkbox"]),select,textarea').forEach(el => {
+            if (el.name) fields[el.name] = el.value;
+        });
+        form.querySelectorAll('input[type="checkbox"]').forEach(el => {
+            if (el.name === 'chronic_list') {
+                if (!fields._chronic_list) fields._chronic_list = [];
+                if (el.checked) fields._chronic_list.push(el.value);
+            } else {
+                fields[el.name] = el.checked ? el.value : '';
+            }
+        });
 
-    fields.detention_facilities_data = JSON.stringify(collectDetentions());
-    fields.witnesses_data = JSON.stringify(collectWitnesses());
-    const children = collectChildren();
-    fields.children_data = JSON.stringify(children);
-    fields.has_kids = children.length > 0 ? 'yes' : 'no';
-    fields.kids_count = String(children.length);
-    fields.kids_under_18_count = String(children.filter(c => {
-        const y = parseInt(c.birth_year);
-        return y && (new Date().getFullYear() - y) < 18;
-    }).length);
+        fields.detention_facilities_data = JSON.stringify(collectDetentions());
+        fields.witnesses_data = JSON.stringify(collectWitnesses());
+        const children = collectChildren();
+        fields.children_data = JSON.stringify(children);
+        fields.has_kids = children.length > 0 ? 'yes' : 'no';
+        fields.kids_count = String(children.length);
+        fields.kids_under_18_count = String(children.filter(c => {
+            const y = parseInt(c.birth_year);
+            return y && (new Date().getFullYear() - y) < 18;
+        }).length);
 
-    // Companions
-    const companions = collectCompanions();
-    fields.companions_count = String(companions.length);
-    fields._companions = companions;
+        const companions = collectCompanions();
+        fields.companions_count = String(companions.length);
+        fields._companions = companions;
 
-    // Extra documents metadata
-    const extraDocs = collectExtraDocs();
-    fields.record_doc_count = String(extraDocs.length);
-    fields._extra_docs = extraDocs;
+        const extraDocs = collectExtraDocs();
+        fields.record_doc_count = String(extraDocs.length);
+        fields._extra_docs = extraDocs;
 
-    // Methodology tags
-    const methodTags = getSelectedMethodologyTags();
-    fields._methodology_tags = methodTags;
+        const methodTags = getSelectedMethodologyTags();
+        fields._methodology_tags = methodTags;
 
-    const fileFields = ['photo', 'document', 'digital_evidence_screenshot', 'civil_registry_document', 'survivor_cv', 'survivor_cv_photo'];
-    const fileData = {};
-    for (const fname of fileFields) {
-        const input = form.querySelector('[name="' + fname + '"]');
-        if (input && input.files && input.files[0]) {
-            fileData[fname] = await readFileAsBase64(input.files[0]);
-        }
+        diagAdd('تم جمع بيانات النموذج بنجاح (' + Object.keys(fields).length + ' حقل)', 'ok');
+    } catch (collectErr) {
+        diagAdd('خطأ أثناء جمع بيانات النموذج: ' + collectErr.message, 'error');
+        showToast('خطأ في قراءة بيانات النموذج: ' + collectErr.message + '\nالحل: أعد تحميل الصفحة وحاول مرة أخرى', 'error', 10000);
+        updateLastSave(false, displayName);
+        return;
     }
-    // Extra document files
-    const extraDocFiles = await collectExtraDocFiles();
-    Object.assign(fileData, extraDocFiles);
 
+    // Step 2: Collect files
+    try {
+        const fileFields = ['photo', 'document', 'digital_evidence_screenshot', 'civil_registry_document', 'survivor_cv', 'survivor_cv_photo'];
+        fileData = {};
+        for (const fname of fileFields) {
+            const input = form.querySelector('[name="' + fname + '"]');
+            if (input && input.files && input.files[0]) {
+                fileData[fname] = await readFileAsBase64(input.files[0]);
+                diagAdd('تم قراءة الملف: ' + fname + ' (' + Math.round(input.files[0].size/1024) + 'KB)', 'ok');
+            }
+        }
+        const extraDocFiles = await collectExtraDocFiles();
+        Object.assign(fileData, extraDocFiles);
+    } catch (fileErr) {
+        diagAdd('خطأ أثناء قراءة الملفات: ' + fileErr.message, 'error');
+        showToast('خطأ في قراءة الملفات المرفقة: ' + fileErr.message + '\nالحل: حاول تقليل حجم الملفات أو إزالة المرفقات وإعادة إرفاقها', 'error', 10000);
+        updateLastSave(false, displayName);
+        return;
+    }
+
+    // Step 3: Save to storage
     const entryId = uuid();
     const entry = {
         client_uuid: entryId,
@@ -1487,13 +1641,73 @@ async function saveEntry() {
         status: 'pending',
         server_id: null,
         created_at: new Date().toISOString(),
-        display_name: [firstName, fatherName, lastName].filter(Boolean).join(' ')
+        display_name: displayName
     };
 
-    await dbPut('entries', entry);
-    showToast('تم حفظ الحالة بنجاح — ' + entry.display_name, 'success');
-    resetForm();
-    updateBadge();
+    const dataSizeKB = Math.round(JSON.stringify(entry).length / 1024);
+    diagAdd('حجم البيانات للحفظ: ' + dataSizeKB + 'KB — وضع التخزين: ' + storageMode, 'info');
+
+    try {
+        await dbPut('entries', entry);
+        diagAdd('تم الحفظ بنجاح في ' + storageMode + ' — المعرّف: ' + entryId.slice(0, 8), 'ok');
+        showToast('تم حفظ الحالة بنجاح — ' + displayName, 'success');
+        updateLastSave(true, displayName);
+        resetForm();
+        updateBadge();
+    } catch (saveErr) {
+        diagAdd('فشل الحفظ! الخطأ: ' + saveErr.message, 'error');
+        updateLastSave(false, displayName);
+
+        // Provide specific Arabic fix instructions based on error type
+        let userMsg = '';
+        const errMsg = (saveErr.message || '').toLowerCase();
+
+        if (errMsg.includes('quota') || errMsg.includes('exceeded') || errMsg.includes('full')) {
+            userMsg = 'فشل الحفظ: مساحة التخزين ممتلئة!\n\n' +
+                'الحل:\n' +
+                '١. اذهب إلى "الإعدادات والمزامنة"\n' +
+                '٢. زامن الحالات المعلقة أولاً\n' +
+                '٣. ثم احذف الحالات المتزامنة\n' +
+                '٤. أو قلّل عدد الملفات المرفقة';
+            diagAdd('السبب: مساحة التخزين ممتلئة — يجب حذف حالات قديمة أو تقليل المرفقات', 'error');
+        } else if (errMsg.includes('private') || errMsg.includes('incognito') || errMsg.includes('access')) {
+            userMsg = 'فشل الحفظ: المتصفح في وضع التصفح الخاص!\n\n' +
+                'الحل:\n' +
+                '١. أغلق نافذة التصفح الخاص\n' +
+                '٢. افتح المتصفح في الوضع العادي\n' +
+                '٣. أعد فتح النموذج من جديد';
+            diagAdd('السبب: وضع التصفح الخاص يمنع الحفظ', 'error');
+        } else if (errMsg.includes('transaction') || errMsg.includes('abort') || errMsg.includes('version')) {
+            userMsg = 'فشل الحفظ: خطأ في قاعدة البيانات الداخلية!\n\n' +
+                'الحل:\n' +
+                '١. أعد تحميل الصفحة (اسحب للأسفل أو اضغط F5)\n' +
+                '٢. إذا استمرت المشكلة: امسح بيانات الموقع من إعدادات المتصفح\n' +
+                '٣. ثم أعد فتح النموذج';
+            diagAdd('السبب: خطأ في IndexedDB transaction — قد يحتاج إعادة تحميل', 'error');
+        } else if (storageMode === 'memory') {
+            userMsg = 'تحذير: البيانات محفوظة في الذاكرة المؤقتة فقط!\n\n' +
+                'ستُفقد جميع البيانات عند إغلاق المتصفح.\n\n' +
+                'الحل:\n' +
+                '١. افتح المتصفح في الوضع العادي (ليس خاص/incognito)\n' +
+                '٢. أو افتح النموذج عبر السرفر مباشرة:\n' +
+                '   http://[عنوان-السرفر]/offline-form/app';
+            diagAdd('تحذير: وضع الذاكرة المؤقتة — البيانات ستضيع عند الإغلاق!', 'error');
+        } else {
+            userMsg = 'فشل الحفظ: ' + saveErr.message + '\n\n' +
+                'الحلول الممكنة:\n' +
+                '١. أعد تحميل الصفحة وحاول مرة أخرى\n' +
+                '٢. تأكد أن المتصفح ليس في وضع خاص\n' +
+                '٣. جرّب متصفح آخر (Chrome أفضل)\n' +
+                '٤. إذا استمرت المشكلة: امسح بيانات الموقع';
+            diagAdd('خطأ غير معروف: ' + saveErr.message, 'error');
+        }
+
+        showToast(userMsg, 'error', 15000);
+
+        // Auto-open diagnostic panel on error
+        const details = document.getElementById('diagDetails');
+        if (details) details.open = true;
+    }
 }
 
 // ===================== Reset Form =====================
@@ -1876,7 +2090,17 @@ async function syncAll() {
             entry.error = e.message;
             await dbPut('entries', entry);
             failed++;
-            logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + e.message + '</div>';
+            // Provide Arabic diagnosis for network errors
+            let arabicErr = e.message;
+            if (e.name === 'AbortError' || e.message.includes('timeout')) {
+                arabicErr = 'انتهت مهلة الاتصال — تأكد أن السرفر يعمل والجهاز على نفس الشبكة';
+            } else if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+                arabicErr = 'لا يمكن الوصول للسرفر — تأكد من: العنوان صحيح، السرفر يعمل، نفس شبكة WiFi';
+            } else if (e.message.includes('CORS') || e.message.includes('blocked')) {
+                arabicErr = 'خطأ CORS — السرفر يرفض الطلب. تأكد أن السرفر محدّث';
+            }
+            logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + arabicErr + '</div>';
+            diagAdd('فشل مزامنة "' + entry.display_name + '": ' + e.message, 'error');
         }
     }
 
@@ -1885,6 +2109,12 @@ async function syncAll() {
     syncBtn.disabled = false;
     updateStats();
     updateBadge();
+    checkServerConnection();
+    if (failed > 0) {
+        diagAdd('المزامنة: ' + synced + ' نجحت، ' + failed + ' فشلت — راجع السجل أعلاه للتفاصيل', failed ? 'error' : 'ok');
+    } else {
+        diagAdd('المزامنة اكتملت بنجاح: ' + synced + ' حالة', 'ok');
+    }
     showToast('المزامنة: ' + synced + ' نجحت' + (failed ? '، ' + failed + ' فشلت' : ''), synced && !failed ? 'success' : 'error');
 }
 
@@ -1928,12 +2158,19 @@ async function clearSyncedEntries() {
 
 // ===================== Initialize =====================
 async function init() {
+    diagAdd('بدء تهيئة التطبيق...', 'info');
     await openDB();
+    updateStatusStrip();
     await requestPersistentStorage();
     loadSettings();
     updateBadge();
     updateStats();
     showStorageStatus();
+    // Check server connectivity in background
+    checkServerConnection();
+    // Re-check every 30 seconds
+    setInterval(checkServerConnection, 30000);
+    diagAdd('اكتملت التهيئة — وضع التخزين: ' + storageMode, storageMode === 'idb' ? 'ok' : 'warn');
     // Set today's date for collection_date
     const today = new Date().toISOString().slice(0, 10);
     const dateInput = document.querySelector('[name="collection_date"]');
@@ -1941,16 +2178,19 @@ async function init() {
 }
 
 async function requestPersistentStorage() {
-    if (!navigator.storage || !navigator.storage.persist) return;
+    if (!navigator.storage || !navigator.storage.persist) {
+        diagAdd('المتصفح لا يدعم التخزين الدائم (persist API)', 'warn');
+        return;
+    }
     try {
         const persistent = await navigator.storage.persist();
         if (persistent) {
-            console.log('[Storage] Persistent storage granted — data will not be auto-evicted');
+            diagAdd('تم تفعيل التخزين الدائم — البيانات لن تُحذف تلقائياً', 'ok');
         } else {
-            console.warn('[Storage] Persistent storage denied — browser may evict data under pressure');
+            diagAdd('التخزين الدائم مرفوض — المتصفح قد يحذف البيانات تلقائياً. الحل: أضف الموقع للشاشة الرئيسية', 'warn');
         }
     } catch (e) {
-        console.warn('[Storage] persist() error:', e);
+        diagAdd('خطأ في طلب التخزين الدائم: ' + e.message, 'warn');
     }
 }
 

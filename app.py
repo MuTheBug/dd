@@ -8401,26 +8401,36 @@ def _add_cors_headers(resp):
     works for non-credentialed requests, plus explicitly allow null for safety.
     """
     origin = request.headers.get('Origin', '*')
-    # Echo origin when present (works for both null and real origins), else wildcard
     resp.headers['Access-Control-Allow-Origin'] = origin if origin else '*'
     resp.headers['Vary'] = 'Origin'
     resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS, GET'
     resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, X-Sync-User, X-Sync-Pass, Accept, Access-Control-Request-Private-Network'
     resp.headers['Access-Control-Max-Age'] = '600'
     resp.headers['Access-Control-Allow-Credentials'] = 'false'
-    # Chrome 104+ blocks fetches to private-network IPs unless the server opts in
-    if request.headers.get('Access-Control-Request-Private-Network'):
-        resp.headers['Access-Control-Allow-Private-Network'] = 'true'
+    # Chrome 104+ Private Network Access: always opt in so browsers never block
+    # requests to LAN IPs (192.168.x.x, 10.x.x.x, etc.)
+    resp.headers['Access-Control-Allow-Private-Network'] = 'true'
     return resp
+
+
+@app.before_request
+def handle_sync_preflight():
+    """Intercept ALL OPTIONS preflights for /api/sync/ early.
+
+    Chrome's Private Network Access sends a preflight before ANY cross-origin
+    request to a private IP.  If this preflight hits a before_request hook that
+    returns a redirect or error without CORS headers, the browser reports
+    'Failed to fetch'.  Handling it here guarantees a clean 204 with full
+    CORS + PNA headers before any other middleware runs.
+    """
+    if request.method == 'OPTIONS' and request.path.startswith('/api/sync/'):
+        resp = make_response('', 204)
+        return _add_cors_headers(resp)
 
 
 @app.after_request
 def global_cors_for_sync(resp):
-    """Ensure CORS headers on ALL /api/sync/ responses, including error pages.
-
-    Some mobile browsers get 'Failed to fetch' if a 500 or framework-level
-    error response lacks CORS headers.  This guarantees they are always present.
-    """
+    """Ensure CORS headers on ALL /api/sync/ responses, including error pages."""
     if request.path.startswith('/api/sync/'):
         if 'Access-Control-Allow-Origin' not in resp.headers:
             _add_cors_headers(resp)

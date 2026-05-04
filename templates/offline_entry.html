@@ -2178,16 +2178,29 @@ async function clearSyncedEntries() {
 // ===================== Initialize =====================
 async function init() {
     diagAdd('بدء تهيئة التطبيق...', 'info');
+
+    // Warn if opened from a downloaded file — most connectivity issues stem from this
+    if (location.protocol === 'file:') {
+        diagAdd('تحذير: النموذج مفتوح من ملف محفوظ (file://) — الاتصال بالسرفر قد لا يعمل', 'error');
+        const banner = document.getElementById('storageBanner');
+        if (banner) {
+            banner.classList.remove('hidden');
+            banner.style.background = '#fee2e2';
+            banner.style.color = '#991b1b';
+            banner.style.fontWeight = '700';
+            banner.innerHTML = '&#x26D4; النموذج مفتوح من ملف محفوظ — المتصفح يحظر الاتصال بالسرفر!<br>' +
+                '<span style="font-weight:400">الحل: افتح النموذج عبر السرفر مباشرة بكتابة عنوان السرفر في المتصفح ثم <code>/offline-form/app</code></span>';
+        }
+    }
+
     await openDB();
     updateStatusStrip();
     await requestPersistentStorage();
     loadSettings();
     updateBadge();
     updateStats();
-    showStorageStatus();
-    // Check server connectivity in background
+    if (location.protocol !== 'file:') showStorageStatus();
     checkServerConnection();
-    // Re-check every 30 seconds
     setInterval(checkServerConnection, 30000);
     diagAdd('اكتملت التهيئة — وضع التخزين: ' + storageMode, storageMode === 'idb' ? 'ok' : 'warn');
     // Set today's date for collection_date

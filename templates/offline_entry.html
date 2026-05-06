@@ -1234,6 +1234,20 @@ async function checkServerConnection() {
     }
     if (!url.startsWith('http')) url = 'http://' + url;
     const base = url.replace(/\/+$/, '');
+
+    if (needsBridge(base)) {
+        // Cross-origin: try loading the bridge iframe as a connectivity test
+        try {
+            const bridge = await getSyncBridge(base);
+            if (ssConn) { ssConn.className = 'ss-item ss-conn-ok'; ssConn.textContent = 'السرفر: متصل (جسر)'; }
+            diagAdd('اتصال بالسرفر عبر الجسر ناجح', 'ok');
+        } catch (e) {
+            if (ssConn) { ssConn.className = 'ss-item ss-conn-off'; ssConn.textContent = 'السرفر: غير متصل'; }
+            diagAdd('فشل الاتصال بالسرفر عبر الجسر', 'error');
+        }
+        return;
+    }
+
     try {
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), 5000);
@@ -1890,7 +1904,6 @@ async function testConnection() {
     const statusEl = document.getElementById('connStatus');
     statusEl.innerHTML = '<span style="color:var(--warning)">جارٍ الاختبار...</span>';
 
-    // Detect mixed-content issues upfront
     if (location.protocol === 'https:' && base.startsWith('http://')) {
         statusEl.innerHTML = '<div style="color:var(--danger)">' +
             '<strong>مشكلة Mixed Content:</strong> النموذج محمّل عبر HTTPS لكن السرفر HTTP. ' +
@@ -1899,11 +1912,51 @@ async function testConnection() {
         return;
     }
 
+    const useBridge = needsBridge(base);
+
+    if (useBridge) {
+        // Cross-origin (file:// or different host): use iframe bridge
+        statusEl.innerHTML = '<span style="color:var(--warning)">جارٍ الاتصال عبر جسر الاتصال...</span>';
+        diagAdd('اختبار اتصال عبر جسر (cross-origin)', 'info');
+        let bridge;
+        try {
+            bridge = await getSyncBridge(base);
+        } catch (e) {
+            statusEl.innerHTML = '<div style="color:var(--danger);line-height:1.8">' +
+                '<strong>فشل فتح جسر الاتصال مع السرفر.</strong><br>' +
+                '<strong>الحلول:</strong><br>' +
+                '١. تأكد أن السرفر يعمل (شغّل البرنامج على الكمبيوتر)<br>' +
+                '٢. تأكد أن هذا الجهاز على <u>نفس شبكة WiFi</u> للمبنى<br>' +
+                '٣. تأكد أن العنوان صحيح: <code>' + base + '</code></div>';
+            diagAdd('فشل فتح جسر الاتصال: ' + e.message, 'error');
+            return;
+        }
+        const result = await bridgeTestConnection(bridge, user, pass);
+        if (result.success) {
+            if (result.pingOnly) {
+                statusEl.innerHTML = '<span style="color:var(--success)">&#x2713; السرفر متصل عبر الجسر (حقنا ' + (result.version||'') + '). أدخل اسم المستخدم وكلمة المرور للمزامنة.</span>';
+            } else if (result.loginData && result.loginData.success) {
+                statusEl.innerHTML = '<span style="color:var(--success)">&#x2713; متصل بنجاح عبر الجسر — مرحباً ' + result.loginData.display_name + ' (' + result.loginData.role + ')</span>';
+                saveSettings();
+            }
+            diagAdd('اتصال ناجح عبر جسر الاتصال', 'ok');
+        } else {
+            const msgMap = {
+                'invalid_credentials': 'اسم المستخدم أو كلمة المرور خاطئة',
+                'insufficient_role': 'صلاحيتك لا تسمح بالمزامنة (يجب أن تكون admin أو data_entry)',
+                'not_haqquna': 'العنوان لا يبدو سرفر حقنا',
+                'timeout': 'انتهت مهلة الاتصال'
+            };
+            statusEl.innerHTML = '<span style="color:var(--danger)">فشل: ' + (msgMap[result.error] || result.error) + '</span>';
+            diagAdd('فشل اختبار الاتصال عبر الجسر: ' + result.error, 'error');
+        }
+        return;
+    }
+
+    // Same-origin: direct fetch
     try {
-        // Use AbortController for explicit timeout (some networks just hang)
         const ctrl = new AbortController();
         const timeoutId = setTimeout(() => ctrl.abort(), 8000);
-
         let pingResp;
         try {
             pingResp = await fetch(base + '/api/sync/ping', {
@@ -1912,44 +1965,22 @@ async function testConnection() {
             });
         } catch (fetchErr) {
             clearTimeout(timeoutId);
-            const isFile = location.protocol === 'file:';
             const isAbort = fetchErr.name === 'AbortError';
             const errText = fetchErr.message || '';
             let msg = '<div style="color:var(--danger);line-height:1.8"><strong>فشل الاتصال بالسرفر.</strong><br>';
-
             if (isAbort) {
                 msg += '<strong>السبب:</strong> انتهت مهلة الاتصال (8 ثوانٍ).<br>' +
-                       '<strong>الحلول:</strong><br>' +
-                       '١. تأكد أن السرفر يعمل (شغّل البرنامج على الكمبيوتر)<br>' +
-                       '٢. تأكد أن هذا الجهاز على <u>نفس شبكة WiFi</u><br>' +
-                       '٣. جرّب فتح <code>' + base + '</code> في المتصفح مباشرة — إذا لم يفتح فالمشكلة في الشبكة';
-            } else if (isFile) {
-                msg += '<strong>السبب:</strong> النموذج مفتوح من ملف محفوظ (<code>file://</code>).<br>' +
-                       'معظم المتصفحات تمنع الاتصال بالشبكة من الملفات المحفوظة.<br>' +
-                       '<strong>الحل:</strong> افتح النموذج عبر السرفر مباشرة:<br>' +
-                       '<code style="background:#1e293b;color:#f1f5f9;padding:0.2rem 0.5rem;border-radius:4px;display:inline-block;margin:0.3rem 0">' + base + '/offline-form/app</code>';
+                       '١. تأكد أن السرفر يعمل<br>' +
+                       '٢. تأكد أن الجهاز على نفس شبكة WiFi';
             } else {
-                // Check if it's a Private Network Access block (Chrome 104+)
-                const sameOrigin = location.origin === base;
-                const isPrivateIP = /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|localhost|127\.)/.test(base);
-
-                msg += '<strong>السبب المحتمل:</strong><br>';
-                if (!sameOrigin && isPrivateIP) {
-                    msg += '• المتصفح يحظر الوصول لعناوين الشبكة المحلية (Private Network Access)<br>' +
-                           '<strong>الحل الأفضل:</strong> افتح النموذج عبر السرفر مباشرة:<br>' +
-                           '<code style="background:#1e293b;color:#f1f5f9;padding:0.2rem 0.5rem;border-radius:4px;display:inline-block;margin:0.3rem 0">' + base + '/offline-form/app</code><br>';
-                }
                 msg += '• تأكد أن العنوان صحيح: <code>' + base + '</code><br>' +
-                       '• تأكد أن السرفر يعمل على الكمبيوتر<br>' +
-                       '• تأكد أن الجهاز متصل بنفس شبكة WiFi<br>' +
-                       '• تأكد أن الجدار الناري (Firewall) لا يحجب المنفذ<br>';
-                if (errText) {
-                    msg += '<small style="color:#f87171">تفاصيل تقنية: ' + errText + '</small>';
-                }
+                       '• تأكد أن السرفر يعمل<br>' +
+                       '• تأكد أن الجهاز متصل بنفس الشبكة<br>';
+                if (errText) msg += '<small style="color:#f87171">' + errText + '</small>';
             }
             msg += '</div>';
             statusEl.innerHTML = msg;
-            diagAdd('فشل اختبار الاتصال: ' + (isAbort ? 'timeout' : errText), 'error');
+            diagAdd('فشل اختبار الاتصال المباشر: ' + (isAbort ? 'timeout' : errText), 'error');
             return;
         }
         clearTimeout(timeoutId);
@@ -1999,6 +2030,106 @@ function base64ToBlob(dataUrl) {
     return new Blob([arr], { type: mime });
 }
 
+// ===================== Sync Bridge (iframe postMessage) =====================
+function needsBridge(base) {
+    try {
+        return location.origin !== new URL(base).origin;
+    } catch (e) {
+        return true;
+    }
+}
+
+let syncBridgeIframe = null;
+
+function getSyncBridge(base) {
+    return new Promise((resolve, reject) => {
+        if (syncBridgeIframe) {
+            try { syncBridgeIframe.remove(); } catch(e){}
+            syncBridgeIframe = null;
+        }
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;border:none';
+        iframe.src = base + '/offline-form/sync-receiver';
+        let done = false;
+        const onReady = (evt) => {
+            if (!evt.data || evt.data.type !== 'sync-bridge-ready') return;
+            if (done) return;
+            done = true;
+            window.removeEventListener('message', onReady);
+            syncBridgeIframe = iframe;
+            resolve(iframe);
+        };
+        window.addEventListener('message', onReady);
+        const timeout = setTimeout(() => {
+            if (done) return;
+            done = true;
+            window.removeEventListener('message', onReady);
+            iframe.remove();
+            reject(new Error('bridge_timeout'));
+        }, 12000);
+        iframe.onerror = () => {
+            if (done) return;
+            done = true;
+            clearTimeout(timeout);
+            window.removeEventListener('message', onReady);
+            iframe.remove();
+            reject(new Error('bridge_load_error'));
+        };
+        document.body.appendChild(iframe);
+    });
+}
+
+function bridgeTestConnection(iframe, user, pass) {
+    return new Promise((resolve) => {
+        const onMsg = (evt) => {
+            if (!evt.data || evt.data.type !== 'sync-test-result') return;
+            window.removeEventListener('message', onMsg);
+            resolve(evt.data);
+        };
+        window.addEventListener('message', onMsg);
+        iframe.contentWindow.postMessage({
+            type: 'sync-test-connection',
+            credentials: { user: user, pass: pass }
+        }, '*');
+        setTimeout(() => {
+            window.removeEventListener('message', onMsg);
+            resolve({ success: false, error: 'timeout' });
+        }, 10000);
+    });
+}
+
+function bridgeSyncEntries(iframe, pending, user, pass) {
+    return new Promise((resolve) => {
+        const results = [];
+        const onMsg = (evt) => {
+            if (!evt.data) return;
+            if (evt.data.type === 'sync-entry-result') {
+                results.push(evt.data);
+            } else if (evt.data.type === 'sync-complete') {
+                window.removeEventListener('message', onMsg);
+                resolve(results);
+            }
+        };
+        window.addEventListener('message', onMsg);
+        const entriesToSend = pending.map(e => ({
+            client_uuid: e.client_uuid,
+            display_name: e.display_name,
+            fields: e.fields,
+            files: e.files
+        }));
+        iframe.contentWindow.postMessage({
+            type: 'sync-start',
+            entries: entriesToSend,
+            credentials: { user: user, pass: pass }
+        }, '*');
+        // Safety timeout: 2 minutes per entry max
+        setTimeout(() => {
+            window.removeEventListener('message', onMsg);
+            resolve(results);
+        }, pending.length * 120000);
+    });
+}
+
 // ===================== Sync All Pending Entries =====================
 async function syncAll() {
     const base = getServerBase();
@@ -2022,104 +2153,146 @@ async function syncAll() {
     logEl.innerHTML = '';
     let synced = 0, failed = 0;
 
-    for (let idx = 0; idx < pending.length; idx++) {
-        const entry = pending[idx];
-        const pct = Math.round(((idx + 1) / pending.length) * 100);
-        textEl.textContent = 'مزامنة ' + (idx + 1) + ' من ' + pending.length + ' — ' + entry.display_name;
-        barEl.style.width = pct + '%';
+    const useBridge = needsBridge(base);
+    if (useBridge) {
+        diagAdd('وضع ملف محلي — سيتم المزامنة عبر جسر الاتصال', 'info');
+        textEl.textContent = 'جارٍ فتح جسر الاتصال مع السرفر...';
 
+        let bridge;
         try {
-            const fd = new FormData();
-            fd.append('client_uuid', entry.client_uuid);
+            bridge = await getSyncBridge(base);
+            diagAdd('جسر الاتصال جاهز', 'ok');
+        } catch (e) {
+            logEl.innerHTML = '<div style="color:var(--danger)">فشل فتح جسر الاتصال مع السرفر.<br>' +
+                'تأكد أن السرفر يعمل وأنك على نفس شبكة WiFi.<br>' +
+                'العنوان: <code>' + base + '</code></div>';
+            diagAdd('فشل فتح جسر المزامنة: ' + e.message, 'error');
+            syncBtn.disabled = false;
+            showToast('فشل الاتصال بالسرفر — تأكد من الشبكة والعنوان', 'error');
+            return;
+        }
 
-            // Add all form fields
-            const f = entry.fields;
-            Object.keys(f).forEach(key => {
-                if (key.startsWith('_')) return;
-                if (key === 'chronic_list') return;
-                fd.append(key, f[key] || '');
-            });
+        textEl.textContent = 'جارٍ إرسال ' + pending.length + ' حالة عبر جسر الاتصال...';
+        const results = await bridgeSyncEntries(bridge, pending, user, pass);
 
-            // Handle chronic_list → chronic
-            if (f._chronic_list && f._chronic_list.length) {
-                f._chronic_list.forEach(v => fd.append('chronic_list', v));
-            }
-
-            // Companions — flatten to comp_first_0, comp_father_0, etc.
-            if (f._companions && f._companions.length) {
-                fd.set('companions_count', String(f._companions.length));
-                f._companions.forEach((c, ci) => {
-                    fd.append('comp_first_' + ci, c.first_name || '');
-                    fd.append('comp_father_' + ci, c.father_name || '');
-                    fd.append('comp_last_' + ci, c.last_name || '');
-                    fd.append('comp_mother_' + ci, c.mother_name || '');
-                    fd.append('comp_notes_' + ci, c.notes || '');
-                });
-            }
-
-            // Extra documents — flatten to record_doc_type_0, etc.
-            if (f._extra_docs && f._extra_docs.length) {
-                fd.set('record_doc_count', String(f._extra_docs.length));
-                f._extra_docs.forEach((d, di) => {
-                    fd.append('record_doc_type_' + di, d.doc_type || '');
-                    fd.append('record_doc_date_' + di, d.doc_date || '');
-                    fd.append('record_doc_url_' + di, d.doc_url || '');
-                    fd.append('record_doc_desc_' + di, d.doc_desc || '');
-                });
-            }
-
-            // Methodology tags → methodology_notes prefix
-            if (f._methodology_tags && f._methodology_tags.length) {
-                const existingNotes = f.methodology_notes || '';
-                const tagsStr = '[وسوم: ' + f._methodology_tags.join('، ') + ']';
-                fd.set('methodology_notes', tagsStr + (existingNotes ? '\n' + existingNotes : ''));
-            }
-
-            // Add files as blobs
-            const files = entry.files || {};
-            Object.keys(files).forEach(fname => {
-                const fileInfo = files[fname];
-                if (fileInfo && fileInfo.data) {
-                    const blob = base64ToBlob(fileInfo.data);
-                    fd.append(fname, blob, fileInfo.name || (fname + '.jpg'));
-                }
-            });
-
-            const resp = await fetch(base + '/api/sync/entries', {
-                method: 'POST', mode: 'cors', body: fd,
-                headers: { 'X-Sync-User': user, 'X-Sync-Pass': pass }
-            });
-            const data = await resp.json();
-
-            if (data.success) {
+        // Process results
+        for (const r of results) {
+            const entry = pending.find(e => e.client_uuid === r.uuid);
+            if (!entry) continue;
+            if (r.success) {
                 entry.status = 'synced';
-                entry.server_id = data.server_id;
+                entry.server_id = r.server_id;
                 await dbPut('entries', entry);
                 synced++;
-                logEl.innerHTML += '<div style="color:var(--success)">✓ ' + entry.display_name + ' → سجل #' + data.server_id + (data.duplicate_uuid ? ' (موجود مسبقاً)' : '') + '</div>';
+                logEl.innerHTML += '<div style="color:var(--success)">✓ ' + entry.display_name + ' → سجل #' + r.server_id + (r.duplicate ? ' (موجود مسبقاً)' : '') + '</div>';
             } else {
                 entry.status = 'failed';
-                entry.error = (data.errors || [data.error]).join(', ');
+                entry.error = r.error;
                 await dbPut('entries', entry);
                 failed++;
-                logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + entry.error + '</div>';
+                logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + r.error + '</div>';
             }
-        } catch (e) {
-            entry.status = 'failed';
-            entry.error = e.message;
-            await dbPut('entries', entry);
-            failed++;
-            // Provide Arabic diagnosis for network errors
-            let arabicErr = e.message;
-            if (e.name === 'AbortError' || e.message.includes('timeout')) {
-                arabicErr = 'انتهت مهلة الاتصال — تأكد أن السرفر يعمل والجهاز على نفس الشبكة';
-            } else if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
-                arabicErr = 'لا يمكن الوصول للسرفر — تأكد من: العنوان صحيح، السرفر يعمل، نفس شبكة WiFi';
-            } else if (e.message.includes('CORS') || e.message.includes('blocked')) {
-                arabicErr = 'خطأ CORS — السرفر يرفض الطلب. تأكد أن السرفر محدّث';
+            const pct = Math.round(((synced + failed) / pending.length) * 100);
+            barEl.style.width = pct + '%';
+            textEl.textContent = 'مزامنة ' + (synced + failed) + ' من ' + pending.length;
+        }
+        // Mark any entries that got no result as failed
+        for (const entry of pending) {
+            if (entry.status !== 'synced' && entry.status !== 'failed') {
+                entry.status = 'failed';
+                entry.error = 'لم يتم استلام نتيجة من جسر المزامنة';
+                await dbPut('entries', entry);
+                failed++;
+                logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': لم تصل نتيجة</div>';
             }
-            logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + arabicErr + '</div>';
-            diagAdd('فشل مزامنة "' + entry.display_name + '": ' + e.message, 'error');
+        }
+    } else {
+        // Same-origin: direct fetch (standard mode)
+        diagAdd('وضع اتصال مباشر — نفس مصدر السرفر', 'ok');
+        for (let idx = 0; idx < pending.length; idx++) {
+            const entry = pending[idx];
+            const pct = Math.round(((idx + 1) / pending.length) * 100);
+            textEl.textContent = 'مزامنة ' + (idx + 1) + ' من ' + pending.length + ' — ' + entry.display_name;
+            barEl.style.width = pct + '%';
+
+            try {
+                const fd = new FormData();
+                fd.append('client_uuid', entry.client_uuid);
+                const f = entry.fields;
+                Object.keys(f).forEach(key => {
+                    if (key.startsWith('_')) return;
+                    if (key === 'chronic_list') return;
+                    fd.append(key, f[key] || '');
+                });
+                if (f._chronic_list && f._chronic_list.length) {
+                    f._chronic_list.forEach(v => fd.append('chronic_list', v));
+                }
+                if (f._companions && f._companions.length) {
+                    fd.set('companions_count', String(f._companions.length));
+                    f._companions.forEach((c, ci) => {
+                        fd.append('comp_first_' + ci, c.first_name || '');
+                        fd.append('comp_father_' + ci, c.father_name || '');
+                        fd.append('comp_last_' + ci, c.last_name || '');
+                        fd.append('comp_mother_' + ci, c.mother_name || '');
+                        fd.append('comp_notes_' + ci, c.notes || '');
+                    });
+                }
+                if (f._extra_docs && f._extra_docs.length) {
+                    fd.set('record_doc_count', String(f._extra_docs.length));
+                    f._extra_docs.forEach((d, di) => {
+                        fd.append('record_doc_type_' + di, d.doc_type || '');
+                        fd.append('record_doc_date_' + di, d.doc_date || '');
+                        fd.append('record_doc_url_' + di, d.doc_url || '');
+                        fd.append('record_doc_desc_' + di, d.doc_desc || '');
+                    });
+                }
+                if (f._methodology_tags && f._methodology_tags.length) {
+                    const existingNotes = f.methodology_notes || '';
+                    const tagsStr = '[وسوم: ' + f._methodology_tags.join('، ') + ']';
+                    fd.set('methodology_notes', tagsStr + (existingNotes ? '\n' + existingNotes : ''));
+                }
+                const files = entry.files || {};
+                Object.keys(files).forEach(fname => {
+                    const fileInfo = files[fname];
+                    if (fileInfo && fileInfo.data) {
+                        const blob = base64ToBlob(fileInfo.data);
+                        fd.append(fname, blob, fileInfo.name || (fname + '.jpg'));
+                    }
+                });
+
+                const resp = await fetch(base + '/api/sync/entries', {
+                    method: 'POST', mode: 'cors', body: fd,
+                    headers: { 'X-Sync-User': user, 'X-Sync-Pass': pass }
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    entry.status = 'synced';
+                    entry.server_id = data.server_id;
+                    await dbPut('entries', entry);
+                    synced++;
+                    logEl.innerHTML += '<div style="color:var(--success)">✓ ' + entry.display_name + ' → سجل #' + data.server_id + (data.duplicate_uuid ? ' (موجود مسبقاً)' : '') + '</div>';
+                } else {
+                    entry.status = 'failed';
+                    entry.error = (data.errors || [data.error]).join(', ');
+                    await dbPut('entries', entry);
+                    failed++;
+                    logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + entry.error + '</div>';
+                }
+            } catch (e) {
+                entry.status = 'failed';
+                entry.error = e.message;
+                await dbPut('entries', entry);
+                failed++;
+                let arabicErr = e.message;
+                if (e.name === 'AbortError' || e.message.includes('timeout')) {
+                    arabicErr = 'انتهت مهلة الاتصال — تأكد أن السرفر يعمل والجهاز على نفس الشبكة';
+                } else if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+                    arabicErr = 'لا يمكن الوصول للسرفر — تأكد من: العنوان صحيح، السرفر يعمل، نفس شبكة WiFi';
+                }
+                logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + arabicErr + '</div>';
+                diagAdd('فشل مزامنة "' + entry.display_name + '": ' + e.message, 'error');
+            }
         }
     }
 
@@ -2130,7 +2303,7 @@ async function syncAll() {
     updateBadge();
     checkServerConnection();
     if (failed > 0) {
-        diagAdd('المزامنة: ' + synced + ' نجحت، ' + failed + ' فشلت — راجع السجل أعلاه للتفاصيل', failed ? 'error' : 'ok');
+        diagAdd('المزامنة: ' + synced + ' نجحت، ' + failed + ' فشلت — راجع السجل أعلاه للتفاصيل', 'error');
     } else {
         diagAdd('المزامنة اكتملت بنجاح: ' + synced + ' حالة', 'ok');
     }
@@ -2181,15 +2354,13 @@ async function init() {
 
     // Warn if opened from a downloaded file — most connectivity issues stem from this
     if (location.protocol === 'file:') {
-        diagAdd('تحذير: النموذج مفتوح من ملف محفوظ (file://) — الاتصال بالسرفر قد لا يعمل', 'error');
+        diagAdd('النموذج مفتوح من ملف محفوظ (file://) — المزامنة ستتم عبر جسر الاتصال', 'info');
         const banner = document.getElementById('storageBanner');
         if (banner) {
             banner.classList.remove('hidden');
-            banner.style.background = '#fee2e2';
-            banner.style.color = '#991b1b';
-            banner.style.fontWeight = '700';
-            banner.innerHTML = '&#x26D4; النموذج مفتوح من ملف محفوظ — المتصفح يحظر الاتصال بالسرفر!<br>' +
-                '<span style="font-weight:400">الحل: افتح النموذج عبر السرفر مباشرة بكتابة عنوان السرفر في المتصفح ثم <code>/offline-form/app</code></span>';
+            banner.style.background = '#dbeafe';
+            banner.style.color = '#1e40af';
+            banner.innerHTML = '&#x1F4C4; النموذج يعمل من ملف محفوظ — عند الاتصال بشبكة المبنى ستتم المزامنة تلقائياً عبر جسر الاتصال.';
         }
     }
 

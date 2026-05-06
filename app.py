@@ -142,6 +142,7 @@ def enforce_role_permissions():
         allowed = common_allowed + ('entry_form', 'entry_submit', 'admin_dashboard',
                                      'api_draft_save', 'api_draft_load', 'api_draft_clear',
                                      'offline_form_page', 'offline_form_download', 'offline_form_app',
+                                     'offline_form_sync_receiver',
                                      'api_sync_ping', 'api_sync_login', 'api_sync_entries') + shared_endpoints
         if endpoint not in allowed:
             flash('صلاحيتك محدودة بصفحة إدخال البيانات والسجلات فقط', 'error')
@@ -8756,6 +8757,20 @@ def offline_form_app():
     Public route (no auth required) — sync API still requires user credentials.
     """
     template_path = os.path.join(BASE_DIR, 'templates', 'offline_entry.html')
+    return send_file(template_path, mimetype='text/html')
+
+
+@app.route('/offline-form/sync-receiver')
+def offline_form_sync_receiver():
+    """Lightweight bridge page for syncing from file:// offline forms.
+
+    Loaded in a hidden iframe from the offline form.  Since this page is
+    served from the server origin, its fetch() calls to /api/sync/* are
+    same-origin and bypass CORS / Private-Network-Access restrictions that
+    block file:// → private-IP requests.  The parent communicates via
+    postMessage.
+    """
+    template_path = os.path.join(BASE_DIR, 'templates', 'sync_receiver.html')
     return send_file(template_path, mimetype='text/html')
 
 

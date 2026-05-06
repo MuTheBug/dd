@@ -1,0 +1,2479 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1e40af">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600;700&display=swap">
+<title>حقنا - نموذج إدخال بدون انترنت</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--primary:#1e40af;--primary-light:#3b82f6;--success:#059669;--danger:#dc2626;--warning:#f59e0b;--bg:#f0f2f5;--card:#fff;--border:#dfe3e8;--text:#1e293b;--text-light:#64748b;--radius:12px;--safe-bottom:env(safe-area-inset-bottom,0px)}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Arabic','Droid Arabic Naskh','Tahoma','Arial',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;direction:rtl;padding-bottom:calc(70px + var(--safe-bottom));min-height:100vh;min-height:100dvh}
+.container{max-width:800px;margin:0 auto;padding:0.6rem}
+
+/* Mobile-first header */
+.app-header{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;padding:0.8rem 1rem;text-align:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
+.app-header h1{font-size:1.15rem;margin:0;font-weight:700;letter-spacing:-0.3px}
+.app-header .subtitle{font-size:0.75rem;opacity:0.85;margin-top:0.1rem}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:0.8rem;margin-bottom:0.7rem;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.section-title{font-weight:700;font-size:0.92rem;padding:0.5rem 0.8rem;margin:-0.8rem -0.8rem 0.7rem -0.8rem;background:linear-gradient(to bottom,#f8fafc,#f1f5f9);border-bottom:1px solid var(--border);color:var(--primary);border-radius:var(--radius) var(--radius) 0 0}
+
+/* Form fields — large touch targets */
+.field{margin-bottom:0.6rem}
+.field label{display:block;font-size:0.82rem;font-weight:600;margin-bottom:0.25rem;color:var(--text)}
+.field input,.field select,.field textarea{width:100%;padding:0.65rem 0.7rem;border:1.5px solid var(--border);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;appearance:none;-webkit-appearance:none;transition:border-color 0.2s}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 0.7rem center;padding-left:2rem}
+.field textarea{resize:vertical;min-height:60px}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary-light);box-shadow:0 0 0 3px rgba(59,130,246,0.12)}
+.field input[type="file"]{padding:0.5rem;font-size:0.88rem;border-style:dashed;background:#fafbfc}
+.field input[type="checkbox"]{width:auto;margin-left:0.4rem;transform:scale(1.3);appearance:checkbox;-webkit-appearance:checkbox;cursor:pointer;min-height:20px;min-width:20px}
+
+/* Layout rows — stack on mobile by default */
+.row{display:flex;gap:0.5rem;flex-direction:column}
+.row3{display:flex;gap:0.5rem;flex-direction:row}
+.row3>.field{flex:1;min-width:0}
+
+/* Buttons — fat touch targets */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.7rem 1.3rem;border:none;border-radius:10px;font-size:0.95rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.15s;touch-action:manipulation;min-height:44px}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-warning{background:var(--warning);color:#fff}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text)}
+.btn-sm{padding:0.45rem 0.7rem;font-size:0.82rem;min-height:36px;border-radius:8px}
+.btn-block{width:100%}
+
+/* Badges */
+.badge{display:inline-block;padding:0.2rem 0.6rem;border-radius:10px;font-size:0.75rem;font-weight:600}
+.badge-pending{background:#fef3c7;color:#92400e}
+.badge-synced{background:#d1fae5;color:#065f46}
+.badge-failed{background:#fee2e2;color:#991b1b}
+
+/* Bottom tab bar — fixed, mobile-native feel */
+.bottom-tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:flex;justify-content:space-around;align-items:stretch;z-index:200;padding-bottom:var(--safe-bottom);box-shadow:0 -2px 10px rgba(0,0,0,0.06)}
+.bottom-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0.5rem 0;cursor:pointer;color:var(--text-light);font-size:0.68rem;font-weight:600;transition:color 0.15s;position:relative;-webkit-tap-highlight-color:transparent;touch-action:manipulation;min-height:56px}
+.bottom-tab .tab-icon{font-size:1.4rem;line-height:1;margin-bottom:0.15rem}
+.bottom-tab.active{color:var(--primary)}
+.bottom-tab.active::after{content:'';position:absolute;top:0;left:20%;right:20%;height:2.5px;background:var(--primary);border-radius:0 0 2px 2px}
+.bottom-tab .tab-badge{position:absolute;top:4px;right:calc(50% - 18px);background:var(--danger);color:#fff;font-size:0.6rem;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px}
+
+/* Hide old top tabs */
+.tabs{display:none}
+
+/* Tab content */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* Toast — mobile friendly */
+.toast{position:fixed;top:0;left:0;right:0;padding:0.9rem 1rem;color:#fff;font-weight:600;z-index:9999;animation:slideDown 0.3s ease;text-align:center;font-size:0.9rem}
+.toast-success{background:var(--success)}
+.toast-error{background:var(--danger)}
+.toast-info{background:var(--primary)}
+@keyframes slideDown{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:translateY(0)}}
+
+/* File preview */
+.file-preview{display:flex;align-items:center;gap:0.5rem;margin-top:0.3rem;font-size:0.78rem;color:var(--text-light);padding:0.3rem;background:#f8fafc;border-radius:6px}
+.file-preview img{width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border)}
+
+/* Entries list */
+.entries-list{max-height:calc(100vh - 220px);max-height:calc(100dvh - 220px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.entry-item{padding:0.7rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.5rem;background:#fff}
+.entry-item-header{display:flex;justify-content:space-between;align-items:flex-start;gap:0.3rem}
+.entry-item-actions{display:flex;gap:0.3rem;margin-top:0.4rem;flex-wrap:wrap}
+
+/* Stats */
+.stats-bar{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.7rem;font-size:0.8rem}
+.stat{padding:0.35rem 0.6rem;border-radius:8px;font-weight:600;flex:1;text-align:center;min-width:0}
+.stat-total{background:#e0e7ff;color:#3730a3}
+.stat-pending{background:#fef3c7;color:#92400e}
+.stat-synced{background:#d1fae5;color:#065f46}
+
+.hidden{display:none!important}
+
+/* Methodology tags */
+.method-tag{display:inline-block;padding:0.35rem 0.7rem;border:1.5px solid var(--border);border-radius:16px;background:var(--card);color:var(--text);font-size:0.78rem;cursor:pointer;transition:all 0.15s;font-family:inherit;touch-action:manipulation;min-height:32px}
+.method-tag:hover{border-color:var(--primary-light);background:#eff6ff}
+.method-tag.selected{border-color:var(--primary);background:var(--primary);color:#fff;font-weight:600}
+
+/* Sync progress */
+.sync-progress{margin:0.5rem 0;padding:0.6rem;background:#f1f5f9;border-radius:8px;font-size:0.82rem}
+.sync-progress .bar{height:8px;background:#e2e8f0;border-radius:4px;margin-top:0.3rem;overflow:hidden}
+.sync-progress .bar-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-light));transition:width 0.3s;border-radius:4px}
+
+/* Collapsible sections */
+.card-collapse .section-title{cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:0}
+.card-collapse .section-title::after{content:'▼';font-size:0.7rem;transition:transform 0.2s}
+.card-collapse.collapsed .section-title::after{transform:rotate(-90deg)}
+.card-collapse.collapsed .card-body{display:none}
+.card-collapse .card-body{margin-top:0.7rem}
+
+/* Dynamic row items (detention, witness, child) */
+.dyn-row{border:1px solid var(--border);border-radius:8px;padding:0.6rem;margin-top:0.4rem;position:relative;background:#fafbfc}
+.dyn-row .dyn-remove{position:absolute;left:0.3rem;top:0.3rem;background:var(--danger);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+
+/* Desktop: side-by-side rows */
+@media(min-width:601px){
+    .row{flex-direction:row}
+    .row>.field{flex:1;min-width:0}
+    .container{padding:1rem}
+    .card{padding:1rem}
+    .section-title{margin:-1rem -1rem 0.8rem -1rem;padding:0.6rem 1rem}
+    .bottom-tabs{display:none}
+    .tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:1rem;gap:0}
+    .tab{padding:0.6rem 1.2rem;cursor:pointer;font-weight:600;font-size:0.9rem;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-light);transition:all 0.2s}
+    .tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+    body{padding-bottom:0}
+    .app-header h1{font-size:1.4rem}
+}
+/* Diagnostic panel */
+.diag-panel{background:#1e293b;color:#e2e8f0;border-radius:var(--radius);padding:0.6rem 0.8rem;margin-bottom:0.7rem;font-size:0.78rem;direction:rtl;max-height:250px;overflow-y:auto;font-family:'Courier New',monospace}
+.diag-panel .diag-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;font-weight:700;font-size:0.82rem;color:#94a3b8;font-family:inherit}
+.diag-panel .diag-line{padding:0.15rem 0;border-bottom:1px solid #334155;direction:ltr;text-align:left;word-break:break-all}
+.diag-panel .diag-line:last-child{border-bottom:none}
+.diag-panel .d-ok{color:#34d399}
+.diag-panel .d-warn{color:#fbbf24}
+.diag-panel .d-err{color:#f87171}
+.diag-panel .d-info{color:#60a5fa}
+.diag-panel .d-time{color:#94a3b8;margin-left:0.5rem;font-size:0.7rem}
+/* Status strip at top of form */
+.status-strip{display:flex;gap:0.4rem;flex-wrap:wrap;padding:0.4rem 0.6rem;background:#f8fafc;border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;font-size:0.75rem;align-items:center}
+.status-strip .ss-item{display:flex;align-items:center;gap:0.2rem;padding:0.2rem 0.5rem;border-radius:6px;font-weight:600}
+.ss-storage-idb{background:#d1fae5;color:#065f46}
+.ss-storage-ls{background:#fef3c7;color:#92400e}
+.ss-storage-mem{background:#fee2e2;color:#991b1b}
+.ss-conn-ok{background:#d1fae5;color:#065f46}
+.ss-conn-off{background:#fee2e2;color:#991b1b}
+.ss-conn-unknown{background:#e0e7ff;color:#3730a3}
+</style>
+</head>
+<body>
+
+<!-- App Header -->
+<div class="app-header">
+    <h1>حقنا</h1>
+    <div class="subtitle">نموذج إدخال بدون انترنت</div>
+</div>
+
+<!-- Storage warning banner (shown only when storage is degraded) -->
+<div id="storageBanner" class="hidden" style="background:#fef3c7;color:#92400e;padding:0.6rem 1rem;font-size:0.82rem;text-align:center;border-bottom:1px solid #f59e0b;line-height:1.5"></div>
+
+<div class="container">
+
+<!-- Desktop Tabs (hidden on mobile) -->
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('form')">نموذج جديد</div>
+    <div class="tab" onclick="switchTab('entries')">الحالات المحفوظة <span id="entriesCountBadge2" style="background:var(--primary);color:#fff;padding:0 6px;border-radius:10px;font-size:0.75rem;margin-right:4px;">0</span></div>
+    <div class="tab" onclick="switchTab('settings')">الإعدادات والمزامنة</div>
+</div>
+
+<!-- ============ TAB: SETTINGS ============ -->
+<div id="tab-settings" class="tab-content">
+<div class="card">
+    <div class="section-title">اتصال السرفر</div>
+    <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:0.4rem">يمكن لعدة أجهزة استخدام النموذج والمزامنة في نفس الوقت. كل جهاز يحفظ بياناته محلياً ويزامنها مستقلاً.</p>
+    <div class="field">
+        <label>عنوان السرفر (IP:Port)</label>
+        <input type="text" id="serverUrl" placeholder="مثال: 192.168.1.50:5000" dir="ltr" style="text-align:left">
+    </div>
+    <div class="field">
+        <label>اسم المستخدم</label>
+        <input type="text" id="syncUsername" placeholder="اسم المستخدم">
+    </div>
+    <div class="field">
+        <label>كلمة المرور</label>
+        <input type="password" id="syncPassword" placeholder="كلمة المرور">
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+        <button class="btn btn-primary" onclick="testConnection()" style="flex:1">اختبار الاتصال</button>
+        <button class="btn btn-outline" onclick="saveSettings()" style="flex:1">حفظ</button>
+    </div>
+    <div id="connStatus" style="margin-top:0.5rem;font-size:0.85rem"></div>
+</div>
+
+<div class="card">
+    <div class="section-title">المزامنة</div>
+    <div class="stats-bar">
+        <span class="stat stat-total" id="statTotal">الإجمالي: 0</span>
+        <span class="stat stat-pending" id="statPending">بانتظار المزامنة: 0</span>
+        <span class="stat stat-synced" id="statSynced">تمت المزامنة: 0</span>
+    </div>
+    <button class="btn btn-success btn-block" onclick="syncAll()" id="syncBtn" style="font-size:1rem;padding:0.8rem">&#x21BA; مزامنة الحالات المعلقة</button>
+    <div id="syncProgress" class="sync-progress hidden">
+        <span id="syncText">جارٍ المزامنة...</span>
+        <div class="bar"><div class="bar-fill" id="syncBarFill" style="width:0%"></div></div>
+    </div>
+    <div id="syncLog" style="margin-top:0.5rem;font-size:0.82rem;max-height:200px;overflow-y:auto"></div>
+</div>
+
+<div class="card">
+    <div class="section-title">إدارة البيانات المحلية</div>
+    <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.5rem">البيانات محفوظة بشكل دائم داخل المتصفح ولن تُحذف تلقائياً. تُحذف فقط يدوياً من هنا أو بمسح بيانات المتصفح.</p>
+    <div style="display:flex;flex-direction:column;gap:0.5rem">
+        <button class="btn btn-outline btn-block" onclick="exportLocalData()">تصدير نسخة احتياطية (JSON)</button>
+        <button class="btn btn-danger btn-block" onclick="clearSyncedEntries()">حذف الحالات المتزامنة فقط</button>
+    </div>
+</div>
+</div>
+
+<!-- ============ TAB: ENTRIES LIST ============ -->
+<div id="tab-entries" class="tab-content">
+<div class="card">
+    <div class="section-title">الحالات المحفوظة محلياً</div>
+    <div class="stats-bar">
+        <span class="stat stat-total" id="statTotal2">الإجمالي: 0</span>
+        <span class="stat stat-pending" id="statPending2">معلقة: 0</span>
+        <span class="stat stat-synced" id="statSynced2">متزامنة: 0</span>
+    </div>
+    <div id="entriesList" class="entries-list">
+        <p style="text-align:center;color:var(--text-light);padding:2rem 0">لا توجد حالات محفوظة بعد.</p>
+    </div>
+</div>
+</div>
+
+<!-- ============ TAB: FORM ============ -->
+<div id="tab-form" class="tab-content active">
+
+<!-- Status Strip — always visible -->
+<div class="status-strip" id="statusStrip">
+    <div class="ss-item ss-conn-unknown" id="ssConn">الاتصال: غير معروف</div>
+    <div class="ss-item ss-storage-idb" id="ssStorage">التخزين: جارٍ التحميل...</div>
+    <div class="ss-item" id="ssLastSave" style="background:#e0e7ff;color:#3730a3">آخر حفظ: —</div>
+</div>
+
+<!-- Diagnostic Log Panel (collapsible) -->
+<details id="diagDetails" style="margin-bottom:0.5rem">
+    <summary style="cursor:pointer;font-size:0.8rem;font-weight:600;color:var(--text-light);padding:0.3rem 0">سجل التشخيص (اضغط لعرض التفاصيل)</summary>
+    <div class="diag-panel" id="diagPanel">
+        <div class="diag-header"><span>سجل الأحداث</span><button onclick="document.getElementById('diagPanel').innerHTML='<div class=\'diag-header\'><span>سجل الأحداث</span></div>'" style="background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:0.1rem 0.4rem;font-size:0.7rem;cursor:pointer">مسح</button></div>
+    </div>
+</details>
+
+<div id="entryForm">
+
+<!-- Section 1: Reporter & Case Classification -->
+<div class="card">
+    <div class="section-title">بيانات المُبلِّغ وتصنيف الحالة</div>
+    <div class="row">
+        <div class="field"><label>تصنيف الحالة *</label>
+            <select name="status" id="offStatus" onchange="handleStatusChange()">
+                <option value="">-- اختر التصنيف --</option>
+                <option value="survivor">ناجٍ (شخص أُفرج عنه / هرب)</option>
+                <option value="enforced">مغيّب قسراً (لا يُعرف مصيره)</option>
+                <option value="deceased">متوفى (مؤكد الوفاة)</option>
+            </select>
+        </div>
+        <div class="field"><label>نوع الحالة التفصيلي</label>
+            <select name="case_type" id="offCaseType"><option value="">-- اختر التصنيف أولاً --</option></select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="field"><label>اسم المُبلِّغ *</label>
+            <input type="text" name="reporter_name" required placeholder="الاسم الكامل للمُبلِّغ"></div>
+        <div class="field"><label>صلة المُبلِّغ بالضحية *</label>
+            <select name="reporter_relation" required>
+                <option value="">-- اختر الصلة --</option>
+                <option value="أم">أم</option>
+                <option value="أب">أب</option>
+                <option value="أخ">أخ</option>
+                <option value="أخت">أخت</option>
+                <option value="زوج/ة">زوج/ة</option>
+                <option value="ابن/ة">ابن/ة</option>
+                <option value="قريب">قريب</option>
+                <option value="صديق">صديق</option>
+                <option value="جار">جار</option>
+                <option value="زميل">زميل</option>
+                <option value="الشخص نفسه">الشخص نفسه</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="field"><label>هاتف المُبلِّغ</label>
+            <input type="tel" name="reporter_phone" placeholder="رقم الهاتف"></div>
+        <div class="field"><label>رقم هوية المُبلِّغ</label>
+            <input type="text" name="reporter_id" placeholder="الرقم الوطني للمُبلِّغ"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>اسم جامع البيانات</label>
+            <input type="text" name="collector_name" placeholder="اسم الموظف/المتطوع"></div>
+        <div class="field"><label>تاريخ جمع البيانات</label>
+            <input type="date" name="collection_date"></div>
+        <div class="field"><label>نوع المصدر *</label>
+            <select name="source_type" required>
+                <option value="">-- اختر نوع المصدر --</option>
+                <option value="مقابلة مباشرة">مقابلة مباشرة</option>
+                <option value="مقابلة هاتفية">مقابلة هاتفية</option>
+                <option value="وثائق رسمية">وثائق رسمية</option>
+                <option value="مصادر مفتوحة">مصادر مفتوحة (إنترنت / إعلام)</option>
+                <option value="شهادة شاهد">شهادة شاهد</option>
+                <option value="تسريبات">تسريبات</option>
+                <option value="إحالة">إحالة من منظمة / جهة أخرى</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+    </div>
+    <div class="field" style="margin-top:0.3rem">
+        <label><input type="checkbox" name="informant_consent" value="1"> أقرّ بموافقتي الواعية على جمع هذه المعلومات واستخدامها لأغراض التوثيق وفق بروتوكول بيركلي</label>
+    </div>
+</div>
+
+<!-- Section 2: Personal Info -->
+<div class="card">
+    <div class="section-title">البيانات الشخصية للضحية</div>
+    <div class="row">
+        <div class="field"><label>الاسم الأول *</label>
+            <input type="text" name="first_name" required placeholder="الاسم الأول"></div>
+        <div class="field"><label>اسم الأب *</label>
+            <input type="text" name="father_name" required placeholder="اسم الأب"></div>
+        <div class="field"><label>اسم العائلة *</label>
+            <input type="text" name="last_name" required placeholder="الكنية"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>اسم الأم</label>
+            <input type="text" name="mother_name" placeholder="اسم الأم الكامل"></div>
+        <div class="field"><label>الجنس *</label>
+            <select name="gender" required>
+                <option value="">-- اختر --</option>
+                <option value="male">ذكر</option>
+                <option value="female">أنثى</option>
+            </select>
+        </div>
+    </div>
+    <div class="row row3">
+        <div class="field"><label>يوم الميلاد</label>
+            <input type="number" name="birth_day" min="0" max="31" placeholder="اليوم"></div>
+        <div class="field"><label>شهر الميلاد</label>
+            <input type="number" name="birth_month" min="0" max="12" placeholder="الشهر"></div>
+        <div class="field"><label>سنة الميلاد</label>
+            <input type="number" name="birth_year" min="1900" max="2026" placeholder="السنة"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>المحافظة *</label>
+            <select name="province" required>
+                <option value="">-- اختر --</option>
+                <option value="اللاذقية">اللاذقية</option>
+                <option value="دمشق">دمشق</option>
+                <option value="ريف دمشق">ريف دمشق</option>
+                <option value="حلب">حلب</option>
+                <option value="حمص">حمص</option>
+                <option value="حماة">حماة</option>
+                <option value="إدلب">إدلب</option>
+                <option value="درعا">درعا</option>
+                <option value="السويداء">السويداء</option>
+                <option value="القنيطرة">القنيطرة</option>
+                <option value="الرقة">الرقة</option>
+                <option value="دير الزور">دير الزور</option>
+                <option value="الحسكة">الحسكة</option>
+                <option value="طرطوس">طرطوس</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>الرقم الوطني *</label>
+            <input type="text" name="national_id" required placeholder="الرقم الوطني"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>رقم دفتر العائلة</label>
+            <input type="text" name="family_book_number" placeholder="رقم دفتر العائلة"></div>
+        <div class="field"><label>هاتف الضحية</label>
+            <input type="tel" name="phone" placeholder="رقم الهاتف"></div>
+        <div class="field"><label>فصيلة الدم</label>
+            <select name="blood_type">
+                <option value="">--</option>
+                <option>A+</option><option>A-</option>
+                <option>B+</option><option>B-</option>
+                <option>AB+</option><option>AB-</option>
+                <option>O+</option><option>O-</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Section 3: Attachments -->
+<div class="card">
+    <div class="section-title">المرفقات</div>
+    <div class="row">
+        <div class="field">
+            <label>صورة شخصية</label>
+            <input type="file" name="photo" accept="image/*" onchange="previewFile(this,'photoPreview')">
+            <div id="photoPreview" class="file-preview"></div>
+        </div>
+        <div class="field">
+            <label>وثيقة هوية</label>
+            <input type="file" name="document" accept="image/*,.pdf" onchange="previewFile(this,'docPreview')">
+            <div id="docPreview" class="file-preview"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 4: Arrest & Detention -->
+<div class="card">
+    <div class="section-title">تفاصيل الاعتقال والاحتجاز</div>
+    <div class="row row3">
+        <div class="field"><label>يوم الاعتقال</label>
+            <input type="number" name="arrest_day" min="0" max="31" placeholder="اليوم"></div>
+        <div class="field"><label>شهر الاعتقال</label>
+            <input type="number" name="arrest_month" min="0" max="12" placeholder="الشهر"></div>
+        <div class="field"><label>سنة الاعتقال</label>
+            <input type="number" name="arrest_year" min="2000" max="2026" placeholder="السنة"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>الجهة المعتقِلة *</label>
+            <select name="arrest_authority" required>
+                <option value="">-- اختر --</option>
+                <option value="الأمن العسكري">الأمن العسكري</option>
+                <option value="الأمن السياسي">الأمن السياسي</option>
+                <option value="أمن الدولة">أمن الدولة</option>
+                <option value="المخابرات الجوية">المخابرات الجوية</option>
+                <option value="الدفاع الوطني">الدفاع الوطني</option>
+                <option value="الشرطة العسكرية">الشرطة العسكرية</option>
+                <option value="الأمن الجنائي">الأمن الجنائي</option>
+                <option value="الجيش">الجيش</option>
+                <option value="حاجز أمني">حاجز أمني</option>
+                <option value="دورية مشتركة">دورية مشتركة</option>
+                <option value="غير معروف">غير معروف</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>مكان الاحتجاز / المعتقل</label>
+            <select name="arrest_place">
+                <option value="">-- اختر --</option>
+                <option value="صيدنايا الامني (الاحمر)">صيدنايا الامني (الاحمر)</option>
+                <option value="صيدنايا القضائي (الابيض)">صيدنايا القضائي (الابيض)</option>
+                <option value="فرع 215، بسرية المداهمة والاقتحام">فرع 215، بسرية المداهمة والاقتحام</option>
+                <option value="فرع 216، فرع الدوريات">فرع 216، فرع الدوريات</option>
+                <option value="فرع 227، فرع المنطقة">فرع 227، فرع المنطقة</option>
+                <option value="فرع 235 فرع فلسطين">فرع 235 فرع فلسطين</option>
+                <option value="فرع 248، التحقيق العسكري">فرع 248، التحقيق العسكري</option>
+                <option value="فرع 251، فرع الخطيب">فرع 251، فرع الخطيب</option>
+                <option value="فرع 285، فرع التحقيق">فرع 285، فرع التحقيق</option>
+                <option value="فرع 293">فرع 293</option>
+                <option value="فرع 295، مكافحة الإرهاب">فرع 295، مكافحة الإرهاب</option>
+                <option value="فرع الأمن العسكري">فرع الأمن العسكري</option>
+                <option value="فرع الأمن السياسي">فرع الأمن السياسي</option>
+                <option value="فرع أمن الدولة">فرع أمن الدولة</option>
+                <option value="فرع المخابرات الجوية">فرع المخابرات الجوية</option>
+                <option value="السجن المدني">السجن المدني</option>
+                <option value="سجن تدمر">سجن تدمر</option>
+                <option value="سجن عدرا">سجن عدرا</option>
+                <option value="سجن حمص المركزي">سجن حمص المركزي</option>
+                <option value="مطار المزة">مطار المزة</option>
+                <option value="المدينة الرياضية">المدينة الرياضية</option>
+                <option value="غير معروف">غير معروف</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="field"><label>سبب الاعتقال *</label>
+            <input type="text" name="arrest_reason" required placeholder="مثال: مظاهرة، تقرير كيدي، حاجز..."></div>
+        <div class="field"><label>المتسبب بالاعتقال (إن وُجد)</label>
+            <input type="text" name="arrest_causer" placeholder="اسم الشخص أو الجهة"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>آخر مكان معروف</label>
+            <input type="text" name="last_known_location" placeholder="آخر مكان عُرف أن الشخص كان فيه"></div>
+        <div class="field"><label>آخر تاريخ عُرف أنه حي</label>
+            <input type="date" name="last_known_alive_date"></div>
+    </div>
+    <!-- Detention facilities -->
+    <div style="margin-top:0.5rem">
+        <label style="font-size:0.85rem;font-weight:600;">مراكز الاحتجاز (يمكن إضافة أكثر من مركز)</label>
+        <div id="detentionList"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addDetention()" style="margin-top:0.3rem">+ إضافة مركز احتجاز</button>
+    </div>
+    <!-- Companions -->
+    <div style="margin-top:0.7rem;border-top:1px solid var(--border);padding-top:0.6rem">
+        <label style="font-size:0.85rem;font-weight:600;">أشخاص كانوا معه (مرافقون)</label>
+        <p style="font-size:0.78rem;color:var(--text-light);margin:0.2rem 0 0.4rem">إذا كان المعتقل برفقة أشخاص آخرين أثناء الاعتقال أو الاحتجاز</p>
+        <div id="companionsList"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addCompanion()" style="margin-top:0.3rem">+ إضافة مرافق</button>
+    </div>
+</div>
+
+<!-- Section 5: Release (survivors) -->
+<div class="card hidden" id="releaseSection">
+    <div class="section-title">بيانات الإفراج (للناجين)</div>
+    <div class="row row3">
+        <div class="field"><label>يوم الإفراج</label>
+            <input type="number" name="release_day" min="0" max="31" placeholder="اليوم"></div>
+        <div class="field"><label>شهر الإفراج</label>
+            <input type="number" name="release_month" min="0" max="12" placeholder="الشهر"></div>
+        <div class="field"><label>سنة الإفراج</label>
+            <input type="number" name="release_year" min="2000" max="2026" placeholder="السنة"></div>
+    </div>
+    <div class="field">
+        <label>وصف تجربة الاعتقال</label>
+        <textarea name="survivor_cv_text" rows="3" placeholder="وصف مختصر لتجربة الاعتقال والاحتجاز..."></textarea>
+    </div>
+    <div class="row">
+        <div class="field">
+            <label>ملخص التجربة / السيرة الذاتية</label>
+            <input type="file" name="survivor_cv" accept="image/*,.pdf,.doc,.docx" onchange="previewFile(this,'cvPreview')">
+            <div id="cvPreview" class="file-preview"></div>
+        </div>
+        <div class="field">
+            <label>صورة بعد الإفراج</label>
+            <input type="file" name="survivor_cv_photo" accept="image/*" onchange="previewFile(this,'cvPhotoPreview')">
+            <div id="cvPhotoPreview" class="file-preview"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 6: Death -->
+<div class="card hidden" id="deathSection">
+    <div class="section-title">بيانات الوفاة</div>
+    <div class="row row3">
+        <div class="field"><label>يوم الوفاة</label>
+            <input type="number" name="death_day" min="0" max="31" placeholder="اليوم"></div>
+        <div class="field"><label>شهر الوفاة</label>
+            <input type="number" name="death_month" min="0" max="12" placeholder="الشهر"></div>
+        <div class="field"><label>سنة الوفاة</label>
+            <input type="number" name="death_year" min="2000" max="2026" placeholder="السنة"></div>
+    </div>
+    <div class="field">
+        <label>مكان الوفاة</label>
+        <input type="text" name="death_place" placeholder="مكان الوفاة إن عُرف">
+    </div>
+</div>
+
+<!-- Section 7: Digital Evidence -->
+<div class="card">
+    <div class="section-title">الأدلة الرقمية والتحقق</div>
+    <div class="row">
+        <div class="field"><label>نوع الدليل الرقمي</label>
+            <select name="digital_evidence_type" id="offDigitalType" onchange="toggleDigitalDetails()">
+                <option value="">-- لا يوجد --</option>
+                <option value="caesar_files">ملفات قي��ر</option>
+                <option value="leaked_database">تسريبات قاعدة بيانات</option>
+                <option value="social_media">وسائل التواصل الاجتماعي</option>
+                <option value="news_report">تقرير إخباري</option>
+                <option value="ngo_report">تقرير منظمة</option>
+                <option value="civil_registry">��جل مدني</option>
+                <option value="official_document">وثيقة رسمية</option>
+                <option value="other">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>مستوى الأدلة</label>
+            <select name="evidence_level">
+                <option value="unverified">غير مُتحقق منه</option>
+                <option value="low">منخفض - شهادة شفهية فقط</option>
+                <option value="medium">متوسط - دليل واحد موثق</option>
+                <option value="high">عالي - أدلة موثقة متعددة</option>
+            </select>
+        </div>
+        <div class="field"><label>عدد مصادر الأدلة</label>
+            <input type="number" name="evidence_sources_count" min="0" value="0"></div>
+    </div>
+    <div id="digitalDetailsSection" class="hidden">
+        <div class="row">
+            <div class="field"><label>رابط الدليل (إن وُجد)</label>
+                <input type="url" name="digital_evidence_url" placeholder="https://..." dir="ltr"></div>
+            <div class="field"><label>حالة الرابط</label>
+                <select name="digital_evidence_url_status">
+                    <option value="">-- اختر --</option>
+                    <option value="active">فعّال</option>
+                    <option value="deleted">محذوف</option>
+                    <option value="archived">مؤرشف</option>
+                    <option value="unknown">غير معروف</option>
+                    <option value="no_url">لم يكن هناك رابط أصلاً</option>
+                    <option value="url_forgotten">الر��بط غير متاح (نُسي)</option>
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="field"><label>رابط ��لمصدر الأصلي</label>
+                <input type="url" name="source_url" placeholder="https://... حتى لو كان الرابط محذوفاً، وثّقه هنا" dir="ltr">
+                <span style="font-size:0.75rem;color:var(--text-light)">وثّق الرابط حتى لو كان محذوفاً - مهم لإثبات المصدر</span></div>
+            <div class="field"><label>تاريخ الدليل الرقمي</label>
+                <input type="date" name="digital_evidence_date"></div>
+        </div>
+        <div class="field">
+            <label>لقطة شاشة للدليل</label>
+            <input type="file" name="digital_evidence_screenshot" accept="image/*,.pdf" onchange="previewFile(this,'ssPreview')">
+            <div id="ssPreview" class="file-preview"></div>
+        </div>
+        <div class="row">
+            <div class="field"><label>ا��اسم الوارد في الدليل</label>
+                <input type="text" name="digital_evidence_person_name" placeholder="الاسم كما ظهر في التسريبات"></div>
+            <div class="field"><label>تاريخ الوفاة الوارد في الدليل</label>
+                <input type="date" name="digital_evidence_death_date"></div>
+        </div>
+        <div class="field">
+            <label>وصف الدليل</label>
+            <textarea name="digital_evidence_description" rows="2" placeholder="وصف تفصيلي للدليل الرقمي..."></textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Section 7b: Extra Documents -->
+<div class="card">
+    <div class="section-title">وثائق وأدلة إضافية</div>
+    <p style="font-size:0.78rem;color:var(--text-light);margin-bottom:0.4rem">أوامر محكمة، كروت زيارة سجين، أوراق إفراج، لقطات شاشة تسريبات، شهادات وفاة</p>
+    <div id="extraDocsList"></div>
+    <button type="button" class="btn btn-outline btn-sm" onclick="addExtraDoc()" style="margin-top:0.3rem">+ إ��افة وثيقة</button>
+</div>
+
+<!-- Section 8: Civil Registry -->
+<div class="card">
+    <div class="section-title">حالة السجل المدني (النفوس)</div>
+    <div class="row">
+        <div class="field"><label>حالة السجل المدني</label>
+            <select name="civil_registry_status">
+                <option value="">--</option>
+                <option value="alive">حي في السجل المدني</option>
+                <option value="deceased">متوفى في السجل المدني</option>
+                <option value="unknown">غير معروف</option>
+                <option value="not_checked">لم يتم التحقق</option>
+            </select>
+        </div>
+        <div class="field"><label>تاريخ مراجعة النفوس</label>
+            <input type="date" name="civil_registry_date"></div>
+    </div>
+    <div class="field">
+        <label>وثيقة من النفوس (إخراج قيد)</label>
+        <input type="file" name="civil_registry_document" accept="image/*,.pdf" onchange="previewFile(this,'civilPreview')">
+        <div id="civilPreview" class="file-preview"></div>
+    </div>
+    <div class="field" style="margin-top:0.3rem">
+        <label><input type="checkbox" name="has_conflicting_info" value="1" id="offConflictCheck" onchange="document.getElementById('offConflictDetails').classList.toggle('hidden',!this.checked)"> يوجد تضارب في المعلومات</label>
+    </div>
+    <div id="offConflictDetails" class="hidden field">
+        <label>تفاصيل التضارب</label>
+        <textarea name="conflicting_info_details" rows="2" placeholder="مثال: التسريبات تقول متوفى لكن النفوس تقول حي..."></textarea>
+    </div>
+</div>
+
+<!-- Section 9: Witnesses -->
+<div class="card">
+    <div class="section-title">الشهود</div>
+    <div id="witnessList"></div>
+    <button type="button" class="btn btn-outline btn-sm" onclick="addWitness()">+ إضافة شاهد</button>
+</div>
+
+<!-- Section 10: Family -->
+<div class="card">
+    <div class="section-title">البيانات العائلية والاجتماعية</div>
+    <div class="row">
+        <div class="field"><label>الحالة الاجتماعية</label>
+            <select name="marital" id="offMarital" onchange="toggleSpouse()">
+                <option value="">--</option>
+                <option value="single">أعزب/عزباء</option>
+                <option value="married">متزوج/ة</option>
+                <option value="divorced">مطلق/ة</option>
+                <option value="widowed">أرمل/ة</option>
+            </select>
+        </div>
+        <div class="field"><label>اسم ولي الأمر / المعرّف</label>
+            <input type="text" name="guardian_name"></div>
+        <div class="field"><label>صلة ولي الأمر</label>
+            <input type="text" name="guardian_relation"></div>
+        <div class="field"><label>هاتف ولي الأمر</label>
+            <input type="tel" name="guardian_phone"></div>
+    </div>
+    <div id="spouseSection" class="hidden" style="margin-top:0.5rem">
+        <div class="row">
+            <div class="field"><label>اسم الزوج/ة</label>
+                <input type="text" name="spouse_name"></div>
+            <div class="field"><label>هاتف الزوج/ة</label>
+                <input type="tel" name="spouse_phone"></div>
+        </div>
+    </div>
+    <div id="exSpouseSection" class="hidden" style="margin-top:0.5rem;border-top:1px solid var(--border);padding-top:0.5rem">
+        <label style="font-size:0.85rem;font-weight:600;">بيانات الزوج/ة السابق/ة</label>
+        <div class="row">
+            <div class="field"><label>اسم الزوج/ة السابق/ة</label>
+                <input type="text" name="ex_spouse_name"></div>
+            <div class="field"><label>أطفال من الزواج السابق؟</label>
+                <select name="has_kids_w" onchange="document.getElementById('kidsWField').classList.toggle('hidden',this.value!=='yes')">
+                    <option value="no">لا</option>
+                    <option value="yes">نعم</option>
+                </select>
+            </div>
+            <div class="field hidden" id="kidsWField"><label>عددهم</label>
+                <input type="number" name="kids_count_w" min="0" value="0"></div>
+        </div>
+    </div>
+    <!-- Children -->
+    <div style="margin-top:0.7rem;border-top:1px solid var(--border);padding-top:0.5rem">
+        <label style="font-size:0.85rem;font-weight:600;">المسح الاجتماعي للأطفال</label>
+        <div id="childrenList"></div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addChild()" style="margin-top:0.3rem">+ إضافة طفل</button>
+    </div>
+</div>
+
+<!-- Section 11: Housing & Economy -->
+<div class="card">
+    <div class="section-title">البيانات السكنية والاقتصادية</div>
+    <div class="row">
+        <div class="field"><label>المنطقة / الحي</label>
+            <select name="address_area">
+                <option value="">-- اختر المنطقة --</option>
+                <option value="الرمل الجنوبي">الرمل الجنوبي</option>
+                <option value="قنينص">قنينص</option>
+                <option value="الحفة">الحفة</option>
+                <option value="الصليبة">الصليبة</option>
+                <option value="العوينة">العوينة</option>
+                <option value="الأشرفية">الأشرفية</option>
+                <option value="بستان الصيداوي">بستان الصيداوي</option>
+                <option value="الطابيات">الطابيات</option>
+                <option value="شيخ ضاهر">شيخ ضاهر</option>
+                <option value="حي القصور">حي القصور</option>
+                <option value="مرتقلا">مرتقلا</option>
+                <option value="شارع انطاكيا">شارع انطاكيا</option>
+                <option value="حي السجن">حي السجن</option>
+                <option value="مشروع القلعة">مشروع القلعة</option>
+                <option value="شارع ميسلون">شارع ميسلون</option>
+                <option value="سوق الداية">سوق الداية</option>
+                <option value="الريجي">الريجي</option>
+                <option value="شارع بور سعيد">شارع بور سعيد</option>
+                <option value="حي الفاروس">حي الفاروس</option>
+                <option value="طريق الحرش">طريق الحرش</option>
+                <option value="خارج اللاذقية">خارج اللاذقية</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>العنوان الحالي *</label>
+            <input type="text" name="address" required placeholder="العنوان التفصيلي"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>نوع السكن *</label>
+            <select name="housing_type" required>
+                <option value="">-- اختر --</option>
+                <option value="ملك">ملك</option>
+                <option value="إيجار">إيجار</option>
+                <option value="رهن">رهن</option>
+                <option value="مستضاف">مستضاف</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>مبلغ الإيجار (إن وُجد)</label>
+            <input type="text" name="rent_amount" placeholder="بالليرة السورية"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>الوضع الوظيفي</label>
+            <input type="text" name="employment" placeholder="يعمل / لا يعمل"></div>
+        <div class="field"><label>المهنة</label>
+            <input type="text" name="profession"></div>
+        <div class="field"><label>جهة العمل</label>
+            <input type="text" name="employer"></div>
+    </div>
+    <div class="row">
+        <div class="field"><label>المعيل</label>
+            <input type="text" name="breadwinner" placeholder="اسم المعيل"></div>
+        <div class="field"><label>مهنة المعيل</label>
+            <input type="text" name="breadwinner_job"></div>
+        <div class="field"><label>صلة المعيل بالضحية</label>
+            <select name="breadwinner_relation">
+                <option value="">-- اختر --</option>
+                <option value="أم">أم</option>
+                <option value="أب">أب</option>
+                <option value="أخ">أخ</option>
+                <option value="أخت">أخت</option>
+                <option value="زوج/ة">زوج/ة</option>
+                <option value="ابن/ة">ابن/ة</option>
+                <option value="قريب">قريب</option>
+                <option value="صديق">صديق</option>
+                <option value="جار">جار</option>
+                <option value="زميل">زميل</option>
+                <option value="الشخص نفسه">الشخص نفسه</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Section 12: Education -->
+<div class="card">
+    <div class="section-title">التحصيل العلمي</div>
+    <div class="row">
+        <div class="field"><label>المستوى التعليمي</label>
+            <select name="education">
+                <option value="">--</option>
+                <option value="أمّي">أمّي</option>
+                <option value="ابتدائية">ابتدائية</option>
+                <option value="إعدادية">إعدادية</option>
+                <option value="ثانوية">ثانوية</option>
+                <option value="معهد">معهد</option>
+                <option value="بكالوريوس">بكالوريوس</option>
+                <option value="ماجستير">ماجستير</option>
+                <option value="دكتوراه">دكتوراه</option>
+            </select>
+        </div>
+        <div class="field"><label>نوع الدراسة</label>
+            <select name="edu_type">
+                <option value="">--</option>
+                <option value="علمي">علمي</option>
+                <option value="أدبي">أدبي</option>
+                <option value="شرعي">شرعي</option>
+                <option value="مهني">مهني</option>
+                <option value="تجاري">تجاري</option>
+                <option value="صناعي">صناعي</option>
+                <option value="نسوي">نسوي</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="field"><label>الاختصاص</label>
+            <input type="text" name="edu_specialization"></div>
+        <div class="field"><label>الجامعة / المعهد</label>
+            <input type="text" name="edu_university"></div>
+    </div>
+</div>
+
+<!-- Section 13: Health -->
+<div class="card">
+    <div class="section-title">الحالة الصحية</div>
+    <div class="field">
+        <label>الأمراض المزمنة (اختر ما ينطبق)</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.3rem 0.8rem;margin:0.3rem 0">
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="ضغط الدم"> ضغط الدم</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="السكري"> السكري</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الربو"> الربو</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أمراض القلب"> أمراض القلب</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الكلى"> الكلى</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الكبد"> الكبد</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="السرطان"> السرطان</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الصرع"> الصرع</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الثلاسيميا"> الثلاسيميا</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="فقر الدم"> فقر الدم</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="التهاب المفاصل"> التهاب المفاصل</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="هشاشة العظام"> هشاشة العظام</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="الغدة الدرقية"> الغدة الدرقية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أمراض الجهاز الهضمي"> أمراض الجهاز الهضمي</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أمراض الجهاز التنفسي"> أمراض الجهاز التنفسي</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أمراض نفسية"> أمراض نفسية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="اكتئاب"> اكتئاب</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="اضطراب ما بعد الصدمة (PTSD)"> PTSD</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="إعاقة حركية"> إعاقة حركية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="إعاقة بصرية"> إعاقة بصرية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="إعاقة سمعية"> إعاقة سمعية</label>
+            <label style="font-size:0.82rem"><input type="checkbox" name="chronic_list" value="أخرى"> أخرى</label>
+        </div>
+        <input type="text" name="other_diseases" placeholder="أمراض أخرى غير مذكورة..." style="margin-top:0.3rem">
+    </div>
+    <div class="field" style="margin-top:0.3rem">
+        <label><input type="checkbox" name="has_special_needs" value="1" id="offSpecialCheck" onchange="document.getElementById('offSpecialDetails').classList.toggle('hidden',!this.checked)"> احتياجات خاصة</label>
+    </div>
+    <div id="offSpecialDetails" class="hidden field">
+        <label>تفاصيل الاحتياجات الخاصة</label>
+        <input type="text" name="special_needs_details" placeholder="تفاصيل الاحتياجات الخاصة">
+    </div>
+</div>
+
+<!-- Section 14: Legal & Associations -->
+<div class="card">
+    <div class="section-title">المشاكل القانونية والجمعيات</div>
+    <div class="row">
+        <div class="field"><label>مشاكل قانونية</label>
+            <select name="legal" onchange="document.getElementById('offLegalDetails').classList.toggle('hidden',this.value!=='نعم')">
+                <option value="">--</option>
+                <option value="نعم">نعم</option>
+                <option value="لا">لا</option>
+            </select>
+        </div>
+        <div class="field"><label>مسجّل لدى جمعية</label>
+            <select name="assoc" onchange="document.getElementById('offAssocDetails').classList.toggle('hidden',this.value!=='نعم')">
+                <option value="">--</option>
+                <option value="نعم">نعم</option>
+                <option value="لا">لا</option>
+            </select>
+        </div>
+    </div>
+    <div id="offLegalDetails" class="hidden field">
+        <textarea name="legal_details" rows="2" placeholder="تفاصيل المشاكل القانونية"></textarea>
+    </div>
+    <div id="offAssocDetails" class="hidden field">
+        <div class="row">
+            <div class="field"><input type="text" name="assoc_name" placeholder="اسم الجمعية"></div>
+            <div class="field"><input type="text" name="service_type" placeholder="نوع الخدمة المقدمة"></div>
+        </div>
+    </div>
+    <div class="field" style="margin-top:0.3rem">
+        <label><input type="checkbox" name="is_officially_registered" value="1"> مسجّل رسمياً لدى جهة حكومية</label>
+    </div>
+</div>
+
+<!-- Section 15: Notes & Methodology -->
+<div class="card">
+    <div class="section-title">ملاحظات إضافية ومنهجية التوثيق</div>
+    <div class="field">
+        <textarea name="notes" rows="4" placeholder="أي ملاحظات إضافية أو معلومات لم تُذكر أعلاه..."></textarea>
+    </div>
+    <div class="field" style="margin-top:0.5rem">
+        <label style="font-weight:600;font-size:0.85rem">منهجية التوثيق (اختر الوسوم المناسبة)</label>
+        <div id="methodologyTags" style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-top:0.3rem">
+            <button type="button" class="method-tag" data-tag="مقابلة مباشرة">مقابلة مباشرة</button>
+            <button type="button" class="method-tag" data-tag="مقابلة هاتفية">مقابلة هاتفية</button>
+            <button type="button" class="method-tag" data-tag="مقابلة عبر الإنترنت">مقابلة عبر الإنترنت</button>
+            <button type="button" class="method-tag" data-tag="شهادة شاهد عيان">شهادة شاهد عيان</button>
+            <button type="button" class="method-tag" data-tag="شهادة أحد الأقارب">شهادة أحد الأقارب</button>
+            <button type="button" class="method-tag" data-tag="تسريبات قيصر">تسريبات قيصر</button>
+            <button type="button" class="method-tag" data-tag="وثائق رسمية">وثائق رسمية</button>
+            <button type="button" class="method-tag" data-tag="بيانات السجل المدني">بيانات السجل المدني</button>
+            <button type="button" class="method-tag" data-tag="تقارير إعلامية">تقارير إعلامية</button>
+            <button type="button" class="method-tag" data-tag="منشورات وسائل التواصل">منشورات وسائل التواصل</button>
+            <button type="button" class="method-tag" data-tag="تقارير منظمات حقوقية">تقارير منظمات حقوقية</button>
+            <button type="button" class="method-tag" data-tag="أرشيف رقمي">أرشيف رقمي</button>
+            <button type="button" class="method-tag" data-tag="تحليل صور/فيديو">تحليل صور/فيديو</button>
+            <button type="button" class="method-tag" data-tag="تقاطع معلومات من مصادر متعددة">تقاطع معلومات</button>
+            <button type="button" class="method-tag" data-tag="زيارة ميدانية">زيارة ميدانية</button>
+            <button type="button" class="method-tag" data-tag="بلاغ مجهول">بلاغ مجهول</button>
+        </div>
+    </div>
+    <div class="row" style="margin-top:0.4rem">
+        <div class="field"><label>نوع المنهجية</label>
+            <select name="methodology_type">
+                <option value="">-- اختر --</option>
+                <option value="interview">مقابلة شخصية</option>
+                <option value="document_review">مراجعة وثائق</option>
+                <option value="open_source">تحقيق مصادر مفتوحة</option>
+                <option value="field_visit">زيارة ميدانية</option>
+                <option value="remote_interview">مقابلة عن بعد</option>
+                <option value="database_cross_ref">تقاطع قواعد بيانات</option>
+                <option value="witness_testimony">شهادة شاهد</option>
+                <option value="other">أخرى</option>
+            </select>
+        </div>
+        <div class="field"><label>ملاحظات المنهجية</label>
+            <textarea name="methodology_notes" rows="2" placeholder="ملاحظات حول منهجية جمع البيانات..."></textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Submit buttons — stacked on mobile -->
+<div style="padding:0.8rem 0 1.5rem;display:flex;flex-direction:column;gap:0.5rem">
+    <button type="button" class="btn btn-primary btn-block" onclick="saveEntry()" style="padding:0.85rem;font-size:1.05rem">حفظ الحالة محلياً</button>
+    <button type="button" class="btn btn-outline btn-block" onclick="resetForm()">مسح النموذج</button>
+</div>
+
+</div><!-- end entryForm -->
+</div><!-- end tab-form -->
+
+</div><!-- end container -->
+
+<!-- Bottom Tab Bar (mobile) -->
+<div class="bottom-tabs">
+    <div class="bottom-tab active" onclick="switchTab('form')" id="btab-form">
+        <span class="tab-icon">&#x1F4DD;</span>
+        نموذج جديد
+    </div>
+    <div class="bottom-tab" onclick="switchTab('entries')" id="btab-entries">
+        <span class="tab-icon">&#x1F4CB;</span>
+        المحفوظة
+        <span class="tab-badge" id="entriesCountBadge" style="display:none">0</span>
+    </div>
+    <div class="bottom-tab" onclick="switchTab('settings')" id="btab-settings">
+        <span class="tab-icon">&#x2699;&#xFE0F;</span>
+        مزامنة
+    </div>
+</div>
+
+<script>
+// ===================== Storage Layer (IndexedDB with localStorage fallback) =====================
+const DB_NAME = 'HaqqunaOffline';
+const DB_VERSION = 1;
+const LS_KEY = 'haqquna_entries_fallback';
+let db = null;
+let storageMode = 'unknown'; // 'idb' | 'localstorage' | 'memory'
+let memoryStore = {};
+
+function openDB() {
+    return new Promise((resolve) => {
+        if (typeof indexedDB === 'undefined' || !indexedDB) {
+            storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+            diagAdd('IndexedDB غير متاح — وضع التخزين: ' + storageMode, storageMode === 'memory' ? 'error' : 'warn');
+            if (storageMode === 'memory') {
+                diagAdd('تحذير خطير: التخزين في الذاكرة فقط! البيانات ستضيع عند إغلاق المتصفح. الحل: افتح المتصفح في الوضع العادي', 'error');
+            }
+            resolve(null);
+            return;
+        }
+        let resolved = false;
+        const timeoutId = setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+                diagAdd('IndexedDB لم يستجب خلال 3 ثوانٍ (timeout) — بديل: ' + storageMode, 'warn');
+                diagAdd('الحل: أغلق جميع نوافذ هذا الموقع الأخرى ثم أعد تحميل الصفحة', 'warn');
+                resolve(null);
+            }
+        }, 3000);
+
+        try {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = e => {
+                const d = e.target.result;
+                if (!d.objectStoreNames.contains('entries')) {
+                    const store = d.createObjectStore('entries', { keyPath: 'client_uuid' });
+                    store.createIndex('status', 'status', { unique: false });
+                    store.createIndex('created_at', 'created_at', { unique: false });
+                }
+                if (!d.objectStoreNames.contains('files')) {
+                    d.createObjectStore('files', { keyPath: 'id' });
+                }
+                diagAdd('تم إنشاء/تحديث قاعدة البيانات المحلية', 'ok');
+            };
+            req.onsuccess = e => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timeoutId);
+                db = e.target.result;
+                storageMode = 'idb';
+                diagAdd('IndexedDB جاهز — التخزين يعمل بشكل طبيعي', 'ok');
+                resolve(db);
+            };
+            req.onerror = e => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timeoutId);
+                const errDetail = e.target.error ? e.target.error.message || e.target.error.name : 'unknown';
+                storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+                diagAdd('خطأ في فتح IndexedDB: ' + errDetail + ' — بديل: ' + storageMode, 'error');
+                if (storageMode === 'localstorage') {
+                    diagAdd('التخزين البديل (localStorage) يعمل لكن بسعة محدودة (~5MB). قلّل المرفقات.', 'warn');
+                } else {
+                    diagAdd('لا يوجد تخزين دائم! البيانات ستضيع. افتح الوضع العادي للمتصفح.', 'error');
+                }
+                resolve(null);
+            };
+            req.onblocked = () => {
+                diagAdd('IndexedDB محظور — أغلق النوافذ/التبويبات الأخرى لهذا الموقع', 'warn');
+            };
+        } catch (e) {
+            if (resolved) return;
+            resolved = true;
+            clearTimeout(timeoutId);
+            storageMode = testLocalStorage() ? 'localstorage' : 'memory';
+            diagAdd('استثناء IndexedDB: ' + e.message + ' — بديل: ' + storageMode, 'error');
+            if (storageMode === 'memory') {
+                diagAdd('البيانات في الذاكرة فقط! لن تُحفظ بعد الإغلاق. الحل: وضع عادي أو متصفح آخر', 'error');
+            }
+            resolve(null);
+        }
+    });
+}
+
+function testLocalStorage() {
+    try {
+        const k = '__haqquna_test__';
+        localStorage.setItem(k, '1');
+        localStorage.removeItem(k);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function lsGetAll() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
+}
+function lsSetAll(obj) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(obj)); return true; }
+    catch (e) {
+        // QuotaExceeded — too many photos in localStorage
+        showToast('تجاوزت سعة التخزين المحلية! امسح الحالات المتزامنة أو قلّل عدد الصور.', 'error');
+        return false;
+    }
+}
+
+function dbPut(store, data) {
+    return new Promise((resolve, reject) => {
+        if (storageMode === 'idb' && db) {
+            const tx = db.transaction(store, 'readwrite');
+            tx.objectStore(store).put(data);
+            tx.oncomplete = () => resolve();
+            tx.onerror = e => reject(e.target.error);
+        } else if (storageMode === 'localstorage') {
+            const all = lsGetAll();
+            if (!all[store]) all[store] = {};
+            all[store][data.client_uuid || data.id] = data;
+            lsSetAll(all) ? resolve() : reject(new Error('localStorage quota exceeded'));
+        } else {
+            if (!memoryStore[store]) memoryStore[store] = {};
+            memoryStore[store][data.client_uuid || data.id] = data;
+            resolve();
+        }
+    });
+}
+
+function dbGet(store, key) {
+    return new Promise((resolve, reject) => {
+        if (storageMode === 'idb' && db) {
+            const tx = db.transaction(store, 'readonly');
+            const req = tx.objectStore(store).get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = e => reject(e.target.error);
+        } else {
+            const all = storageMode === 'localstorage' ? lsGetAll() : memoryStore;
+            resolve((all[store] || {})[key] || null);
+        }
+    });
+}
+
+function dbGetAll(store) {
+    return new Promise((resolve, reject) => {
+        if (storageMode === 'idb' && db) {
+            const tx = db.transaction(store, 'readonly');
+            const req = tx.objectStore(store).getAll();
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = e => reject(e.target.error);
+        } else {
+            const all = storageMode === 'localstorage' ? lsGetAll() : memoryStore;
+            resolve(Object.values(all[store] || {}));
+        }
+    });
+}
+
+function dbDelete(store, key) {
+    return new Promise((resolve, reject) => {
+        if (storageMode === 'idb' && db) {
+            const tx = db.transaction(store, 'readwrite');
+            tx.objectStore(store).delete(key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = e => reject(e.target.error);
+        } else if (storageMode === 'localstorage') {
+            const all = lsGetAll();
+            if (all[store]) delete all[store][key];
+            lsSetAll(all);
+            resolve();
+        } else {
+            if (memoryStore[store]) delete memoryStore[store][key];
+            resolve();
+        }
+    });
+}
+
+function uuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+
+// ===================== Toast Notifications =====================
+function showToast(msg, type, duration) {
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + (type || 'info');
+    if (msg.includes('\n')) {
+        t.style.whiteSpace = 'pre-wrap';
+        t.style.textAlign = 'right';
+        t.style.maxWidth = '92vw';
+        t.style.fontSize = '0.82rem';
+        t.style.lineHeight = '1.6';
+    }
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), duration || (type === 'error' ? 8000 : 3500));
+}
+
+// ===================== Diagnostic Logging =====================
+let diagLog = [];
+const DIAG_MAX = 50;
+
+function diagAdd(msg, level) {
+    level = level || 'info';
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('ar-EG', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const entry = { time: timeStr, msg: msg, level: level, ts: now.getTime() };
+    diagLog.push(entry);
+    if (diagLog.length > DIAG_MAX) diagLog.shift();
+    const panel = document.getElementById('diagPanel');
+    if (panel) {
+        const cls = level === 'ok' ? 'd-ok' : level === 'warn' ? 'd-warn' : level === 'error' ? 'd-err' : 'd-info';
+        const line = document.createElement('div');
+        line.className = 'diag-line ' + cls;
+        line.innerHTML = '<span class="d-time">' + timeStr + '</span> ' + msg;
+        panel.appendChild(line);
+        panel.scrollTop = panel.scrollHeight;
+    }
+}
+
+function updateStatusStrip() {
+    const ssConn = document.getElementById('ssConn');
+    const ssStorage = document.getElementById('ssStorage');
+    if (ssStorage) {
+        const modeMap = { 'idb': 'IndexedDB', 'localstorage': 'localStorage', 'memory': 'ذاكرة مؤقتة' };
+        const modeLabel = modeMap[storageMode] || storageMode;
+        ssStorage.className = 'ss-item ' + (storageMode === 'idb' ? 'ss-storage-idb' : storageMode === 'localstorage' ? 'ss-storage-ls' : 'ss-storage-mem');
+        ssStorage.textContent = 'التخزين: ' + modeLabel;
+    }
+}
+
+function updateLastSave(success, name) {
+    const el = document.getElementById('ssLastSave');
+    if (!el) return;
+    const now = new Date().toLocaleTimeString('ar-EG', {hour:'2-digit',minute:'2-digit'});
+    if (success) {
+        el.style.background = '#d1fae5';
+        el.style.color = '#065f46';
+        el.textContent = 'آخر حفظ: ' + now + ' (' + name + ')';
+    } else {
+        el.style.background = '#fee2e2';
+        el.style.color = '#991b1b';
+        el.textContent = 'فشل الحفظ: ' + now;
+    }
+}
+
+async function checkServerConnection() {
+    const ssConn = document.getElementById('ssConn');
+    let url = document.getElementById('serverUrl').value.trim();
+    if (!url) {
+        if (ssConn) { ssConn.className = 'ss-item ss-conn-unknown'; ssConn.textContent = 'السرفر: غير مُعدّ'; }
+        return;
+    }
+    if (!url.startsWith('http')) url = 'http://' + url;
+    const base = url.replace(/\/+$/, '');
+
+    if (needsBridge(base)) {
+        // Cross-origin: can't auto-check without opening a popup.
+        // Show neutral status; user can test manually.
+        if (ssConn) { ssConn.className = 'ss-item ss-conn-unknown'; ssConn.textContent = 'السرفر: اضغط اختبار الاتصال'; }
+        return;
+    }
+
+    try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 5000);
+        const resp = await fetch(base + '/api/sync/ping', { method:'GET', mode:'cors', signal:ctrl.signal, cache:'no-store' });
+        clearTimeout(tid);
+        if (resp.ok) {
+            if (ssConn) { ssConn.className = 'ss-item ss-conn-ok'; ssConn.textContent = 'السرفر: متصل'; }
+            diagAdd('اتصال بالسرفر ناجح: ' + base, 'ok');
+        } else {
+            if (ssConn) { ssConn.className = 'ss-item ss-conn-off'; ssConn.textContent = 'السرفر: خطأ ' + resp.status; }
+            diagAdd('السرفر استجاب بخطأ: HTTP ' + resp.status, 'warn');
+        }
+    } catch (e) {
+        if (ssConn) { ssConn.className = 'ss-item ss-conn-off'; ssConn.textContent = 'السرفر: غير متصل'; }
+        const reason = e.name === 'AbortError' ? 'انتهت المهلة (5 ثوانٍ)' : e.message;
+        diagAdd('فشل الاتصال بالسرفر: ' + reason, 'error');
+    }
+}
+
+// ===================== Tab Switching =====================
+function switchTab(name) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    // Desktop tabs
+    document.querySelectorAll('.tabs .tab').forEach(el => el.classList.remove('active'));
+    const tabs = document.querySelectorAll('.tabs .tab');
+    if (name === 'form') tabs[0] && tabs[0].classList.add('active');
+    else if (name === 'entries') tabs[1] && tabs[1].classList.add('active');
+    else tabs[2] && tabs[2].classList.add('active');
+    // Bottom tabs (mobile)
+    document.querySelectorAll('.bottom-tab').forEach(el => el.classList.remove('active'));
+    const bt = document.getElementById('btab-' + name);
+    if (bt) bt.classList.add('active');
+    if (name === 'entries') renderEntries();
+    if (name === 'settings') updateStats();
+    window.scrollTo(0, 0);
+}
+
+// ===================== Status Change Logic =====================
+function handleStatusChange() {
+    const st = document.getElementById('offStatus').value;
+    const rel = document.getElementById('releaseSection');
+    const death = document.getElementById('deathSection');
+    rel.classList.toggle('hidden', st !== 'survivor');
+    death.classList.toggle('hidden', st !== 'deceased');
+    updateCaseTypes(st);
+}
+
+function updateCaseTypes(status) {
+    const sel = document.getElementById('offCaseType');
+    sel.innerHTML = '<option value="">-- اختر --</option>';
+    const opts = {
+        'survivor': [
+            ['survivor_documented','ناجٍ - لديه وثائق'],
+            ['survivor_undocumented','ناجٍ - بدون وثائق']
+        ],
+        'enforced': [
+            ['enforced_disappearance_no_info','اختفاء قسري - لا معلومات بعد الاعتقال'],
+            ['enforced_disappearance_leaked_not_confirmed','تسريبات تؤكد الوفاة - غير مؤكد بالنفوس'],
+            ['enforced_disappearance_witnesses_alive_registry','شهود على الاعتقال - حي بالنفوس']
+        ],
+        'deceased': [
+            ['enforced_disappearance_leaked_confirmed_dead','تسريبات + مؤكد بالنفوس'],
+            ['enforced_disappearance_civil_registry_dead','متوفى بحسب النفوس فقط'],
+            ['deceased_caesar_files','متوفى - ملفات قيصر']
+        ]
+    };
+    (opts[status] || []).forEach(([v, t]) => {
+        sel.innerHTML += '<option value="' + v + '">' + t + '</option>';
+    });
+}
+
+// ===================== Toggle Helpers =====================
+function toggleDigitalDetails() {
+    const v = document.getElementById('offDigitalType').value;
+    document.getElementById('digitalDetailsSection').classList.toggle('hidden', !v);
+}
+
+function toggleSpouse() {
+    const v = document.getElementById('offMarital').value;
+    document.getElementById('spouseSection').classList.toggle('hidden', v !== 'married' && v !== 'widowed');
+    document.getElementById('exSpouseSection').classList.toggle('hidden', v !== 'divorced');
+}
+
+// ===================== File Preview =====================
+function previewFile(input, previewId) {
+    const container = document.getElementById(previewId);
+    container.innerHTML = '';
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const div = document.createElement('div');
+    div.className = 'file-preview';
+    if (file.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        div.appendChild(img);
+    }
+    div.appendChild(document.createTextNode(file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)'));
+    container.appendChild(div);
+}
+
+// ===================== Dynamic Rows: Detention, Witnesses, Children, Companions, Extra Docs =====================
+let detentionCount = 0, witnessCount = 0, childCount = 0, companionCount = 0, extraDocCount = 0;
+
+function addDetention(data) {
+    detentionCount++;
+    const d = data || {};
+    const div = document.createElement('div');
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div class="field" style="margin-left:2rem"><label style="font-size:0.8rem">اسم المركز</label><input type="text" class="det-name" value="' + (d.facility_name||'') + '"></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">من تاريخ</label><input type="text" class="det-from" placeholder="شهر/سنة" value="' + (d.date_from||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">إلى تاريخ</label><input type="text" class="det-to" placeholder="شهر/سنة" value="' + (d.date_to||'') + '"></div></div>' +
+        '<div class="field"><label style="font-size:0.8rem">ملاحظات</label><input type="text" class="det-notes" value="' + (d.notes||'') + '"></div>';
+    document.getElementById('detentionList').appendChild(div);
+}
+
+function addWitness(data) {
+    witnessCount++;
+    const d = data || {};
+    const div = document.createElement('div');
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div class="field" style="margin-left:2rem"><label style="font-size:0.8rem">الاسم</label><input type="text" class="wit-name" value="' + (d.name||'') + '"></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">الصلة</label><input type="text" class="wit-relation" value="' + (d.relation||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">التواصل</label><input type="text" class="wit-contact" value="' + (d.contact||'') + '"></div></div>' +
+        '<div class="field"><label style="font-size:0.8rem">ملخص الشهادة</label><input type="text" class="wit-summary" value="' + (d.testimony_summary||'') + '"></div>';
+    document.getElementById('witnessList').appendChild(div);
+}
+
+function addChild(data) {
+    childCount++;
+    const d = data || {};
+    const div = document.createElement('div');
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div class="field" style="margin-left:2rem"><label style="font-size:0.8rem">اسم الطفل</label><input type="text" class="ch-name" value="' + (d.name||'') + '"></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">سنة الميلاد</label><input type="number" class="ch-year" min="1990" max="2026" value="' + (d.birth_year||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">الجنس</label><select class="ch-gender"><option value="">--</option><option value="male"' + (d.gender==='male'?' selected':'') + '>ذكر</option><option value="female"' + (d.gender==='female'?' selected':'') + '>أنثى</option></select></div></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">مدرسة</label><select class="ch-school"><option value="">--</option><option value="yes"' + (d.in_school==='yes'?' selected':'') + '>نعم</option><option value="no"' + (d.in_school==='no'?' selected':'') + '>لا</option></select></div>' +
+        '<div class="field"><label style="font-size:0.8rem">احت. خاصة</label><select class="ch-special"><option value="">--</option><option value="نعم"' + (d.special_needs==='نعم'?' selected':'') + '>نعم</option><option value="لا"' + (d.special_needs==='لا'?' selected':'') + '>لا</option></select></div></div>';
+    document.getElementById('childrenList').appendChild(div);
+}
+
+// ===================== Collect Dynamic Data =====================
+function collectDetentions() {
+    const list = [];
+    document.querySelectorAll('#detentionList > div').forEach(div => {
+        const name = div.querySelector('.det-name');
+        if (name && name.value.trim()) {
+            list.push({
+                facility_name: name.value.trim(),
+                date_from: div.querySelector('.det-from').value.trim(),
+                date_to: div.querySelector('.det-to').value.trim(),
+                notes: div.querySelector('.det-notes').value.trim()
+            });
+        }
+    });
+    return list;
+}
+
+function collectWitnesses() {
+    const list = [];
+    document.querySelectorAll('#witnessList > div').forEach(div => {
+        const name = div.querySelector('.wit-name');
+        if (name && name.value.trim()) {
+            list.push({
+                name: name.value.trim(),
+                relation: div.querySelector('.wit-relation').value.trim(),
+                contact: div.querySelector('.wit-contact').value.trim(),
+                testimony_summary: div.querySelector('.wit-summary').value.trim()
+            });
+        }
+    });
+    return list;
+}
+
+function collectChildren() {
+    const list = [];
+    document.querySelectorAll('#childrenList > div').forEach(div => {
+        const name = div.querySelector('.ch-name');
+        if (name && name.value.trim()) {
+            list.push({
+                name: name.value.trim(),
+                birth_year: div.querySelector('.ch-year').value || '',
+                gender: div.querySelector('.ch-gender').value,
+                in_school: div.querySelector('.ch-school').value,
+                special_needs: div.querySelector('.ch-special').value
+            });
+        }
+    });
+    return list;
+}
+
+// ===================== Companions =====================
+function addCompanion(data) {
+    companionCount++;
+    const d = data || {};
+    const div = document.createElement('div');
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div class="row3" style="margin-left:2rem"><div class="field"><label style="font-size:0.8rem">الاسم الأول *</label><input type="text" class="comp-first" value="' + (d.first_name||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">اسم الأب</label><input type="text" class="comp-father" value="' + (d.father_name||'') + '"></div></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">الكنية</label><input type="text" class="comp-last" value="' + (d.last_name||'') + '"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">اسم الأم</label><input type="text" class="comp-mother" value="' + (d.mother_name||'') + '"></div></div>' +
+        '<div class="field"><label style="font-size:0.8rem">ملاحظة</label><input type="text" class="comp-notes" value="' + (d.notes||'') + '" placeholder="مثال: كان معه في نفس الزنزانة..."></div>';
+    document.getElementById('companionsList').appendChild(div);
+}
+
+function collectCompanions() {
+    const list = [];
+    document.querySelectorAll('#companionsList > div').forEach(div => {
+        const first = div.querySelector('.comp-first');
+        if (first && first.value.trim()) {
+            list.push({
+                first_name: first.value.trim(),
+                father_name: (div.querySelector('.comp-father')||{}).value||'',
+                last_name: (div.querySelector('.comp-last')||{}).value||'',
+                mother_name: (div.querySelector('.comp-mother')||{}).value||'',
+                notes: (div.querySelector('.comp-notes')||{}).value||''
+            });
+        }
+    });
+    return list;
+}
+
+// ===================== Extra Documents =====================
+function addExtraDoc(data) {
+    extraDocCount++;
+    const d = data || {};
+    const idx = extraDocCount;
+    const div = document.createElement('div');
+    div.className = 'dyn-row';
+    div.innerHTML = '<button type="button" class="dyn-remove" onclick="this.parentElement.remove()">&times;</button>' +
+        '<div style="margin-left:2rem"><strong style="font-size:0.82rem">وثيقة #' + idx + '</strong></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">نوع الوثيقة</label><select class="edoc-type">' +
+        '<option value="">--</option>' +
+        '<option value="court_order"' + (d.doc_type==='court_order'?' selected':'') + '>أمر محكمة</option>' +
+        '<option value="visit_card"' + (d.doc_type==='visit_card'?' selected':'') + '>كرت زيارة سجين</option>' +
+        '<option value="release_paper"' + (d.doc_type==='release_paper'?' selected':'') + '>ورقة إفراج</option>' +
+        '<option value="death_certificate"' + (d.doc_type==='death_certificate'?' selected':'') + '>شهادة وفاة</option>' +
+        '<option value="leaked_screenshot"' + (d.doc_type==='leaked_screenshot'?' selected':'') + '>لقطة شاشة تسريب</option>' +
+        '<option value="witness_letter"' + (d.doc_type==='witness_letter'?' selected':'') + '>رسالة / شهادة شاهد</option>' +
+        '<option value="id_document"' + (d.doc_type==='id_document'?' selected':'') + '>وثيقة هوية</option>' +
+        '<option value="civil_registry_doc"' + (d.doc_type==='civil_registry_doc'?' selected':'') + '>إخراج قيد / سجل مدني</option>' +
+        '<option value="medical_report"' + (d.doc_type==='medical_report'?' selected':'') + '>تقرير طبي</option>' +
+        '<option value="ngo_report"' + (d.doc_type==='ngo_report'?' selected':'') + '>تقرير منظمة</option>' +
+        '<option value="photo_evidence"' + (d.doc_type==='photo_evidence'?' selected':'') + '>صورة كدليل</option>' +
+        '<option value="other"' + (d.doc_type==='other'?' selected':'') + '>أخرى</option>' +
+        '</select></div>' +
+        '<div class="field"><label style="font-size:0.8rem">تاريخ الوثيقة</label><input type="date" class="edoc-date" value="' + (d.doc_date||'') + '"></div></div>' +
+        '<div class="field"><label style="font-size:0.8rem">الملف</label><input type="file" class="edoc-file" accept="image/*,.pdf,.doc,.docx" style="font-size:0.85rem;border-style:dashed"></div>' +
+        '<div class="row3"><div class="field"><label style="font-size:0.8rem">رابط المصدر</label><input type="url" class="edoc-url" value="' + (d.doc_url||'') + '" placeholder="https://..." dir="ltr"></div>' +
+        '<div class="field"><label style="font-size:0.8rem">وصف مختصر</label><input type="text" class="edoc-desc" value="' + (d.doc_desc||'') + '" placeholder="مثال: أمر محكمة ميدانية..."></div></div>';
+    document.getElementById('extraDocsList').appendChild(div);
+}
+
+function collectExtraDocs() {
+    const list = [];
+    document.querySelectorAll('#extraDocsList > div').forEach(div => {
+        const type = div.querySelector('.edoc-type');
+        list.push({
+            doc_type: (type||{}).value||'',
+            doc_date: (div.querySelector('.edoc-date')||{}).value||'',
+            doc_url: (div.querySelector('.edoc-url')||{}).value||'',
+            doc_desc: (div.querySelector('.edoc-desc')||{}).value||''
+        });
+    });
+    return list;
+}
+
+async function collectExtraDocFiles() {
+    const files = {};
+    const rows = document.querySelectorAll('#extraDocsList > div');
+    for (let i = 0; i < rows.length; i++) {
+        const input = rows[i].querySelector('.edoc-file');
+        if (input && input.files && input.files[0]) {
+            files['record_doc_file_' + i] = await readFileAsBase64(input.files[0]);
+        }
+    }
+    return files;
+}
+
+// ===================== Methodology Tags =====================
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('method-tag')) {
+        e.target.classList.toggle('selected');
+    }
+});
+
+function getSelectedMethodologyTags() {
+    const tags = [];
+    document.querySelectorAll('#methodologyTags .method-tag.selected').forEach(btn => {
+        tags.push(btn.dataset.tag);
+    });
+    return tags;
+}
+
+// ===================== Read File as Base64 =====================
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        if (!file || !file.size) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve({ name: file.name, type: file.type, size: file.size, data: reader.result });
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+    });
+}
+
+// ===================== Save Entry to IndexedDB =====================
+async function saveEntry() {
+    const form = document.getElementById('entryForm');
+    const firstName = form.querySelector('[name="first_name"]').value.trim();
+    const fatherName = form.querySelector('[name="father_name"]').value.trim();
+    const lastName = form.querySelector('[name="last_name"]').value.trim();
+    const status = form.querySelector('[name="status"]').value;
+
+    if (!firstName || !lastName) {
+        showToast('الاسم الأول واسم العائلة مطلوبان', 'error');
+        diagAdd('محاولة حفظ بدون اسم — مطلوب الاسم الأول واسم العائلة', 'warn');
+        return;
+    }
+    if (!status) {
+        showToast('يرجى اختيار حالة الشخص', 'error');
+        diagAdd('محاولة حفظ بدون اختيار حالة الشخص', 'warn');
+        return;
+    }
+
+    const displayName = [firstName, fatherName, lastName].filter(Boolean).join(' ');
+    diagAdd('بدء حفظ الحالة: ' + displayName, 'info');
+    showToast('جارٍ الحفظ...', 'info');
+
+    // Step 1: Collect form fields
+    let fields, fileData;
+    try {
+        fields = {};
+        form.querySelectorAll('input:not([type="file"]):not([type="checkbox"]),select,textarea').forEach(el => {
+            if (el.name) fields[el.name] = el.value;
+        });
+        form.querySelectorAll('input[type="checkbox"]').forEach(el => {
+            if (el.name === 'chronic_list') {
+                if (!fields._chronic_list) fields._chronic_list = [];
+                if (el.checked) fields._chronic_list.push(el.value);
+            } else {
+                fields[el.name] = el.checked ? el.value : '';
+            }
+        });
+
+        fields.detention_facilities_data = JSON.stringify(collectDetentions());
+        fields.witnesses_data = JSON.stringify(collectWitnesses());
+        const children = collectChildren();
+        fields.children_data = JSON.stringify(children);
+        fields.has_kids = children.length > 0 ? 'yes' : 'no';
+        fields.kids_count = String(children.length);
+        fields.kids_under_18_count = String(children.filter(c => {
+            const y = parseInt(c.birth_year);
+            return y && (new Date().getFullYear() - y) < 18;
+        }).length);
+
+        const companions = collectCompanions();
+        fields.companions_count = String(companions.length);
+        fields._companions = companions;
+
+        const extraDocs = collectExtraDocs();
+        fields.record_doc_count = String(extraDocs.length);
+        fields._extra_docs = extraDocs;
+
+        const methodTags = getSelectedMethodologyTags();
+        fields._methodology_tags = methodTags;
+
+        diagAdd('تم جمع بيانات النموذج بنجاح (' + Object.keys(fields).length + ' حقل)', 'ok');
+    } catch (collectErr) {
+        diagAdd('خطأ أثناء جمع بيانات النموذج: ' + collectErr.message, 'error');
+        showToast('خطأ في قراءة بيانات النموذج: ' + collectErr.message + '\nالحل: أعد تحميل الصفحة وحاول مرة أخرى', 'error', 10000);
+        updateLastSave(false, displayName);
+        return;
+    }
+
+    // Step 2: Collect files
+    try {
+        const fileFields = ['photo', 'document', 'digital_evidence_screenshot', 'civil_registry_document', 'survivor_cv', 'survivor_cv_photo'];
+        fileData = {};
+        for (const fname of fileFields) {
+            const input = form.querySelector('[name="' + fname + '"]');
+            if (input && input.files && input.files[0]) {
+                fileData[fname] = await readFileAsBase64(input.files[0]);
+                diagAdd('تم قراءة الملف: ' + fname + ' (' + Math.round(input.files[0].size/1024) + 'KB)', 'ok');
+            }
+        }
+        const extraDocFiles = await collectExtraDocFiles();
+        Object.assign(fileData, extraDocFiles);
+    } catch (fileErr) {
+        diagAdd('خطأ أثناء قراءة الملفات: ' + fileErr.message, 'error');
+        showToast('خطأ في قراءة الملفات المرفقة: ' + fileErr.message + '\nالحل: حاول تقليل حجم الملفات أو إزالة المرفقات وإعادة إرفاقها', 'error', 10000);
+        updateLastSave(false, displayName);
+        return;
+    }
+
+    // Step 3: Save to storage
+    const entryId = uuid();
+    const entry = {
+        client_uuid: entryId,
+        fields: fields,
+        files: fileData,
+        status: 'pending',
+        server_id: null,
+        created_at: new Date().toISOString(),
+        display_name: displayName
+    };
+
+    const dataSizeKB = Math.round(JSON.stringify(entry).length / 1024);
+    diagAdd('حجم البيانات للحفظ: ' + dataSizeKB + 'KB — وضع التخزين: ' + storageMode, 'info');
+
+    try {
+        await dbPut('entries', entry);
+        diagAdd('تم الحفظ بنجاح في ' + storageMode + ' — المعرّف: ' + entryId.slice(0, 8), 'ok');
+        showToast('تم حفظ الحالة بنجاح — ' + displayName, 'success');
+        updateLastSave(true, displayName);
+        resetForm();
+        updateBadge();
+    } catch (saveErr) {
+        diagAdd('فشل الحفظ! الخطأ: ' + saveErr.message, 'error');
+        updateLastSave(false, displayName);
+
+        // Provide specific Arabic fix instructions based on error type
+        let userMsg = '';
+        const errMsg = (saveErr.message || '').toLowerCase();
+
+        if (errMsg.includes('quota') || errMsg.includes('exceeded') || errMsg.includes('full')) {
+            userMsg = 'فشل الحفظ: مساحة التخزين ممتلئة!\n\n' +
+                'الحل:\n' +
+                '١. اذهب إلى "الإعدادات والمزامنة"\n' +
+                '٢. زامن الحالات المعلقة أولاً\n' +
+                '٣. ثم احذف الحالات المتزامنة\n' +
+                '٤. أو قلّل عدد الملفات المرفقة';
+            diagAdd('السبب: مساحة التخزين ممتلئة — يجب حذف حالات قديمة أو تقليل المرفقات', 'error');
+        } else if (errMsg.includes('private') || errMsg.includes('incognito') || errMsg.includes('access')) {
+            userMsg = 'فشل الحفظ: المتصفح في وضع التصفح الخاص!\n\n' +
+                'الحل:\n' +
+                '١. أغلق نافذة التصفح الخاص\n' +
+                '٢. افتح المتصفح في الوضع العادي\n' +
+                '٣. أعد فتح النموذج من جديد';
+            diagAdd('السبب: وضع التصفح الخاص يمنع الحفظ', 'error');
+        } else if (errMsg.includes('transaction') || errMsg.includes('abort') || errMsg.includes('version')) {
+            userMsg = 'فشل الحفظ: خطأ في قاعدة البيانات الداخلية!\n\n' +
+                'الحل:\n' +
+                '١. أعد تحميل الصفحة (اسحب للأسفل أو اضغط F5)\n' +
+                '٢. إذا استمرت المشكلة: امسح بيانات الموقع من إعدادات المتصفح\n' +
+                '٣. ثم أعد فتح النموذج';
+            diagAdd('السبب: خطأ في IndexedDB transaction — قد يحتاج إعادة تحميل', 'error');
+        } else if (storageMode === 'memory') {
+            userMsg = 'تحذير: البيانات محفوظة في الذاكرة المؤقتة فقط!\n\n' +
+                'ستُفقد جميع البيانات عند إغلاق المتصفح.\n\n' +
+                'الحل:\n' +
+                '١. افتح المتصفح في الوضع العادي (ليس خاص/incognito)\n' +
+                '٢. أو افتح النموذج عبر السرفر مباشرة:\n' +
+                '   http://[عنوان-السرفر]/offline-form/app';
+            diagAdd('تحذير: وضع الذاكرة المؤقتة — البيانات ستضيع عند الإغلاق!', 'error');
+        } else {
+            userMsg = 'فشل الحفظ: ' + saveErr.message + '\n\n' +
+                'الحلول الممكنة:\n' +
+                '١. أعد تحميل الصفحة وحاول مرة أخرى\n' +
+                '٢. تأكد أن المتصفح ليس في وضع خاص\n' +
+                '٣. جرّب متصفح آخر (Chrome أفضل)\n' +
+                '٤. إذا استمرت المشكلة: امسح بيانات الموقع';
+            diagAdd('خطأ غير معروف: ' + saveErr.message, 'error');
+        }
+
+        showToast(userMsg, 'error', 15000);
+
+        // Auto-open diagnostic panel on error
+        const details = document.getElementById('diagDetails');
+        if (details) details.open = true;
+    }
+}
+
+// ===================== Reset Form =====================
+function resetForm() {
+    const form = document.getElementById('entryForm');
+    form.querySelectorAll('input:not([type="checkbox"]),select,textarea').forEach(el => {
+        if (el.type === 'file') el.value = '';
+        else if (el.tagName === 'SELECT') el.selectedIndex = 0;
+        else el.value = '';
+    });
+    form.querySelectorAll('input[type="checkbox"]').forEach(el => el.checked = false);
+    document.getElementById('detentionList').innerHTML = '';
+    document.getElementById('witnessList').innerHTML = '';
+    document.getElementById('childrenList').innerHTML = '';
+    document.getElementById('companionsList').innerHTML = '';
+    document.getElementById('extraDocsList').innerHTML = '';
+    detentionCount = witnessCount = childCount = companionCount = extraDocCount = 0;
+    ['photoPreview','docPreview','ssPreview','civilPreview','cvPreview','cvPhotoPreview'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
+    document.getElementById('releaseSection').classList.add('hidden');
+    document.getElementById('deathSection').classList.add('hidden');
+    document.getElementById('spouseSection').classList.add('hidden');
+    document.getElementById('exSpouseSection').classList.add('hidden');
+    document.getElementById('digitalDetailsSection').classList.add('hidden');
+    document.getElementById('offCaseType').innerHTML = '<option value="">-- اختر --</option>';
+    document.querySelectorAll('#methodologyTags .method-tag').forEach(t => t.classList.remove('selected'));
+}
+
+// ===================== Render Entries List =====================
+async function renderEntries() {
+    const entries = await dbGetAll('entries');
+    entries.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const container = document.getElementById('entriesList');
+    if (!entries.length) {
+        container.innerHTML = '<p style="text-align:center;color:var(--text-light);padding:2rem 0">لا توجد حالات محفوظة بعد.</p>';
+        updateStats();
+        return;
+    }
+    let html = '';
+    entries.forEach(e => {
+        const badge = e.status === 'synced' ? '<span class="badge badge-synced">متزامنة #' + e.server_id + '</span>' :
+                      e.status === 'failed' ? '<span class="badge badge-failed">فشلت</span>' :
+                      '<span class="badge badge-pending">معلقة</span>';
+        const date = new Date(e.created_at).toLocaleString('ar-SY');
+        const fileCount = Object.keys(e.files || {}).length;
+        html += '<div class="entry-item">' +
+            '<div class="entry-item-header"><div><strong style="font-size:0.95rem">' + (e.display_name || '---') + '</strong> ' + badge + '</div></div>' +
+            '<div style="font-size:0.78rem;color:var(--text-light);margin:0.2rem 0">' + date +
+            (fileCount ? ' &middot; ' + fileCount + ' مرفقات' : '') +
+            ' &middot; ' + (e.fields.status || '') + '</div>' +
+            '<div class="entry-item-actions">' +
+            (e.status !== 'synced' ? '<button class="btn btn-outline btn-sm" onclick="editEntry(\'' + e.client_uuid + '\')">تعديل</button>' : '') +
+            '<button class="btn btn-danger btn-sm" onclick="deleteEntry(\'' + e.client_uuid + '\')">حذف</button></div></div>';
+    });
+    container.innerHTML = html;
+    updateStats();
+}
+
+// ===================== Delete Entry =====================
+async function deleteEntry(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه الحالة؟')) return;
+    await dbDelete('entries', id);
+    showToast('تم الحذف', 'info');
+    renderEntries();
+    updateBadge();
+}
+
+// ===================== Edit Entry (load back into form) =====================
+async function editEntry(id) {
+    const entry = await dbGet('entries', id);
+    if (!entry) return;
+    switchTab('form');
+    const form = document.getElementById('entryForm');
+    const f = entry.fields;
+    Object.keys(f).forEach(key => {
+        if (key.startsWith('_')) return;
+        const el = form.querySelector('[name="' + key + '"]');
+        if (!el) return;
+        if (el.type === 'checkbox') el.checked = !!f[key];
+        else el.value = f[key] || '';
+    });
+    if (f._chronic_list) {
+        f._chronic_list.forEach(v => {
+            const cb = form.querySelector('input[name="chronic_list"][value="' + v + '"]');
+            if (cb) cb.checked = true;
+        });
+    }
+    handleStatusChange();
+    toggleDigitalDetails();
+    toggleSpouse();
+    // Re-create dynamic rows
+    document.getElementById('detentionList').innerHTML = '';
+    document.getElementById('witnessList').innerHTML = '';
+    document.getElementById('childrenList').innerHTML = '';
+    document.getElementById('companionsList').innerHTML = '';
+    document.getElementById('extraDocsList').innerHTML = '';
+    detentionCount = witnessCount = childCount = companionCount = extraDocCount = 0;
+    try { JSON.parse(f.detention_facilities_data || '[]').forEach(d => addDetention(d)); } catch(e){}
+    try { JSON.parse(f.witnesses_data || '[]').forEach(d => addWitness(d)); } catch(e){}
+    try { JSON.parse(f.children_data || '[]').forEach(d => addChild(d)); } catch(e){}
+    if (f._companions) f._companions.forEach(d => addCompanion(d));
+    if (f._extra_docs) f._extra_docs.forEach(d => addExtraDoc(d));
+    // Restore methodology tags
+    if (f._methodology_tags) {
+        document.querySelectorAll('#methodologyTags .method-tag').forEach(btn => {
+            if (f._methodology_tags.includes(btn.dataset.tag)) btn.classList.add('selected');
+        });
+    }
+    // Delete old entry so re-save creates fresh
+    await dbDelete('entries', id);
+    updateBadge();
+    showToast('تم تحميل الحالة للتعديل — احفظ مجدداً بعد التعديل', 'info');
+}
+
+// ===================== Update Stats & Badge =====================
+async function updateStats() {
+    const entries = await dbGetAll('entries');
+    const total = entries.length;
+    const pending = entries.filter(e => e.status === 'pending' || e.status === 'failed').length;
+    const synced = entries.filter(e => e.status === 'synced').length;
+    ['statTotal','statTotal2'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = 'الإجمالي: ' + total; });
+    ['statPending','statPending2'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = (id.includes('2') ? 'معلقة: ' : 'بانتظار المزامنة: ') + pending; });
+    ['statSynced','statSynced2'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = (id.includes('2') ? 'متزامنة: ' : 'تمت المزامنة: ') + synced; });
+    updateBadge();
+}
+
+async function updateBadge() {
+    const entries = await dbGetAll('entries');
+    const count = entries.length;
+    const pending = entries.filter(e => e.status === 'pending' || e.status === 'failed').length;
+    // Desktop tab badge
+    const b2 = document.getElementById('entriesCountBadge2');
+    if (b2) b2.textContent = count;
+    // Mobile bottom tab badge (show only if there are pending entries)
+    const b = document.getElementById('entriesCountBadge');
+    if (b) {
+        if (pending > 0) { b.style.display = 'block'; b.textContent = pending; }
+        else b.style.display = 'none';
+    }
+}
+
+// ===================== Settings Persistence =====================
+function saveSettings() {
+    const url = document.getElementById('serverUrl').value.trim();
+    const user = document.getElementById('syncUsername').value.trim();
+    if (url) localStorage.setItem('haqquna_server', url);
+    if (user) localStorage.setItem('haqquna_user', user);
+    showToast('تم حفظ الإعدادات', 'success');
+}
+
+function loadSettings() {
+    let url = localStorage.getItem('haqquna_server') || '';
+    const user = localStorage.getItem('haqquna_user') || '';
+    // Auto-detect server URL when opened from the server itself
+    if (!url && location.protocol !== 'file:' && location.hostname !== 'localhost') {
+        url = location.origin;
+        localStorage.setItem('haqquna_server', url);
+    } else if (!url && location.protocol !== 'file:') {
+        url = location.origin;
+    }
+    document.getElementById('serverUrl').value = url;
+    document.getElementById('syncUsername').value = user;
+}
+
+function getServerBase() {
+    let url = document.getElementById('serverUrl').value.trim();
+    if (!url) { showToast('أدخل عنوان السرفر أولاً', 'error'); return null; }
+    if (!url.startsWith('http')) url = 'http://' + url;
+    return url.replace(/\/+$/, '');
+}
+
+// ===================== Connection Test =====================
+async function testConnection() {
+    const base = getServerBase();
+    if (!base) return;
+    const user = document.getElementById('syncUsername').value.trim();
+    const pass = document.getElementById('syncPassword').value;
+    const statusEl = document.getElementById('connStatus');
+    statusEl.innerHTML = '<span style="color:var(--warning)">جارٍ الاختبار...</span>';
+
+    if (location.protocol === 'https:' && base.startsWith('http://')) {
+        statusEl.innerHTML = '<div style="color:var(--danger)">' +
+            '<strong>مشكلة Mixed Content:</strong> النموذج محمّل عبر HTTPS لكن السرفر HTTP. ' +
+            'افتح النموذج عبر <code>http://' + base.replace(/^https?:\/\//, '') + '/offline-form/app</code> بدلاً من ذلك.' +
+            '</div>';
+        return;
+    }
+
+    const useBridge = needsBridge(base);
+
+    if (useBridge) {
+        // Cross-origin (file:// or different host): use window.open bridge
+        statusEl.innerHTML = '<span style="color:var(--warning)">جارٍ فتح نافذة الاتصال بالسرفر...</span>';
+        diagAdd('اختبار اتصال عبر نافذة (cross-origin)', 'info');
+        let bridge;
+        try {
+            bridge = await getSyncBridge(base);
+        } catch (e) {
+            if (e.message === 'popup_blocked') {
+                statusEl.innerHTML = '<div style="color:var(--danger);line-height:1.8">' +
+                    '<strong>المتصفح منع فتح نافذة الاتصال.</strong><br>' +
+                    'اسمح بالنوافذ المنبثقة (Popups) لهذا الموقع من إعدادات المتصفح ثم حاول مرة أخرى.</div>';
+            } else {
+                statusEl.innerHTML = '<div style="color:var(--danger);line-height:1.8">' +
+                    '<strong>فشل فتح جسر الاتصال مع السرفر.</strong><br>' +
+                    '١. تأكد أن السرفر يعمل (شغّل البرنامج على الكمبيوتر)<br>' +
+                    '٢. تأكد أن هذا الجهاز على <u>نفس شبكة WiFi</u> للمبنى<br>' +
+                    '٣. تأكد أن العنوان صحيح: <code>' + base + '</code></div>';
+            }
+            diagAdd('فشل فتح جسر الاتصال: ' + e.message, 'error');
+            return;
+        }
+        const result = await bridgeTestConnection(bridge, user, pass);
+        if (result.success) {
+            if (result.pingOnly) {
+                statusEl.innerHTML = '<span style="color:var(--success)">&#x2713; السرفر متصل عبر الجسر (حقنا ' + (result.version||'') + '). أدخل اسم المستخدم وكلمة المرور للمزامنة.</span>';
+            } else if (result.loginData && result.loginData.success) {
+                statusEl.innerHTML = '<span style="color:var(--success)">&#x2713; متصل بنجاح عبر الجسر — مرحباً ' + result.loginData.display_name + ' (' + result.loginData.role + ')</span>';
+                saveSettings();
+            }
+            diagAdd('اتصال ناجح عبر جسر الاتصال', 'ok');
+        } else {
+            const msgMap = {
+                'invalid_credentials': 'اسم المستخدم أو كلمة المرور خاطئة',
+                'insufficient_role': 'صلاحيتك لا تسمح بالمزامنة (يجب أن تكون admin أو data_entry)',
+                'not_haqquna': 'العنوان لا يبدو سرفر حقنا',
+                'timeout': 'انتهت مهلة الاتصال'
+            };
+            statusEl.innerHTML = '<span style="color:var(--danger)">فشل: ' + (msgMap[result.error] || result.error) + '</span>';
+            diagAdd('فشل اختبار الاتصال عبر الجسر: ' + result.error, 'error');
+        }
+        // Close bridge window after test
+        if (syncBridgeWin && !syncBridgeWin.closed) {
+            try { syncBridgeWin.close(); } catch(e){}
+            syncBridgeWin = null;
+        }
+        return;
+    }
+
+    // Same-origin: direct fetch
+    try {
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+        let pingResp;
+        try {
+            pingResp = await fetch(base + '/api/sync/ping', {
+                method: 'GET', mode: 'cors', signal: ctrl.signal,
+                cache: 'no-store'
+            });
+        } catch (fetchErr) {
+            clearTimeout(timeoutId);
+            const isAbort = fetchErr.name === 'AbortError';
+            const errText = fetchErr.message || '';
+            let msg = '<div style="color:var(--danger);line-height:1.8"><strong>فشل الاتصال بالسرفر.</strong><br>';
+            if (isAbort) {
+                msg += '<strong>السبب:</strong> انتهت مهلة الاتصال (8 ثوانٍ).<br>' +
+                       '١. تأكد أن السرفر يعمل<br>' +
+                       '٢. تأكد أن الجهاز على نفس شبكة WiFi';
+            } else {
+                msg += '• تأكد أن العنوان صحيح: <code>' + base + '</code><br>' +
+                       '• تأكد أن السرفر يعمل<br>' +
+                       '• تأكد أن الجهاز متصل بنفس الشبكة<br>';
+                if (errText) msg += '<small style="color:#f87171">' + errText + '</small>';
+            }
+            msg += '</div>';
+            statusEl.innerHTML = msg;
+            diagAdd('فشل اختبار الاتصال المباشر: ' + (isAbort ? 'timeout' : errText), 'error');
+            return;
+        }
+        clearTimeout(timeoutId);
+
+        if (!pingResp.ok) {
+            statusEl.innerHTML = '<span style="color:var(--danger)">السرفر استجاب لكن بخطأ: HTTP ' + pingResp.status + '</span>';
+            return;
+        }
+        const pingData = await pingResp.json();
+        if (!pingData.ok) {
+            statusEl.innerHTML = '<span style="color:var(--danger)">العنوان لا يبدو سرفر حقنا.</span>';
+            return;
+        }
+
+        if (!user || !pass) {
+            statusEl.innerHTML = '<span style="color:var(--success)">&#x2713; السرفر متصل (حقنا ' + (pingData.version||'') + '). أدخل اسم المستخدم وكلمة المرور للمزامنة.</span>';
+            return;
+        }
+
+        const loginResp = await fetch(base + '/api/sync/login', {
+            method: 'POST', mode: 'cors',
+            headers: { 'Content-Type': 'application/json', 'X-Sync-User': user, 'X-Sync-Pass': pass }
+        });
+        const loginData = await loginResp.json();
+        if (loginData.success) {
+            statusEl.innerHTML = '<span style="color:var(--success)">&#x2713; متصل بنجاح — مرحباً ' + loginData.display_name + ' (' + loginData.role + ')</span>';
+            saveSettings();
+        } else {
+            const msgMap = {
+                'invalid_credentials': 'اسم المستخدم أو كلمة المرور خاطئة',
+                'insufficient_role': 'صلاحيتك لا تسمح بالمزامنة (يجب أن تكون admin أو data_entry)'
+            };
+            statusEl.innerHTML = '<span style="color:var(--danger)">فشل تسجيل الدخول: ' + (msgMap[loginData.error] || loginData.error) + '</span>';
+        }
+    } catch (e) {
+        statusEl.innerHTML = '<span style="color:var(--danger)">خطأ غير متوقع: ' + e.message + '</span>';
+    }
+}
+
+// ===================== Base64 to Blob =====================
+function base64ToBlob(dataUrl) {
+    const parts = dataUrl.split(',');
+    const mime = parts[0].match(/:(.*?);/)[1];
+    const raw = atob(parts[1]);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+}
+
+// ===================== Sync Bridge (window.open + postMessage) =====================
+// Chrome blocks both fetch() AND iframe navigations from file:// to private IPs.
+// window.open() is a top-level navigation and is NEVER blocked by PNA.
+function needsBridge(base) {
+    try {
+        return location.origin !== new URL(base).origin;
+    } catch (e) {
+        return true;
+    }
+}
+
+let syncBridgeWin = null;
+
+function getSyncBridge(base) {
+    return new Promise((resolve, reject) => {
+        if (syncBridgeWin && !syncBridgeWin.closed) {
+            try { syncBridgeWin.close(); } catch(e){}
+        }
+        syncBridgeWin = window.open(
+            base + '/offline-form/sync-receiver',
+            'haqquna_sync',
+            'width=420,height=350,scrollbars=yes,resizable=yes'
+        );
+        if (!syncBridgeWin) {
+            reject(new Error('popup_blocked'));
+            return;
+        }
+        let done = false;
+        const onReady = (evt) => {
+            if (!evt.data || evt.data.type !== 'sync-bridge-ready') return;
+            if (done) return;
+            done = true;
+            window.removeEventListener('message', onReady);
+            resolve(syncBridgeWin);
+        };
+        window.addEventListener('message', onReady);
+        setTimeout(() => {
+            if (done) return;
+            done = true;
+            window.removeEventListener('message', onReady);
+            reject(new Error('bridge_timeout'));
+        }, 15000);
+    });
+}
+
+function bridgeTestConnection(bridgeWin, user, pass) {
+    return new Promise((resolve) => {
+        const onMsg = (evt) => {
+            if (!evt.data || evt.data.type !== 'sync-test-result') return;
+            window.removeEventListener('message', onMsg);
+            resolve(evt.data);
+        };
+        window.addEventListener('message', onMsg);
+        bridgeWin.postMessage({
+            type: 'sync-test-connection',
+            credentials: { user: user, pass: pass }
+        }, '*');
+        setTimeout(() => {
+            window.removeEventListener('message', onMsg);
+            resolve({ success: false, error: 'timeout' });
+        }, 10000);
+    });
+}
+
+function bridgeSyncEntries(bridgeWin, pending, user, pass) {
+    return new Promise((resolve) => {
+        const results = [];
+        const onMsg = (evt) => {
+            if (!evt.data) return;
+            if (evt.data.type === 'sync-entry-result') {
+                results.push(evt.data);
+            } else if (evt.data.type === 'sync-complete') {
+                window.removeEventListener('message', onMsg);
+                resolve(results);
+            }
+        };
+        window.addEventListener('message', onMsg);
+        const entriesToSend = pending.map(e => ({
+            client_uuid: e.client_uuid,
+            display_name: e.display_name,
+            fields: e.fields,
+            files: e.files
+        }));
+        bridgeWin.postMessage({
+            type: 'sync-start',
+            entries: entriesToSend,
+            credentials: { user: user, pass: pass }
+        }, '*');
+        setTimeout(() => {
+            window.removeEventListener('message', onMsg);
+            resolve(results);
+        }, Math.max(pending.length * 120000, 60000));
+    });
+}
+
+// ===================== Sync All Pending Entries =====================
+async function syncAll() {
+    const base = getServerBase();
+    if (!base) return;
+    const user = document.getElementById('syncUsername').value.trim();
+    const pass = document.getElementById('syncPassword').value;
+    if (!user || !pass) { showToast('أدخل اسم المستخدم وكلمة المرور', 'error'); return; }
+
+    const entries = await dbGetAll('entries');
+    const pending = entries.filter(e => e.status === 'pending' || e.status === 'failed');
+    if (!pending.length) { showToast('لا توجد حالات معلقة للمزامنة', 'info'); return; }
+
+    const progressEl = document.getElementById('syncProgress');
+    const textEl = document.getElementById('syncText');
+    const barEl = document.getElementById('syncBarFill');
+    const logEl = document.getElementById('syncLog');
+    const syncBtn = document.getElementById('syncBtn');
+
+    progressEl.classList.remove('hidden');
+    syncBtn.disabled = true;
+    logEl.innerHTML = '';
+    let synced = 0, failed = 0;
+
+    const useBridge = needsBridge(base);
+    if (useBridge) {
+        diagAdd('وضع ملف محلي — سيتم المزامنة عبر جسر الاتصال', 'info');
+        textEl.textContent = 'جارٍ فتح جسر الاتصال مع السرفر...';
+
+        let bridge;
+        try {
+            bridge = await getSyncBridge(base);
+            diagAdd('جسر الاتصال جاهز', 'ok');
+        } catch (e) {
+            let errHtml;
+            if (e.message === 'popup_blocked') {
+                errHtml = '<div style="color:var(--danger);line-height:1.8">' +
+                    '<strong>المتصفح منع فتح نافذة المزامنة.</strong><br>' +
+                    '<strong>الحل:</strong> اسمح بالنوافذ المنبثقة لهذا الموقع ثم اضغط "مزامنة" مرة أخرى.<br>' +
+                    'أو اضغط الزر أدناه لفتح نافذة المزامنة يدوياً:</div>' +
+                    '<button onclick="window.open(\'' + base + '/offline-form/sync-receiver\',\'haqquna_sync\',\'width=420,height=350\')" ' +
+                    'style="margin-top:0.5rem;padding:0.5rem 1rem;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:0.9rem;cursor:pointer">' +
+                    'فتح نافذة المزامنة</button>';
+            } else {
+                errHtml = '<div style="color:var(--danger)">فشل فتح جسر الاتصال مع السرفر.<br>' +
+                    'تأكد أن السرفر يعمل وأنك على نفس شبكة WiFi.<br>' +
+                    'العنوان: <code>' + base + '</code></div>';
+            }
+            logEl.innerHTML = errHtml;
+            diagAdd('فشل فتح جسر المزامنة: ' + e.message, 'error');
+            syncBtn.disabled = false;
+            showToast('فشل فتح جسر الاتصال — اقرأ التعليمات أدناه', 'error');
+            return;
+        }
+
+        textEl.textContent = 'جارٍ إرسال ' + pending.length + ' حالة عبر نافذة المزامنة...';
+        const results = await bridgeSyncEntries(bridge, pending, user, pass);
+
+        // Process results
+        for (const r of results) {
+            const entry = pending.find(e => e.client_uuid === r.uuid);
+            if (!entry) continue;
+            if (r.success) {
+                entry.status = 'synced';
+                entry.server_id = r.server_id;
+                await dbPut('entries', entry);
+                synced++;
+                logEl.innerHTML += '<div style="color:var(--success)">✓ ' + entry.display_name + ' → سجل #' + r.server_id + (r.duplicate ? ' (موجود مسبقاً)' : '') + '</div>';
+            } else {
+                entry.status = 'failed';
+                entry.error = r.error;
+                await dbPut('entries', entry);
+                failed++;
+                logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + r.error + '</div>';
+            }
+            const pct = Math.round(((synced + failed) / pending.length) * 100);
+            barEl.style.width = pct + '%';
+            textEl.textContent = 'مزامنة ' + (synced + failed) + ' من ' + pending.length;
+        }
+        // Mark any entries that got no result as failed
+        for (const entry of pending) {
+            if (entry.status !== 'synced' && entry.status !== 'failed') {
+                entry.status = 'failed';
+                entry.error = 'لم يتم استلام نتيجة من جسر المزامنة';
+                await dbPut('entries', entry);
+                failed++;
+                logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': لم تصل نتيجة</div>';
+            }
+        }
+    } else {
+        // Same-origin: direct fetch (standard mode)
+        diagAdd('وضع اتصال مباشر — نفس مصدر السرفر', 'ok');
+        for (let idx = 0; idx < pending.length; idx++) {
+            const entry = pending[idx];
+            const pct = Math.round(((idx + 1) / pending.length) * 100);
+            textEl.textContent = 'مزامنة ' + (idx + 1) + ' من ' + pending.length + ' — ' + entry.display_name;
+            barEl.style.width = pct + '%';
+
+            try {
+                const fd = new FormData();
+                fd.append('client_uuid', entry.client_uuid);
+                const f = entry.fields;
+                Object.keys(f).forEach(key => {
+                    if (key.startsWith('_')) return;
+                    if (key === 'chronic_list') return;
+                    fd.append(key, f[key] || '');
+                });
+                if (f._chronic_list && f._chronic_list.length) {
+                    f._chronic_list.forEach(v => fd.append('chronic_list', v));
+                }
+                if (f._companions && f._companions.length) {
+                    fd.set('companions_count', String(f._companions.length));
+                    f._companions.forEach((c, ci) => {
+                        fd.append('comp_first_' + ci, c.first_name || '');
+                        fd.append('comp_father_' + ci, c.father_name || '');
+                        fd.append('comp_last_' + ci, c.last_name || '');
+                        fd.append('comp_mother_' + ci, c.mother_name || '');
+                        fd.append('comp_notes_' + ci, c.notes || '');
+                    });
+                }
+                if (f._extra_docs && f._extra_docs.length) {
+                    fd.set('record_doc_count', String(f._extra_docs.length));
+                    f._extra_docs.forEach((d, di) => {
+                        fd.append('record_doc_type_' + di, d.doc_type || '');
+                        fd.append('record_doc_date_' + di, d.doc_date || '');
+                        fd.append('record_doc_url_' + di, d.doc_url || '');
+                        fd.append('record_doc_desc_' + di, d.doc_desc || '');
+                    });
+                }
+                if (f._methodology_tags && f._methodology_tags.length) {
+                    const existingNotes = f.methodology_notes || '';
+                    const tagsStr = '[وسوم: ' + f._methodology_tags.join('، ') + ']';
+                    fd.set('methodology_notes', tagsStr + (existingNotes ? '\n' + existingNotes : ''));
+                }
+                const files = entry.files || {};
+                Object.keys(files).forEach(fname => {
+                    const fileInfo = files[fname];
+                    if (fileInfo && fileInfo.data) {
+                        const blob = base64ToBlob(fileInfo.data);
+                        fd.append(fname, blob, fileInfo.name || (fname + '.jpg'));
+                    }
+                });
+
+                const resp = await fetch(base + '/api/sync/entries', {
+                    method: 'POST', mode: 'cors', body: fd,
+                    headers: { 'X-Sync-User': user, 'X-Sync-Pass': pass }
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    entry.status = 'synced';
+                    entry.server_id = data.server_id;
+                    await dbPut('entries', entry);
+                    synced++;
+                    logEl.innerHTML += '<div style="color:var(--success)">✓ ' + entry.display_name + ' → سجل #' + data.server_id + (data.duplicate_uuid ? ' (موجود مسبقاً)' : '') + '</div>';
+                } else {
+                    entry.status = 'failed';
+                    entry.error = (data.errors || [data.error]).join(', ');
+                    await dbPut('entries', entry);
+                    failed++;
+                    logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + entry.error + '</div>';
+                }
+            } catch (e) {
+                entry.status = 'failed';
+                entry.error = e.message;
+                await dbPut('entries', entry);
+                failed++;
+                let arabicErr = e.message;
+                if (e.name === 'AbortError' || e.message.includes('timeout')) {
+                    arabicErr = 'انتهت مهلة الاتصال — تأكد أن السرفر يعمل والجهاز على نفس الشبكة';
+                } else if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+                    arabicErr = 'لا يمكن الوصول للسرفر — تأكد من: العنوان صحيح، السرفر يعمل، نفس شبكة WiFi';
+                }
+                logEl.innerHTML += '<div style="color:var(--danger)">✗ ' + entry.display_name + ': ' + arabicErr + '</div>';
+                diagAdd('فشل مزامنة "' + entry.display_name + '": ' + e.message, 'error');
+            }
+        }
+    }
+
+    // Close bridge window if it was used
+    if (syncBridgeWin && !syncBridgeWin.closed) {
+        try { syncBridgeWin.close(); } catch(e){}
+        syncBridgeWin = null;
+    }
+
+    barEl.style.width = '100%';
+    textEl.textContent = 'اكتملت المزامنة — ' + synced + ' نجحت، ' + failed + ' فشلت';
+    syncBtn.disabled = false;
+    updateStats();
+    updateBadge();
+    checkServerConnection();
+    if (failed > 0) {
+        diagAdd('المزامنة: ' + synced + ' نجحت، ' + failed + ' فشلت — راجع السجل أعلاه للتفاصيل', 'error');
+    } else {
+        diagAdd('المزامنة اكتملت بنجاح: ' + synced + ' حالة', 'ok');
+    }
+    showToast('المزامنة: ' + synced + ' نجحت' + (failed ? '، ' + failed + ' فشلت' : ''), synced && !failed ? 'success' : 'error');
+}
+
+// ===================== Export Local Data =====================
+async function exportLocalData() {
+    const entries = await dbGetAll('entries');
+    if (!entries.length) { showToast('لا توجد بيانات للتصدير', 'info'); return; }
+    // Remove heavy base64 from export (keep filenames only)
+    const exportData = entries.map(e => {
+        const clean = { ...e };
+        const filesSummary = {};
+        Object.keys(clean.files || {}).forEach(k => {
+            if (clean.files[k]) filesSummary[k] = { name: clean.files[k].name, size: clean.files[k].size };
+        });
+        clean.files_summary = filesSummary;
+        delete clean.files;
+        return clean;
+    });
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'haqquna_offline_backup_' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('تم التصدير', 'success');
+}
+
+// ===================== Clear Synced Entries =====================
+async function clearSyncedEntries() {
+    const entries = await dbGetAll('entries');
+    const synced = entries.filter(e => e.status === 'synced');
+    if (!synced.length) { showToast('لا توجد حالات متزامنة لحذفها', 'info'); return; }
+    if (!confirm('حذف ' + synced.length + ' حالة متزامنة من المتصفح؟ (لن يؤثر على السرفر)')) return;
+    for (const e of synced) await dbDelete('entries', e.client_uuid);
+    showToast('تم حذف ' + synced.length + ' حالة متزامنة', 'success');
+    updateStats();
+    updateBadge();
+}
+
+// ===================== Initialize =====================
+async function init() {
+    diagAdd('بدء تهيئة التطبيق...', 'info');
+
+    // Warn if opened from a downloaded file — most connectivity issues stem from this
+    if (location.protocol === 'file:') {
+        diagAdd('النموذج مفتوح من ملف محفوظ (file://) — المزامنة ستتم عبر جسر الاتصال', 'info');
+        const banner = document.getElementById('storageBanner');
+        if (banner) {
+            banner.classList.remove('hidden');
+            banner.style.background = '#dbeafe';
+            banner.style.color = '#1e40af';
+            banner.innerHTML = '&#x1F4C4; النموذج يعمل من ملف محفوظ — عند الاتصال بشبكة المبنى ستتم المزامنة تلقائياً عبر جسر الاتصال.';
+        }
+    }
+
+    await openDB();
+    updateStatusStrip();
+    await requestPersistentStorage();
+    loadSettings();
+    updateBadge();
+    updateStats();
+    if (location.protocol !== 'file:') showStorageStatus();
+    checkServerConnection();
+    setInterval(checkServerConnection, 30000);
+    diagAdd('اكتملت التهيئة — وضع التخزين: ' + storageMode, storageMode === 'idb' ? 'ok' : 'warn');
+    // Set today's date for collection_date
+    const today = new Date().toISOString().slice(0, 10);
+    const dateInput = document.querySelector('[name="collection_date"]');
+    if (dateInput && !dateInput.value) dateInput.value = today;
+}
+
+async function requestPersistentStorage() {
+    if (!navigator.storage || !navigator.storage.persist) {
+        diagAdd('المتصفح لا يدعم التخزين الدائم (persist API)', 'warn');
+        return;
+    }
+    try {
+        const persistent = await navigator.storage.persist();
+        if (persistent) {
+            diagAdd('تم تفعيل التخزين الدائم — البيانات لن تُحذف تلقائياً', 'ok');
+        } else {
+            diagAdd('التخزين الدائم مرفوض — المتصفح قد يحذف البيانات تلقائياً. الحل: أضف الموقع للشاشة الرئيسية', 'warn');
+        }
+    } catch (e) {
+        diagAdd('خطأ في طلب التخزين الدائم: ' + e.message, 'warn');
+    }
+}
+
+async function showStorageStatus() {
+    const banner = document.getElementById('storageBanner');
+    if (!banner) return;
+    if (storageMode === 'idb') {
+        // Check if persistent
+        let isPersist = false;
+        try { if (navigator.storage && navigator.storage.persisted) isPersist = await navigator.storage.persisted(); } catch(e){}
+        if (!isPersist) {
+            banner.classList.remove('hidden');
+            banner.style.background = '#dbeafe';
+            banner.style.color = '#1e40af';
+            banner.innerHTML = '&#x1F4BE; البيانات محفوظة محلياً. لضمان عدم حذفها تلقائياً: أضف النموذج إلى الشاشة الرئيسية (Add to Home Screen).';
+        } else {
+            banner.classList.add('hidden');
+        }
+    } else if (storageMode === 'localstorage') {
+        banner.classList.remove('hidden');
+        banner.style.background = '#fef3c7';
+        banner.style.color = '#92400e';
+        banner.innerHTML = '&#x26A0;&#xFE0F; التخزين الموسّع غير متاح. يستخدم النموذج التخزين البديل (سعة محدودة ~5 ميغا). ' +
+            'لتجنّب فقدان البيانات: زامن باستمرار، وافتح النموذج عبر <code>http://server-ip/offline-form/app</code>.';
+    } else {
+        banner.classList.remove('hidden');
+        banner.style.background = '#fee2e2';
+        banner.style.color = '#991b1b';
+        banner.innerHTML = '&#x26A0;&#xFE0F; <strong>التخزين معطّل!</strong> البيانات لن تُحفظ بعد إغلاق المتصفح. ' +
+            'افتح النموذج في وضع عادي (ليس incognito/private) أو عبر السرفر مباشرة.';
+    }
+}
+
+// ===================== Service Worker for offline PWA =====================
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    const swCode = `
+self.addEventListener('install', e => { self.skipWaiting(); });
+self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
+self.addEventListener('fetch', e => {
+    if (e.request.url.includes('/offline-form/app')) {
+        e.respondWith(
+            fetch(e.request).catch(() => caches.match(e.request))
+        );
+        e.waitUntil(
+            fetch(e.request).then(resp => {
+                if (resp.ok) {
+                    return caches.open('haqquna-offline-v1').then(c => c.put(e.request, resp));
+                }
+            }).catch(() => {})
+        );
+    }
+});`;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl, { scope: '/offline-form/' }).then(() => {
+        console.log('[SW] Service Worker registered for offline support');
+    }).catch(e => {
+        console.warn('[SW] Registration failed:', e.message);
+    });
+}
+
+init();
+</script>
+
+</body>
+</html>

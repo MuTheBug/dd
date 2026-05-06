@@ -1236,15 +1236,9 @@ async function checkServerConnection() {
     const base = url.replace(/\/+$/, '');
 
     if (needsBridge(base)) {
-        // Cross-origin: try loading the bridge iframe as a connectivity test
-        try {
-            const bridge = await getSyncBridge(base);
-            if (ssConn) { ssConn.className = 'ss-item ss-conn-ok'; ssConn.textContent = 'السرفر: متصل (جسر)'; }
-            diagAdd('اتصال بالسرفر عبر الجسر ناجح', 'ok');
-        } catch (e) {
-            if (ssConn) { ssConn.className = 'ss-item ss-conn-off'; ssConn.textContent = 'السرفر: غير متصل'; }
-            diagAdd('فشل الاتصال بالسرفر عبر الجسر', 'error');
-        }
+        // Cross-origin: can't auto-check without opening a popup.
+        // Show neutral status; user can test manually.
+        if (ssConn) { ssConn.className = 'ss-item ss-conn-unknown'; ssConn.textContent = 'السرفر: اضغط اختبار الاتصال'; }
         return;
     }
 
@@ -1915,19 +1909,24 @@ async function testConnection() {
     const useBridge = needsBridge(base);
 
     if (useBridge) {
-        // Cross-origin (file:// or different host): use iframe bridge
-        statusEl.innerHTML = '<span style="color:var(--warning)">جارٍ الاتصال عبر جسر الاتصال...</span>';
-        diagAdd('اختبار اتصال عبر جسر (cross-origin)', 'info');
+        // Cross-origin (file:// or different host): use window.open bridge
+        statusEl.innerHTML = '<span style="color:var(--warning)">جارٍ فتح نافذة الاتصال بالسرفر...</span>';
+        diagAdd('اختبار اتصال عبر نافذة (cross-origin)', 'info');
         let bridge;
         try {
             bridge = await getSyncBridge(base);
         } catch (e) {
-            statusEl.innerHTML = '<div style="color:var(--danger);line-height:1.8">' +
-                '<strong>فشل فتح جسر الاتصال مع السرفر.</strong><br>' +
-                '<strong>الحلول:</strong><br>' +
-                '١. تأكد أن السرفر يعمل (شغّل البرنامج على الكمبيوتر)<br>' +
-                '٢. تأكد أن هذا الجهاز على <u>نفس شبكة WiFi</u> للمبنى<br>' +
-                '٣. تأكد أن العنوان صحيح: <code>' + base + '</code></div>';
+            if (e.message === 'popup_blocked') {
+                statusEl.innerHTML = '<div style="color:var(--danger);line-height:1.8">' +
+                    '<strong>المتصفح منع فتح نافذة الاتصال.</strong><br>' +
+                    'اسمح بالنوافذ المنبثقة (Popups) لهذا الموقع من إعدادات المتصفح ثم حاول مرة أخرى.</div>';
+            } else {
+                statusEl.innerHTML = '<div style="color:var(--danger);line-height:1.8">' +
+                    '<strong>فشل فتح جسر الاتصال مع السرفر.</strong><br>' +
+                    '١. تأكد أن السرفر يعمل (شغّل البرنامج على الكمبيوتر)<br>' +
+                    '٢. تأكد أن هذا الجهاز على <u>نفس شبكة WiFi</u> للمبنى<br>' +
+                    '٣. تأكد أن العنوان صحيح: <code>' + base + '</code></div>';
+            }
             diagAdd('فشل فتح جسر الاتصال: ' + e.message, 'error');
             return;
         }
@@ -1949,6 +1948,11 @@ async function testConnection() {
             };
             statusEl.innerHTML = '<span style="color:var(--danger)">فشل: ' + (msgMap[result.error] || result.error) + '</span>';
             diagAdd('فشل اختبار الاتصال عبر الجسر: ' + result.error, 'error');
+        }
+        // Close bridge window after test
+        if (syncBridgeWin && !syncBridgeWin.closed) {
+            try { syncBridgeWin.close(); } catch(e){}
+            syncBridgeWin = null;
         }
         return;
     }
@@ -2030,7 +2034,9 @@ function base64ToBlob(dataUrl) {
     return new Blob([arr], { type: mime });
 }
 
-// ===================== Sync Bridge (iframe postMessage) =====================
+// ===================== Sync Bridge (window.open + postMessage) =====================
+// Chrome blocks both fetch() AND iframe navigations from file:// to private IPs.
+// window.open() is a top-level navigation and is NEVER blocked by PNA.
 function needsBridge(base) {
     try {
         return location.origin !== new URL(base).origin;
@@ -2039,47 +2045,41 @@ function needsBridge(base) {
     }
 }
 
-let syncBridgeIframe = null;
+let syncBridgeWin = null;
 
 function getSyncBridge(base) {
     return new Promise((resolve, reject) => {
-        if (syncBridgeIframe) {
-            try { syncBridgeIframe.remove(); } catch(e){}
-            syncBridgeIframe = null;
+        if (syncBridgeWin && !syncBridgeWin.closed) {
+            try { syncBridgeWin.close(); } catch(e){}
         }
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;border:none';
-        iframe.src = base + '/offline-form/sync-receiver';
+        syncBridgeWin = window.open(
+            base + '/offline-form/sync-receiver',
+            'haqquna_sync',
+            'width=420,height=350,scrollbars=yes,resizable=yes'
+        );
+        if (!syncBridgeWin) {
+            reject(new Error('popup_blocked'));
+            return;
+        }
         let done = false;
         const onReady = (evt) => {
             if (!evt.data || evt.data.type !== 'sync-bridge-ready') return;
             if (done) return;
             done = true;
             window.removeEventListener('message', onReady);
-            syncBridgeIframe = iframe;
-            resolve(iframe);
+            resolve(syncBridgeWin);
         };
         window.addEventListener('message', onReady);
-        const timeout = setTimeout(() => {
+        setTimeout(() => {
             if (done) return;
             done = true;
             window.removeEventListener('message', onReady);
-            iframe.remove();
             reject(new Error('bridge_timeout'));
-        }, 12000);
-        iframe.onerror = () => {
-            if (done) return;
-            done = true;
-            clearTimeout(timeout);
-            window.removeEventListener('message', onReady);
-            iframe.remove();
-            reject(new Error('bridge_load_error'));
-        };
-        document.body.appendChild(iframe);
+        }, 15000);
     });
 }
 
-function bridgeTestConnection(iframe, user, pass) {
+function bridgeTestConnection(bridgeWin, user, pass) {
     return new Promise((resolve) => {
         const onMsg = (evt) => {
             if (!evt.data || evt.data.type !== 'sync-test-result') return;
@@ -2087,7 +2087,7 @@ function bridgeTestConnection(iframe, user, pass) {
             resolve(evt.data);
         };
         window.addEventListener('message', onMsg);
-        iframe.contentWindow.postMessage({
+        bridgeWin.postMessage({
             type: 'sync-test-connection',
             credentials: { user: user, pass: pass }
         }, '*');
@@ -2098,7 +2098,7 @@ function bridgeTestConnection(iframe, user, pass) {
     });
 }
 
-function bridgeSyncEntries(iframe, pending, user, pass) {
+function bridgeSyncEntries(bridgeWin, pending, user, pass) {
     return new Promise((resolve) => {
         const results = [];
         const onMsg = (evt) => {
@@ -2117,16 +2117,15 @@ function bridgeSyncEntries(iframe, pending, user, pass) {
             fields: e.fields,
             files: e.files
         }));
-        iframe.contentWindow.postMessage({
+        bridgeWin.postMessage({
             type: 'sync-start',
             entries: entriesToSend,
             credentials: { user: user, pass: pass }
         }, '*');
-        // Safety timeout: 2 minutes per entry max
         setTimeout(() => {
             window.removeEventListener('message', onMsg);
             resolve(results);
-        }, pending.length * 120000);
+        }, Math.max(pending.length * 120000, 60000));
     });
 }
 
@@ -2163,16 +2162,28 @@ async function syncAll() {
             bridge = await getSyncBridge(base);
             diagAdd('جسر الاتصال جاهز', 'ok');
         } catch (e) {
-            logEl.innerHTML = '<div style="color:var(--danger)">فشل فتح جسر الاتصال مع السرفر.<br>' +
-                'تأكد أن السرفر يعمل وأنك على نفس شبكة WiFi.<br>' +
-                'العنوان: <code>' + base + '</code></div>';
+            let errHtml;
+            if (e.message === 'popup_blocked') {
+                errHtml = '<div style="color:var(--danger);line-height:1.8">' +
+                    '<strong>المتصفح منع فتح نافذة المزامنة.</strong><br>' +
+                    '<strong>الحل:</strong> اسمح بالنوافذ المنبثقة لهذا الموقع ثم اضغط "مزامنة" مرة أخرى.<br>' +
+                    'أو اضغط الزر أدناه لفتح نافذة المزامنة يدوياً:</div>' +
+                    '<button onclick="window.open(\'' + base + '/offline-form/sync-receiver\',\'haqquna_sync\',\'width=420,height=350\')" ' +
+                    'style="margin-top:0.5rem;padding:0.5rem 1rem;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:0.9rem;cursor:pointer">' +
+                    'فتح نافذة المزامنة</button>';
+            } else {
+                errHtml = '<div style="color:var(--danger)">فشل فتح جسر الاتصال مع السرفر.<br>' +
+                    'تأكد أن السرفر يعمل وأنك على نفس شبكة WiFi.<br>' +
+                    'العنوان: <code>' + base + '</code></div>';
+            }
+            logEl.innerHTML = errHtml;
             diagAdd('فشل فتح جسر المزامنة: ' + e.message, 'error');
             syncBtn.disabled = false;
-            showToast('فشل الاتصال بالسرفر — تأكد من الشبكة والعنوان', 'error');
+            showToast('فشل فتح جسر الاتصال — اقرأ التعليمات أدناه', 'error');
             return;
         }
 
-        textEl.textContent = 'جارٍ إرسال ' + pending.length + ' حالة عبر جسر الاتصال...';
+        textEl.textContent = 'جارٍ إرسال ' + pending.length + ' حالة عبر نافذة المزامنة...';
         const results = await bridgeSyncEntries(bridge, pending, user, pass);
 
         // Process results
@@ -2294,6 +2305,12 @@ async function syncAll() {
                 diagAdd('فشل مزامنة "' + entry.display_name + '": ' + e.message, 'error');
             }
         }
+    }
+
+    // Close bridge window if it was used
+    if (syncBridgeWin && !syncBridgeWin.closed) {
+        try { syncBridgeWin.close(); } catch(e){}
+        syncBridgeWin = null;
     }
 
     barEl.style.width = '100%';

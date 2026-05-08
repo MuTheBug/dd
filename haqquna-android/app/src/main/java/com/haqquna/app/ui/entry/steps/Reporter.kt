@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.haqquna.app.data.CaseStatus
 import com.haqquna.app.ui.DropdownRow
 import com.haqquna.app.ui.SectionCard
+import com.haqquna.app.ui.SingleDatePickerField
 import com.haqquna.app.ui.TextFieldRow
 import com.haqquna.app.ui.entry.EntryFormViewModel
 import com.haqquna.app.ui.entry.FormState
@@ -75,10 +76,11 @@ fun ReporterStep(vm: EntryFormViewModel, state: FormState) {
             onValueChange = { vm.setField("collector_name", it) },
             placeholder = "اسم الموظف/المتطوع"
         )
-        TextFieldRow(
-            label = "تاريخ جمع البيانات (yyyy-mm-dd)",
+        SingleDatePickerField(
+            label = "تاريخ جمع البيانات",
             value = state.fields["collection_date"] ?: "",
-            onValueChange = { vm.setField("collection_date", it) }
+            onValueChange = { vm.setField("collection_date", it) },
+            minYear = 2010
         )
     }
 

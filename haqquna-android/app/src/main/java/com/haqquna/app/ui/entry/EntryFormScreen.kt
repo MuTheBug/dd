@@ -3,7 +3,6 @@ package com.haqquna.app.ui.entry
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,9 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
@@ -122,25 +122,25 @@ fun EntryFormScreen(container: AppContainer, nav: NavController, uuid: String?) 
                 progress = { (state.currentStep + 1f) / FormSteps.size },
                 modifier = Modifier.fillMaxWidth().height(3.dp)
             )
+            val scrollState = rememberScrollState()
+            LaunchedEffect(state.currentStep) { scrollState.scrollTo(0) }
             Box(modifier = Modifier.weight(1f)) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(vertical = 8.dp)
                 ) {
-                    item {
-                        Column {
-                            when (state.currentStep) {
-                                0 -> ReporterStep(vm, state)
-                                1 -> PersonalStep(vm, state, container)
-                                2 -> StatusDetailsStep(vm, state, container)
-                                3 -> CompanionsStep(vm, state)
-                                4 -> WitnessesStep(vm, state)
-                                5 -> AddressStep(vm, state)
-                                else -> NotesAndSubmitStep(vm, state)
-                            }
-                        }
+                    when (state.currentStep) {
+                        0 -> ReporterStep(vm, state)
+                        1 -> PersonalStep(vm, state, container)
+                        2 -> StatusDetailsStep(vm, state, container)
+                        3 -> CompanionsStep(vm, state)
+                        4 -> WitnessesStep(vm, state)
+                        5 -> AddressStep(vm, state)
+                        else -> NotesAndSubmitStep(vm, state)
                     }
-                    item { Spacer(Modifier.height(80.dp)) }
+                    Spacer(Modifier.height(80.dp))
                 }
             }
         }

@@ -1,7 +1,5 @@
 package com.haqquna.app.ui.entry.steps
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.haqquna.app.AppContainer
+import com.haqquna.app.ui.DatePickerField
 import com.haqquna.app.ui.DropdownRow
 import com.haqquna.app.ui.SectionCard
 import com.haqquna.app.ui.TextFieldRow
@@ -62,29 +61,18 @@ fun PersonalStep(vm: EntryFormViewModel, state: FormState, container: AppContain
             onChange = { vm.setField("gender", it) },
             required = true
         )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            TextFieldRow(
-                label = "اليوم",
-                value = state.fields["birth_day"] ?: "",
-                onValueChange = { vm.setField("birth_day", it.filter { c -> c.isDigit() }.take(2)) },
-                keyboardType = KeyboardType.Number
-            )
-            TextFieldRow(
-                label = "الشهر",
-                value = state.fields["birth_month"] ?: "",
-                onValueChange = { vm.setField("birth_month", it.filter { c -> c.isDigit() }.take(2)) },
-                keyboardType = KeyboardType.Number
-            )
-            TextFieldRow(
-                label = "السنة",
-                value = state.fields["birth_year"] ?: "",
-                onValueChange = { vm.setField("birth_year", it.filter { c -> c.isDigit() }.take(4)) },
-                keyboardType = KeyboardType.Number
-            )
-        }
+        DatePickerField(
+            label = "تاريخ الميلاد",
+            day = state.fields["birth_day"] ?: "",
+            month = state.fields["birth_month"] ?: "",
+            year = state.fields["birth_year"] ?: "",
+            onDateChange = { d, m, y ->
+                vm.setField("birth_day", d)
+                vm.setField("birth_month", m)
+                vm.setField("birth_year", y)
+            },
+            minYear = 1900
+        )
     }
 
     SectionCard(title = "الهوية والمحافظة") {

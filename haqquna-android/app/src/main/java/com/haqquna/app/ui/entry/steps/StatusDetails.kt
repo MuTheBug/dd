@@ -1,6 +1,5 @@
 package com.haqquna.app.ui.entry.steps
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,8 +21,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.haqquna.app.AppContainer
 import com.haqquna.app.data.CaseStatus
+import com.haqquna.app.ui.DatePickerField
 import com.haqquna.app.ui.DropdownRow
 import com.haqquna.app.ui.SectionCard
+import com.haqquna.app.ui.SingleDatePickerField
 import com.haqquna.app.ui.TextFieldRow
 import com.haqquna.app.ui.entry.EntryFormViewModel
 import com.haqquna.app.ui.entry.FormState
@@ -51,29 +52,18 @@ fun StatusDetailsStep(vm: EntryFormViewModel, state: FormState, container: AppCo
 @Composable
 private fun ArrestSection(vm: EntryFormViewModel, state: FormState) {
     SectionCard(title = "تفاصيل الاعتقال والاحتجاز", icon = Icons.Default.Lock) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            TextFieldRow(
-                label = "اليوم",
-                value = state.fields["arrest_day"] ?: "",
-                onValueChange = { vm.setField("arrest_day", it.filter { c -> c.isDigit() }.take(2)) },
-                keyboardType = KeyboardType.Number
-            )
-            TextFieldRow(
-                label = "الشهر",
-                value = state.fields["arrest_month"] ?: "",
-                onValueChange = { vm.setField("arrest_month", it.filter { c -> c.isDigit() }.take(2)) },
-                keyboardType = KeyboardType.Number
-            )
-            TextFieldRow(
-                label = "السنة",
-                value = state.fields["arrest_year"] ?: "",
-                onValueChange = { vm.setField("arrest_year", it.filter { c -> c.isDigit() }.take(4)) },
-                keyboardType = KeyboardType.Number
-            )
-        }
+        DatePickerField(
+            label = "تاريخ الاعتقال",
+            day = state.fields["arrest_day"] ?: "",
+            month = state.fields["arrest_month"] ?: "",
+            year = state.fields["arrest_year"] ?: "",
+            onDateChange = { d, m, y ->
+                vm.setField("arrest_day", d)
+                vm.setField("arrest_month", m)
+                vm.setField("arrest_year", y)
+            },
+            minYear = 1970
+        )
         DropdownRow(
             label = "الجهة المعتقِلة",
             value = state.fields["arrest_authority"] ?: "",
@@ -107,10 +97,11 @@ private fun ArrestSection(vm: EntryFormViewModel, state: FormState) {
             value = state.fields["last_known_location"] ?: "",
             onValueChange = { vm.setField("last_known_location", it) }
         )
-        TextFieldRow(
-            label = "آخر تاريخ عُرف أنه حي (yyyy-mm-dd)",
+        SingleDatePickerField(
+            label = "آخر تاريخ عُرف أنه حي",
             value = state.fields["last_known_alive_date"] ?: "",
-            onValueChange = { vm.setField("last_known_alive_date", it) }
+            onValueChange = { vm.setField("last_known_alive_date", it) },
+            minYear = 1970
         )
     }
 }
@@ -118,29 +109,18 @@ private fun ArrestSection(vm: EntryFormViewModel, state: FormState) {
 @Composable
 private fun SurvivorSection(vm: EntryFormViewModel, state: FormState, container: AppContainer) {
     SectionCard(title = "بيانات الإفراج (للناجين)", icon = Icons.Default.Gavel) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            TextFieldRow(
-                label = "يوم الإفراج",
-                value = state.fields["release_day"] ?: "",
-                onValueChange = { vm.setField("release_day", it.filter { c -> c.isDigit() }.take(2)) },
-                keyboardType = KeyboardType.Number
-            )
-            TextFieldRow(
-                label = "شهر",
-                value = state.fields["release_month"] ?: "",
-                onValueChange = { vm.setField("release_month", it.filter { c -> c.isDigit() }.take(2)) },
-                keyboardType = KeyboardType.Number
-            )
-            TextFieldRow(
-                label = "سنة",
-                value = state.fields["release_year"] ?: "",
-                onValueChange = { vm.setField("release_year", it.filter { c -> c.isDigit() }.take(4)) },
-                keyboardType = KeyboardType.Number
-            )
-        }
+        DatePickerField(
+            label = "تاريخ الإفراج",
+            day = state.fields["release_day"] ?: "",
+            month = state.fields["release_month"] ?: "",
+            year = state.fields["release_year"] ?: "",
+            onDateChange = { d, m, y ->
+                vm.setField("release_day", d)
+                vm.setField("release_month", m)
+                vm.setField("release_year", y)
+            },
+            minYear = 1970
+        )
         TextFieldRow(
             label = "وصف تجربة الاعتقال",
             value = state.fields["survivor_cv_text"] ?: "",
@@ -157,29 +137,18 @@ private fun SurvivorSection(vm: EntryFormViewModel, state: FormState, container:
 @Composable
 private fun DeathSection(vm: EntryFormViewModel, state: FormState) {
     SectionCard(title = "بيانات الوفاة", icon = Icons.Default.Description) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            TextFieldRow(
-                label = "اليوم",
-                value = state.fields["death_day"] ?: "",
-                onValueChange = { vm.setField("death_day", it.filter { c -> c.isDigit() }.take(2)) },
-                keyboardType = KeyboardType.Number
-            )
-            TextFieldRow(
-                label = "الشهر",
-                value = state.fields["death_month"] ?: "",
-                onValueChange = { vm.setField("death_month", it.filter { c -> c.isDigit() }.take(2)) },
-                keyboardType = KeyboardType.Number
-            )
-            TextFieldRow(
-                label = "السنة",
-                value = state.fields["death_year"] ?: "",
-                onValueChange = { vm.setField("death_year", it.filter { c -> c.isDigit() }.take(4)) },
-                keyboardType = KeyboardType.Number
-            )
-        }
+        DatePickerField(
+            label = "تاريخ الوفاة",
+            day = state.fields["death_day"] ?: "",
+            month = state.fields["death_month"] ?: "",
+            year = state.fields["death_year"] ?: "",
+            onDateChange = { d, m, y ->
+                vm.setField("death_day", d)
+                vm.setField("death_month", m)
+                vm.setField("death_year", y)
+            },
+            minYear = 1970
+        )
         TextFieldRow(
             label = "مكان الوفاة",
             value = state.fields["death_place"] ?: "",
@@ -238,10 +207,11 @@ private fun DigitalEvidenceSection(vm: EntryFormViewModel, state: FormState, con
             placeholder = "https://... وثّق الرابط حتى لو كان محذوفاً",
             keyboardType = KeyboardType.Uri
         )
-        TextFieldRow(
-            label = "تاريخ الدليل الرقمي (yyyy-mm-dd)",
+        SingleDatePickerField(
+            label = "تاريخ الدليل الرقمي",
             value = state.fields["digital_evidence_date"] ?: "",
-            onValueChange = { vm.setField("digital_evidence_date", it) }
+            onValueChange = { vm.setField("digital_evidence_date", it) },
+            minYear = 1980
         )
         TextFieldRow(
             label = "الاسم الوارد في الدليل",
@@ -249,10 +219,11 @@ private fun DigitalEvidenceSection(vm: EntryFormViewModel, state: FormState, con
             onValueChange = { vm.setField("digital_evidence_person_name", it) },
             placeholder = "الاسم كما ظهر في التسريبات"
         )
-        TextFieldRow(
-            label = "تاريخ الوفاة الوارد في الدليل (yyyy-mm-dd)",
+        SingleDatePickerField(
+            label = "تاريخ الوفاة الوارد في الدليل",
             value = state.fields["digital_evidence_death_date"] ?: "",
-            onValueChange = { vm.setField("digital_evidence_death_date", it) }
+            onValueChange = { vm.setField("digital_evidence_death_date", it) },
+            minYear = 1970
         )
         TextFieldRow(
             label = "وصف الدليل",
@@ -274,10 +245,11 @@ private fun CivilRegistrySection(vm: EntryFormViewModel, state: FormState, conta
             options = CivilRegistryStatuses,
             onChange = { vm.setField("civil_registry_status", it) }
         )
-        TextFieldRow(
-            label = "تاريخ مراجعة النفوس (yyyy-mm-dd)",
+        SingleDatePickerField(
+            label = "تاريخ مراجعة النفوس",
             value = state.fields["civil_registry_date"] ?: "",
-            onValueChange = { vm.setField("civil_registry_date", it) }
+            onValueChange = { vm.setField("civil_registry_date", it) },
+            minYear = 1980
         )
         AttachmentRow(label = "وثيقة من النفوس", field = "civil_registry_document", mime = "*/*", state = state, container = container, vm = vm)
     }

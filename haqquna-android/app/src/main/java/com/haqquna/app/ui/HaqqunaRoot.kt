@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.haqquna.app.AppContainer
+import com.haqquna.app.ui.about.AboutScreen
 import com.haqquna.app.ui.entries.EntriesListScreen
 import com.haqquna.app.ui.entry.EntryFormScreen
 import com.haqquna.app.ui.home.HomeScreen
@@ -23,6 +24,7 @@ object Routes {
     const val SYNC = "sync"
     const val SETTINGS = "settings"
     const val IMPORT = "import"
+    const val ABOUT = "about"
 }
 
 @Composable
@@ -43,5 +45,6 @@ fun HaqqunaRoot(container: AppContainer) {
         composable(Routes.SYNC) { SyncScreen(container, nav) }
         composable(Routes.SETTINGS) { SettingsScreen(container, nav) }
         composable(Routes.IMPORT) { ImportScreen(container, nav) }
+        composable(Routes.ABOUT) { AboutScreen(nav) }
     }
 }

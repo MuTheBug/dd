@@ -1,5 +1,6 @@
 package com.haqquna.app.ui.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,12 +18,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -46,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.haqquna.app.AppContainer
+import com.haqquna.app.R
 import com.haqquna.app.ui.HaqqunaTopBar
 import com.haqquna.app.ui.Routes
 
@@ -126,29 +132,42 @@ private fun HeroCard(nav: NavController) {
                 )
                 .padding(20.dp)
         ) {
-            Column {
-                Text(
-                    "حقنا",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    style = MaterialTheme.typography.headlineLarge
-                )
-                Text(
-                    "توثيق الحالات — يعمل بدون إنترنت ويتمزامن عند الاتصال بالشبكة",
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(Modifier.height(14.dp))
-                Button(
-                    onClick = { nav.navigate(Routes.ENTRY_NEW) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "حقنا",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold
                     )
-                ) {
-                    Icon(Icons.Default.Add, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("إضافة حالة جديدة", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "توثيق الحالات — يعمل بدون إنترنت ويتزامن عند الاتصال بالشبكة",
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Button(
+                        onClick = { nav.navigate(Routes.ENTRY_NEW) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(Icons.Default.Add, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("إضافة حالة جديدة", fontWeight = FontWeight.SemiBold)
+                    }
                 }
+                Spacer(Modifier.width(12.dp))
+                Image(
+                    painter = painterResource(id = R.drawable.logo_haqquna),
+                    contentDescription = "حقنا",
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Color.White, CircleShape),
+                    contentScale = ContentScale.Crop
+                )
             }
         }
     }
@@ -192,7 +211,8 @@ private fun homeActions(pending: Int, failed: Int): List<HomeAction> = listOf(
     HomeAction("مزامنة الحالات", "إرسال البيانات للخادم", Icons.Default.CloudUpload, Routes.SYNC, pending + failed),
     HomeAction("الحالات المحفوظة", "عرض، تعديل، حذف", Icons.Default.List, Routes.ENTRIES),
     HomeAction("استيراد JSON", "إستعادة من نسخة احتياطية", Icons.Default.FileUpload, Routes.IMPORT),
-    HomeAction("الإعدادات", "السرفر، حساب المزامنة", Icons.Default.Settings, Routes.SETTINGS)
+    HomeAction("الإعدادات", "السرفر، حساب المزامنة", Icons.Default.Settings, Routes.SETTINGS),
+    HomeAction("حول التطبيق", "المطوّر والمعلومات", Icons.Default.Info, Routes.ABOUT)
 )
 
 @Composable

@@ -220,6 +220,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans A
     <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:0.5rem">البيانات محفوظة بشكل دائم داخل المتصفح ولن تُحذف تلقائياً. تُحذف فقط يدوياً من هنا أو بمسح بيانات المتصفح.</p>
     <div style="display:flex;flex-direction:column;gap:0.5rem">
         <button class="btn btn-outline btn-block" onclick="exportLocalData()">تصدير نسخة احتياطية (JSON)</button>
+        <label class="btn btn-outline btn-block" style="cursor:pointer;text-align:center">
+            استيراد نسخة احتياطية (JSON)
+            <input type="file" accept=".json,application/json" onchange="importLocalData(this)" style="display:none">
+        </label>
         <button class="btn btn-danger btn-block" onclick="clearSyncedEntries()">حذف الحالات المتزامنة فقط</button>
     </div>
 </div>
@@ -2351,6 +2355,181 @@ async function exportLocalData() {
     a.click();
     URL.revokeObjectURL(url);
     showToast('تم التصدير', 'success');
+}
+
+// ===================== Import Local Data =====================
+async function importLocalData(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+
+    // Validate file type
+    if (!file.name.endsWith('.json')) {
+        showToast('الملف يجب أن يكون بصيغة JSON', 'error');
+        diagAdd('استيراد مرفوض: الملف ليس JSON — ' + file.name, 'error');
+        return;
+    }
+
+    // Validate file size (max 200MB)
+    if (file.size > 200 * 1024 * 1024) {
+        showToast('الملف كبير جداً (الحد الأقصى 200MB)', 'error');
+        diagAdd('استيراد مرفوض: حجم الملف ' + Math.round(file.size/1024/1024) + 'MB', 'error');
+        return;
+    }
+
+    diagAdd('بدء استيراد من: ' + file.name + ' (' + Math.round(file.size/1024) + 'KB)', 'info');
+
+    // Read file
+    let text;
+    try {
+        text = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('فشل قراءة الملف'));
+            reader.readAsText(file);
+        });
+    } catch (e) {
+        showToast('فشل قراءة الملف: ' + e.message, 'error');
+        diagAdd('فشل قراءة ملف الاستيراد: ' + e.message, 'error');
+        return;
+    }
+
+    // Parse JSON
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch (e) {
+        showToast('الملف ليس JSON صالحاً.\n\nالحل: تأكد أنك اخترت ملف النسخة الاحتياطية الصحيح (ينتهي بـ .json)', 'error', 10000);
+        diagAdd('فشل تحليل JSON: ' + e.message, 'error');
+        return;
+    }
+
+    // Validate structure
+    if (!Array.isArray(data)) {
+        showToast('صيغة الملف غير صحيحة — يجب أن يحتوي على مصفوفة حالات.\n\nالحل: استخدم ملف تم تصديره من "تصدير نسخة احتياطية"', 'error', 10000);
+        diagAdd('صيغة الاستيراد خاطئة: ليست مصفوفة', 'error');
+        return;
+    }
+
+    if (data.length === 0) {
+        showToast('الملف لا يحتوي على حالات', 'info');
+        return;
+    }
+
+    // Validate entries and collect errors
+    const errors = [];
+    const valid = [];
+    const existingEntries = await dbGetAll('entries');
+    const existingUuids = new Set(existingEntries.map(e => e.client_uuid));
+
+    for (let i = 0; i < data.length; i++) {
+        const entry = data[i];
+        const label = entry.display_name || ('حالة #' + (i + 1));
+
+        // Must have client_uuid
+        if (!entry.client_uuid) {
+            errors.push({ index: i, name: label, error: 'missing_uuid', msg: 'معرّف الحالة (client_uuid) مفقود' });
+            continue;
+        }
+
+        // Must have fields object
+        if (!entry.fields || typeof entry.fields !== 'object') {
+            errors.push({ index: i, name: label, error: 'missing_fields', msg: 'بيانات الحقول (fields) مفقودة' });
+            continue;
+        }
+
+        // Must have basic name fields
+        if (!entry.fields.first_name && !entry.fields.last_name) {
+            errors.push({ index: i, name: label, error: 'missing_name', msg: 'الاسم الأول واسم العائلة مفقودان' });
+            continue;
+        }
+
+        // Check for duplicates
+        if (existingUuids.has(entry.client_uuid)) {
+            errors.push({ index: i, name: label, error: 'duplicate', msg: 'موجودة مسبقاً (نفس المعرّف)' });
+            continue;
+        }
+
+        // Build clean entry
+        const clean = {
+            client_uuid: entry.client_uuid,
+            fields: entry.fields,
+            files: entry.files || {},
+            status: entry.status || 'pending',
+            server_id: entry.server_id || null,
+            created_at: entry.created_at || new Date().toISOString(),
+            display_name: entry.display_name || [entry.fields.first_name, entry.fields.father_name, entry.fields.last_name].filter(Boolean).join(' ')
+        };
+        valid.push(clean);
+    }
+
+    // Show summary and ask for confirmation
+    let confirmMsg = 'استيراد ' + data.length + ' حالة من الملف:\n\n';
+    confirmMsg += '• صالحة للاستيراد: ' + valid.length + '\n';
+    if (errors.length > 0) {
+        const dupes = errors.filter(e => e.error === 'duplicate').length;
+        const invalid = errors.length - dupes;
+        if (dupes > 0) confirmMsg += '• موجودة مسبقاً (ستُتخطّى): ' + dupes + '\n';
+        if (invalid > 0) confirmMsg += '• غير صالحة (ستُتخطّى): ' + invalid + '\n';
+    }
+
+    if (valid.length === 0) {
+        let errMsg = 'لا توجد حالات صالحة للاستيراد.\n\n';
+        if (errors.every(e => e.error === 'duplicate')) {
+            errMsg += 'جميع الحالات موجودة مسبقاً في هذا الجهاز.';
+        } else {
+            errMsg += 'الأخطاء:\n';
+            errors.slice(0, 5).forEach(e => { errMsg += '• ' + e.name + ': ' + e.msg + '\n'; });
+            if (errors.length > 5) errMsg += '... و ' + (errors.length - 5) + ' أخطاء أخرى';
+        }
+        showToast(errMsg, 'error', 12000);
+        diagAdd('استيراد فاشل: 0 صالحة من ' + data.length, 'error');
+        return;
+    }
+
+    confirmMsg += '\nمتابعة الاستيراد؟';
+    if (!confirm(confirmMsg)) return;
+
+    // Import valid entries
+    let imported = 0, failed = 0;
+    for (const entry of valid) {
+        try {
+            await dbPut('entries', entry);
+            imported++;
+        } catch (e) {
+            failed++;
+            diagAdd('فشل استيراد "' + entry.display_name + '": ' + e.message, 'error');
+        }
+    }
+
+    // Report results
+    updateStats();
+    updateBadge();
+
+    let resultMsg = 'تم استيراد ' + imported + ' حالة بنجاح';
+    if (failed > 0) resultMsg += '\nفشل استيراد ' + failed + ' حالة';
+    if (errors.length > 0) {
+        const dupes = errors.filter(e => e.error === 'duplicate').length;
+        if (dupes > 0) resultMsg += '\nتم تخطي ' + dupes + ' حالة موجودة مسبقاً';
+    }
+
+    showToast(resultMsg, failed > 0 ? 'error' : 'success', 8000);
+    diagAdd('اكتمل الاستيراد: ' + imported + ' نجحت، ' + failed + ' فشلت، ' + errors.length + ' تُخطّيت', imported > 0 ? 'ok' : 'error');
+
+    // Show detailed error log if there were issues
+    if (errors.length > 0) {
+        const logEl = document.getElementById('syncLog');
+        if (logEl) {
+            logEl.innerHTML = '<div style="font-weight:700;margin-bottom:0.3rem">تفاصيل الاستيراد:</div>';
+            errors.forEach(e => {
+                const color = e.error === 'duplicate' ? 'var(--warning)' : 'var(--danger)';
+                logEl.innerHTML += '<div style="color:' + color + '">⊘ ' + e.name + ': ' + e.msg + '</div>';
+            });
+            valid.forEach(v => {
+                logEl.innerHTML += '<div style="color:var(--success)">✓ ' + v.display_name + '</div>';
+            });
+        }
+    }
 }
 
 // ===================== Clear Synced Entries =====================

@@ -1,0 +1,165 @@
+package com.haqquna.app.ui.entry.steps
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.haqquna.app.AppContainer
+import com.haqquna.app.ui.DropdownRow
+import com.haqquna.app.ui.SectionCard
+import com.haqquna.app.ui.TextFieldRow
+import com.haqquna.app.ui.entry.EntryFormViewModel
+import com.haqquna.app.ui.entry.FormState
+
+@Composable
+fun PersonalStep(vm: EntryFormViewModel, state: FormState, container: AppContainer) {
+
+    SectionCard(title = "الاسم", icon = Icons.Default.Person) {
+        TextFieldRow(
+            label = "الاسم الأول",
+            value = state.fields["first_name"] ?: "",
+            onValueChange = { vm.setField("first_name", it) },
+            required = true
+        )
+        TextFieldRow(
+            label = "اسم الأب",
+            value = state.fields["father_name"] ?: "",
+            onValueChange = { vm.setField("father_name", it) }
+        )
+        TextFieldRow(
+            label = "اسم العائلة",
+            value = state.fields["last_name"] ?: "",
+            onValueChange = { vm.setField("last_name", it) },
+            required = true
+        )
+        TextFieldRow(
+            label = "اسم الأم الكامل",
+            value = state.fields["mother_name"] ?: "",
+            onValueChange = { vm.setField("mother_name", it) }
+        )
+    }
+
+    SectionCard(title = "الجنس وتاريخ الميلاد") {
+        DropdownRow(
+            label = "الجنس",
+            value = state.fields["gender"] ?: "",
+            options = listOf(
+                "male" to "ذكر",
+                "female" to "أنثى"
+            ),
+            onChange = { vm.setField("gender", it) },
+            required = true
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            TextFieldRow(
+                label = "اليوم",
+                value = state.fields["birth_day"] ?: "",
+                onValueChange = { vm.setField("birth_day", it.filter { c -> c.isDigit() }.take(2)) },
+                keyboardType = KeyboardType.Number
+            )
+            TextFieldRow(
+                label = "الشهر",
+                value = state.fields["birth_month"] ?: "",
+                onValueChange = { vm.setField("birth_month", it.filter { c -> c.isDigit() }.take(2)) },
+                keyboardType = KeyboardType.Number
+            )
+            TextFieldRow(
+                label = "السنة",
+                value = state.fields["birth_year"] ?: "",
+                onValueChange = { vm.setField("birth_year", it.filter { c -> c.isDigit() }.take(4)) },
+                keyboardType = KeyboardType.Number
+            )
+        }
+    }
+
+    SectionCard(title = "الهوية والمحافظة") {
+        DropdownRow(
+            label = "المحافظة",
+            value = state.fields["province"] ?: "",
+            options = SyrianProvinces,
+            onChange = { vm.setField("province", it) },
+            required = true
+        )
+        TextFieldRow(
+            label = "الرقم الوطني",
+            value = state.fields["national_id"] ?: "",
+            onValueChange = { vm.setField("national_id", it.filter { c -> c.isDigit() }.take(11)) },
+            keyboardType = KeyboardType.Number,
+            required = true
+        )
+        TextFieldRow(
+            label = "رقم دفتر العائلة",
+            value = state.fields["family_book_number"] ?: "",
+            onValueChange = { vm.setField("family_book_number", it) }
+        )
+        TextFieldRow(
+            label = "رقم الهاتف",
+            value = state.fields["phone"] ?: "",
+            onValueChange = { vm.setField("phone", it) },
+            keyboardType = KeyboardType.Phone
+        )
+        DropdownRow(
+            label = "زمرة الدم",
+            value = state.fields["blood_type"] ?: "",
+            options = listOf(
+                "" to "—",
+                "A+" to "A+", "A-" to "A-",
+                "B+" to "B+", "B-" to "B-",
+                "AB+" to "AB+", "AB-" to "AB-",
+                "O+" to "O+", "O-" to "O-"
+            ),
+            onChange = { vm.setField("blood_type", it) }
+        )
+    }
+
+    SectionCard(title = "الصور والوثائق") {
+        AttachmentRow(
+            label = "صورة شخصية",
+            field = "photo",
+            mime = "image/*",
+            state = state,
+            container = container,
+            vm = vm
+        )
+        Spacer(Modifier.height(6.dp))
+        AttachmentRow(
+            label = "وثيقة هوية (PDF أو صورة)",
+            field = "document",
+            mime = "*/*",
+            state = state,
+            container = container,
+            vm = vm
+        )
+    }
+}
+
+private val SyrianProvinces = listOf(
+    "" to "اختر...",
+    "damascus" to "دمشق",
+    "rural_damascus" to "ريف دمشق",
+    "aleppo" to "حلب",
+    "homs" to "حمص",
+    "hama" to "حماة",
+    "latakia" to "اللاذقية",
+    "tartous" to "طرطوس",
+    "idlib" to "إدلب",
+    "deir_ezzor" to "دير الزور",
+    "raqqa" to "الرقة",
+    "hasakah" to "الحسكة",
+    "qamishli" to "القامشلي",
+    "daraa" to "درعا",
+    "sweida" to "السويداء",
+    "quneitra" to "القنيطرة"
+)

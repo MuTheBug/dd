@@ -122,12 +122,25 @@ class EntryFormViewModel(app: Application) : AndroidViewModel(app) {
         fun req(key: String, label: String, step: Int) {
             if (f[key].isNullOrBlank()) errors += ValidationError(step, key, label)
         }
+        // Step 0 — Reporter & Classification
+        req("status", "تصنيف الحالة", 0)
+        req("reporter_name", "اسم المُبلِّغ", 0)
+        req("reporter_relation", "صلة المُبلِّغ", 0)
+        req("source_type", "نوع المصدر", 0)
+        // Step 1 — Personal
         req("first_name", "الاسم الأول", 1)
+        req("father_name", "اسم الأب", 1)
         req("last_name", "اسم العائلة", 1)
-        req("national_id", "الرقم الوطني", 1)
-        req("province", "المحافظة", 1)
+        req("mother_name", "اسم الأم", 1)
         req("gender", "الجنس", 1)
-        req("status", "حالة الشخص", 0)
+        req("province", "المحافظة", 1)
+        req("national_id", "الرقم الوطني", 1)
+        // Step 2 — Arrest / Status details
+        req("arrest_authority", "الجهة المعتقِلة", 2)
+        req("arrest_reason", "سبب الاعتقال", 2)
+        // Step 5 — Address & Housing
+        req("address", "العنوان الحالي", 5)
+        req("housing_type", "نوع السكن", 5)
         return errors
     }
 

@@ -4,11 +4,9 @@ import com.google.gson.annotations.SerializedName
 import java.util.UUID
 
 enum class CaseStatus(val key: String, val arabic: String) {
-    ARRESTED("arrested", "معتقل"),
-    MISSING("missing", "مفقود"),
-    SURVIVOR("survivor", "ناجٍ"),
-    DEAD("dead", "متوفى"),
-    FOUND("found", "موجود");
+    SURVIVOR("survivor", "ناجٍ (شخص أُفرج عنه / هرب)"),
+    ENFORCED("enforced", "مغيّب قسراً (لا يُعرف مصيره)"),
+    DECEASED("deceased", "متوفى (مؤكد الوفاة)");
 
     companion object {
         fun fromKey(k: String?) = values().firstOrNull { it.key == k }

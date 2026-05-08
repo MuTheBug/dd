@@ -33,10 +33,11 @@ fun PersonalStep(vm: EntryFormViewModel, state: FormState, container: AppContain
         TextFieldRow(
             label = "اسم الأب",
             value = state.fields["father_name"] ?: "",
-            onValueChange = { vm.setField("father_name", it) }
+            onValueChange = { vm.setField("father_name", it) },
+            required = true
         )
         TextFieldRow(
-            label = "اسم العائلة",
+            label = "الكنية (اسم العائلة)",
             value = state.fields["last_name"] ?: "",
             onValueChange = { vm.setField("last_name", it) },
             required = true
@@ -44,7 +45,8 @@ fun PersonalStep(vm: EntryFormViewModel, state: FormState, container: AppContain
         TextFieldRow(
             label = "اسم الأم الكامل",
             value = state.fields["mother_name"] ?: "",
-            onValueChange = { vm.setField("mother_name", it) }
+            onValueChange = { vm.setField("mother_name", it) },
+            required = true
         )
     }
 
@@ -53,6 +55,7 @@ fun PersonalStep(vm: EntryFormViewModel, state: FormState, container: AppContain
             label = "الجنس",
             value = state.fields["gender"] ?: "",
             options = listOf(
+                "" to "-- اختر --",
                 "male" to "ذكر",
                 "female" to "أنثى"
             ),
@@ -114,7 +117,7 @@ fun PersonalStep(vm: EntryFormViewModel, state: FormState, container: AppContain
             label = "زمرة الدم",
             value = state.fields["blood_type"] ?: "",
             options = listOf(
-                "" to "—",
+                "" to "-- اختر --",
                 "A+" to "A+", "A-" to "A-",
                 "B+" to "B+", "B-" to "B-",
                 "AB+" to "AB+", "AB-" to "AB-",
@@ -146,20 +149,20 @@ fun PersonalStep(vm: EntryFormViewModel, state: FormState, container: AppContain
 }
 
 private val SyrianProvinces = listOf(
-    "" to "اختر...",
-    "damascus" to "دمشق",
-    "rural_damascus" to "ريف دمشق",
-    "aleppo" to "حلب",
-    "homs" to "حمص",
-    "hama" to "حماة",
-    "latakia" to "اللاذقية",
-    "tartous" to "طرطوس",
-    "idlib" to "إدلب",
-    "deir_ezzor" to "دير الزور",
-    "raqqa" to "الرقة",
-    "hasakah" to "الحسكة",
-    "qamishli" to "القامشلي",
-    "daraa" to "درعا",
-    "sweida" to "السويداء",
-    "quneitra" to "القنيطرة"
+    "" to "-- اختر المحافظة --",
+    "اللاذقية" to "اللاذقية",
+    "دمشق" to "دمشق",
+    "ريف دمشق" to "ريف دمشق",
+    "حلب" to "حلب",
+    "حمص" to "حمص",
+    "حماة" to "حماة",
+    "إدلب" to "إدلب",
+    "درعا" to "درعا",
+    "السويداء" to "السويداء",
+    "القنيطرة" to "القنيطرة",
+    "الرقة" to "الرقة",
+    "دير الزور" to "دير الزور",
+    "الحسكة" to "الحسكة",
+    "طرطوس" to "طرطوس",
+    "أخرى" to "أخرى"
 )

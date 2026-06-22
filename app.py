@@ -496,6 +496,56 @@ REPORTER_RELATIONS = [
     'صديق', 'جار', 'زميل', 'الشخص نفسه', 'أخرى'
 ]
 
+# Torture and abuse methods documented in Syrian detention facilities
+TORTURE_METHODS = [
+    'الدولاب (الكاوتشوك)',
+    'الصعق الكهربائي',
+    'الشبح (التعليق من اليدين)',
+    'بساط الريح (الطي للخلف)',
+    'الفلقة (ضرب القدمين)',
+    'الكرسي الألماني (ثني الظهر)',
+    'الضرب بالكابلات والعصي',
+    'الضرب على الرأس',
+    'الضرب المبرح على الجسم',
+    'الخنق / الكتم',
+    'الإيهام بالغرق',
+    'الحرق بالسجائر',
+    'الحرق بأدوات ساخنة',
+    'خلع الأظافر',
+    'كسر العظام',
+    'الاغتصاب والعنف الجنسي',
+    'التحرش الجنسي',
+    'التهديد باغتصاب الأقارب',
+    'التجويع وحرمان الطعام',
+    'حرمان الماء',
+    'حرمان النوم',
+    'الحبس الانفرادي المطوّل',
+    'الاكتظاظ الشديد في الزنزانة',
+    'التعرض للبرد الشديد',
+    'التعرض للحر الشديد',
+    'الإجبار على أوضاع مُجهدة لساعات',
+    'التهديد بالقتل',
+    'التهديد بإيذاء العائلة',
+    'إجبار المعتقل على مشاهدة تعذيب آخرين',
+    'الإذلال والإهانة النفسية',
+    'تشغيل أصوات عالية / موسيقى مستمرة',
+    'حرمان من العلاج الطبي',
+    'حرمان من التواصل مع العائلة',
+    'الإخفاء عن العائلة (إنكار الاحتجاز)',
+    'الإعدام الوهمي',
+    'نزع الملابس بالقوة',
+    'أخرى'
+]
+
+TORTURE_CONTEXTS = [
+    ('during_arrest', 'أثناء الاعتقال'),
+    ('during_interrogation', 'أثناء التحقيق'),
+    ('during_detention', 'أثناء الاحتجاز'),
+    ('during_transfer', 'أثناء النقل بين المعتقلات'),
+    ('before_release', 'قبل الإفراج'),
+    ('other', 'أخرى'),
+]
+
 # Arrest authority normalization: keyword-based grouping
 # Maps a canonical name to keywords that identify it
 AUTHORITY_GROUPS = {
@@ -754,6 +804,15 @@ def migrate_db():
         'methodology_type': "TEXT DEFAULT ''",
         # Offline form sync: client-generated UUID for idempotent dedup
         'client_uuid': "TEXT DEFAULT ''",
+        # Torture and abuse documentation
+        'torture_methods': "TEXT DEFAULT ''",
+        'other_torture_methods': "TEXT DEFAULT ''",
+        'torture_context': "TEXT DEFAULT ''",
+        'torture_duration': "TEXT DEFAULT ''",
+        'torture_description': "TEXT DEFAULT ''",
+        'torture_witnessed_others': "TEXT DEFAULT ''",
+        'torture_resulted_injury': "TEXT DEFAULT ''",
+        'torture_injuries': "TEXT DEFAULT ''",
     }
 
     for col, typedef in new_columns.items():
@@ -1476,6 +1535,8 @@ def inject_constants():
         'ADDRESS_AREAS': ADDRESS_AREAS,
         'ADDRESS_TO_AREA': ADDRESS_TO_AREA,
         'CHRONIC_DISEASES': CHRONIC_DISEASES,
+        'TORTURE_METHODS': TORTURE_METHODS,
+        'TORTURE_CONTEXTS': TORTURE_CONTEXTS,
         'REPORTER_RELATIONS': REPORTER_RELATIONS,
         'PDF_COLUMNS': PDF_COLUMNS,
         'DEFAULT_PDF_COLS': DEFAULT_PDF_COLS,
@@ -4232,6 +4293,8 @@ FIELD_TOOLTIPS = {
     'survivor_cv': 'ملف السيرة الذاتية للناجي (ملف مرفق).\nصيغ مقبولة: صور، PDF، Word',
     'survivor_cv_text': 'نص السيرة الذاتية أو ملخص قصة الناجي مكتوباً.',
     'survivor_cv_photo': 'صورة إضافية مرفقة بسيرة الناجي.',
+    # --- التعذيب ---
+    'torture_context': 'متى تعرض الشخص للتعذيب.\nأثناء الاعتقال، التحقيق، الاحتجاز، النقل بين المعتقلات، أو قبل الإفراج.',
     # --- التحقق والقفل ---
     'record_status': 'حالة السجل في سير عمل بروتوكول بيركلي:\nمسودة: سجل جديد لم يُراجع بعد\nمراجَع: تمت مراجعته من قبل شخص آخر\nموثّق: تم التحقق من المعلومات من مصادر مستقلة\nمقفل: السجل نهائي ولا يمكن تعديله',
     # --- الشهود ---

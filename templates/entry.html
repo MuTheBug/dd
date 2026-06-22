@@ -497,6 +497,58 @@
         </div>
     </div>
 
+    <!-- Torture & Abuse Methods -->
+    <div class="entry-section">
+        <div class="entry-section-title">&#x26A0;&#xFE0F; أساليب التعذيب والانتهاكات</div>
+        <div class="entry-section-desc">اختر أساليب التعذيب التي تعرّض لها المعتقل (إن توفرت معلومات). يمكن اختيار أكثر من أسلوب.</div>
+        <div class="form-grid">
+            <div class="form-group full-width">
+                <label>أساليب التعذيب (اختر ما ينطبق)</label>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:0.3rem; padding:0.4rem 0;">
+                    {% for method in TORTURE_METHODS %}
+                    <label class="checkbox-label" style="font-size:0.88rem;">
+                        <input type="checkbox" name="torture_methods" value="{{ method }}"> {{ method }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <input type="text" name="other_torture_methods" placeholder="أساليب أخرى غير مذكورة..." style="margin-top:0.4rem;">
+            </div>
+            <div class="form-group">
+                <label>سياق التعذيب {{ tip('torture_context') }}</label>
+                <select name="torture_context">
+                    <option value="">-- اختر --</option>
+                    {% for code, label in TORTURE_CONTEXTS %}
+                    <option value="{{ code }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>مدة التعرض للتعذيب</label>
+                <input type="text" name="torture_duration" placeholder="مثال: طوال فترة الاحتجاز، أول شهرين...">
+            </div>
+            <div class="form-group full-width">
+                <label>وصف تفصيلي للتعذيب</label>
+                <textarea name="torture_description" rows="3" placeholder="تفاصيل إضافية عن أساليب التعذيب والانتهاكات..."></textarea>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="torture_witnessed_others" value="1">
+                    شاهد تعذيب معتقلين آخرين
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="torture_resulted_injury" value="1">
+                    أدى التعذيب إلى إصابات جسدية دائمة
+                </label>
+            </div>
+            <div class="form-group">
+                <label>الإصابات الناتجة (إن وُجدت)</label>
+                <input type="text" name="torture_injuries" placeholder="مثال: كسور، ندوب، فقدان سمع...">
+            </div>
+        </div>
+    </div>
+
     <!-- Companions Section -->
     <div class="entry-section">
         <div class="entry-section-title">&#x1F465; أشخاص كانوا معه (مرافقون)</div>
